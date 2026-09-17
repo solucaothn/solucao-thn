@@ -1,7 +1,7 @@
 <!-- reflex managed begin (do not edit inside this block; add custom content outside the markers) -->
 # Agents
 
-This project uses the **Reflex agent skills** � up-to-date knowledge for building full-stack Python web apps with [Reflex](https://reflex.dev). Install them first, then use them as described below.
+This project uses the **Reflex agent skills** � up-to-date knowledge for building full-stack Python web apps with [Reflex](https://reflex.dev). Install them first, then use them as described below.
 
 ## Installing the Skills
 
@@ -28,19 +28,19 @@ Or clone https://github.com/reflex-dev/agent-skills and copy the `skills/` folde
 
 ### Verifying
 
-Before writing or editing any Reflex code, confirm these three skills are available: `reflex-docs`, `setup-python-env`, and `reflex-process-management`. If they are not, STOP and run the install step above � do not proceed without them.
+Before writing or editing any Reflex code, confirm these three skills are available: `reflex-docs`, `setup-python-env`, and `reflex-process-management`. If they are not, STOP and run the install step above � do not proceed without them.
 
 ## Using the Skills
 
 ### Reflex documentation
 
-For anything about Reflex APIs � components, state management, events, styling, database, routing, authentication � use the **reflex-docs** skill rather than relying on memory. It carries current, version-accurate docs.
+For anything about Reflex APIs � components, state management, events, styling, database, routing, authentication � use the **reflex-docs** skill rather than relying on memory. It carries current, version-accurate docs.
 
 ### Initializing a new Reflex project
 
 When starting a new Reflex project or setting up a development environment, you **must** follow the **setup-python-env** skill before doing anything else.
 
-Do not skip any steps. Do not assume a virtual environment or Reflex is already available � always verify first by following the skill's instructions in order.
+Do not skip any steps. Do not assume a virtual environment or Reflex is already available � always verify first by following the skill's instructions in order.
 
 After the environment is ready and Reflex is installed, run:
 
@@ -54,3 +54,31 @@ Then proceed with the user's request.
 
 When you need to compile, run, reload, or debug a Reflex application, follow the **reflex-process-management** skill for the correct sequence and error investigation steps.
 <!-- reflex managed end -->
+
+## Documentação
+
+Antes de realizar alterações significativas, consultar os documentos de contexto do projeto (`docs/project-overview.md`, `docs/domain-model.md`) e o `openspec/config.yaml`.
+
+## Arquitetura
+
+Respeitar as tecnologias definidas no projeto (Xano como backend, Reflex como frontend). Não introduzir tecnologias alternativas sem justificativa e sem uma mudança arquitetural explicitamente aprovada.
+
+## Frontend
+
+O frontend do projeto deve ser implementado exclusivamente com Reflex. Utilize os mecanismos próprios do Reflex para componentes, estado, eventos, páginas e interação. Não introduza outra tecnologia de frontend (React, Vue, Angular, etc.) para substituir ou complementar o Reflex, salvo quando houver uma alteração arquitetural explicitamente aprovada.
+
+## Código
+
+Reutilizar código existente quando apropriado. Evitar duplicação. Não modificar funcionalidades não relacionadas à mudança atual sem justificativa.
+
+## Segurança
+
+Regras de autorização devem ser aplicadas no backend (Xano). O frontend não deve ser considerado mecanismo de segurança.
+
+## Desenvolvimento
+
+Mudanças devem utilizar OpenSpec: implementar incrementalmente, especificando mudanças relevantes antes da implementação.
+
+## Testes
+
+Mudanças funcionais devem possuir estratégia de verificação.
