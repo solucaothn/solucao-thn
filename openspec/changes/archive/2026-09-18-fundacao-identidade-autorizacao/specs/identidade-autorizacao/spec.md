@@ -67,3 +67,14 @@ O sistema SHALL aplicar regras de autorização no backend para todos os acessos
 #### Scenario: Frontend sem validação de segurança
 - **WHEN** a interface tenta contornar a regra de posse por meio de dados do cliente
 - **THEN** o backend continua rejeitando a operação porque a autorização é validada no servidor
+
+### Requirement: Persistência conveniente do token de autenticação
+O sistema SHALL poder persistir somente o token de autenticação no armazenamento do navegador para restaurar a sessão após uma atualização, sem persistir senha, perfil ou outros dados sensíveis.
+
+#### Scenario: Sessão restaurada após atualização
+- **WHEN** o navegador possui um token salvo e a página é atualizada
+- **THEN** o sistema consulta o backend com esse token e restaura a sessão somente se o backend o validar
+
+#### Scenario: Token expirado ou inválido
+- **WHEN** o navegador possui um token expirado ou inválido
+- **THEN** o backend rejeita a consulta autenticada, o sistema remove o token salvo e exibe o fluxo de login
