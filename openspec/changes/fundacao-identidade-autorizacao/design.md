@@ -17,6 +17,23 @@ A base de identidade e autorização deve ser implementada antes dos fluxos prin
 
 ## Decisions
 
+### 0. Xano como único backend de identidade
+O workspace Xano contém a tabela `user` e os endpoints `auth/signup`, `auth/login`,
+`auth/profile` (GET/PATCH). O Reflex usa somente um cliente HTTP para chamar essas
+APIs e não mantém repositório, hash de senha, validação de credenciais ou checagem
+de posse local. Os endpoints de perfil usam o usuário do token (`$auth.id`) como
+fonte do registro, portanto não aceitam um identificador de usuário fornecido pelo
+cliente para decidir autorização.
+
+### 0. Persistência de conveniência do token no navegador
+O token retornado pelo Xano é mantido em `AuthState.auth_token` usando `rx.Cookie`,
+com nome próprio, caminho global, validade de 24 horas, `Secure` e `SameSite=Lax`.
+Esse é o único dado persistido no navegador. No carregamento da página, o Reflex
+usa o token para chamar `GET /auth/profile`; o Xano continua validando o token em
+cada leitura e edição. Tokens expirados ou inválidos são descartados do cookie e
+o estado volta à tela de login. Senhas, perfil e identificadores não são
+persistidos no navegador.
+
 ### 1. Backend como fonte de verdade para autenticação e autorização
 A autenticação e a autorização serão validadas no Xano, inclusive para ações sobre o próprio perfil. Essa decisão é necessária para respeitar o princípio de segurança estabelecido no projeto e evitar que a interface seja usada como mecanismo de segurança.
 
