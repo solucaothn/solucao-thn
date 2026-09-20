@@ -19,7 +19,7 @@ class AuthState(rx.State):
     session_user_id: str = ""
     api_error: str = ""
     api_success: str = ""
-    profile: dict[str, str] = {}
+    profile: dict[str, object] = {}
 
     register_name: str = ""
     register_email: str = ""
@@ -31,6 +31,14 @@ class AuthState(rx.State):
     profile_name: str = ""
     profile_city: str = ""
     profile_state: str = ""
+    donations: list[dict[str, object]] = []
+    categories: list[dict[str, object]] = []
+    donation_id: int = 0
+    donation_title: str = ""
+    donation_description: str = ""
+    donation_category_id: str = ""
+    donation_status: str = "disponível"
+    pending_delete_id: int = 0
 
     def set_register_name(self, value: str) -> None:
         self.register_name = value
@@ -61,6 +69,22 @@ class AuthState(rx.State):
 
     def set_profile_state(self, value: str) -> None:
         self.profile_state = value
+
+    def set_donation_title(self, value: str) -> None:
+        self.donation_title = value
+
+    def set_donation_description(self, value: str) -> None:
+        self.donation_description = value
+
+    def set_donation_category_id(self, value: str) -> None:
+        self.donation_category_id = value
+
+    def set_donation_status(self, value: str) -> None:
+        self.donation_status = value
+
+    @rx.var
+    def category_names(self) -> list[str]:
+        return [str(category.get("name", "")) for category in self.categories]
 
     def _sync_profile_form(self) -> None:
         self.profile_name = self.profile.get("name", "")
@@ -116,6 +140,7 @@ class AuthState(rx.State):
         self.profile_name = ""
         self.profile_city = ""
         self.profile_state = ""
+        self.pending_delete_id = 0
 
     def load_profile(self) -> None:
         if not self.auth_token:
@@ -128,6 +153,112 @@ class AuthState(rx.State):
             self.auth_token = ""
             self.session_user_id = ""
             self.profile = {}
+            self.api_error = str(exc)
+
+    def hydrate(self) -> None:
+        self.load_profile()
+        self.load_catalog()
+
+    def load_catalog(self) -> None:
+        self.api_error = ""
+        try:
+            self.categories = XanoClient().categories()
+            self.donations = XanoClient().donations()
+        except XanoApiError as exc:
+            self.api_error = str(exc)
+
+    def clear_donation_form(self) -> None:
+        self.donation_id = 0
+        self.donation_title = ""
+        self.donation_description = ""
+        self.donation_category_id = ""
+        self.donation_status = "disponível"
+
+    def cancel_delete_confirmation(self) -> None:
+        self.pending_delete_id = 0
+
+    def edit_donation(self, donation: dict[str, object]) -> None:
+        self.donation_id = int(donation.get("id", 0))
+        self.donation_title = str(donation.get("title", ""))
+        self.donation_description = str(donation.get("description", ""))
+        category_id = str(donation.get("category_id", ""))
+        self.donation_category_id = next(
+            (
+                str(category.get("name", ""))
+                for category in self.categories
+                if str(category.get("id", "")) == category_id
+            ),
+            "",
+        )
+        self.donation_status = str(donation.get("status", "disponível"))
+
+    def save_donation(self) -> None:
+        self.api_error = ""
+        self.api_success = ""
+        if not self.auth_token:
+            self.api_error = "Faça login para cadastrar uma doação."
+            return
+        try:
+            category_id = next(
+                int(category["id"])
+                for category in self.categories
+                if str(category.get("name", "")) == self.donation_category_id
+            )
+            if self.donation_id:
+                XanoClient().update_donation(
+                    token=self.auth_token,
+                    donation_id=self.donation_id,
+                    category_id=category_id,
+                    title=self.donation_title,
+                    description=self.donation_description,
+                )
+                self.api_success = "Doação atualizada com sucesso."
+            else:
+                XanoClient().create_donation(
+                    token=self.auth_token,
+                    category_id=category_id,
+                    title=self.donation_title,
+                    description=self.donation_description,
+                )
+                self.api_success = "Doação cadastrada com sucesso."
+            self.clear_donation_form()
+            self.load_catalog()
+        except (XanoApiError, ValueError) as exc:
+            self.api_error = str(exc)
+
+    def delete_donation(self, donation_id: int) -> None:
+        self.api_error = ""
+        self.api_success = ""
+        if not self.auth_token:
+            self.api_error = "Faça login para excluir uma doação."
+            return
+        if self.pending_delete_id != donation_id:
+            self.pending_delete_id = donation_id
+            self.api_success = "Clique novamente para confirmar a exclusão."
+            return
+        try:
+            XanoClient().delete_donation(
+                token=self.auth_token, donation_id=donation_id
+            )
+            self.pending_delete_id = 0
+            self.api_success = "Doação excluída com sucesso."
+            self.load_catalog()
+        except XanoApiError as exc:
+            self.api_error = str(exc)
+
+    def change_donation_status(self, donation_id: int, status: str) -> None:
+        self.api_error = ""
+        self.api_success = ""
+        if not self.auth_token:
+            self.api_error = "Faça login para alterar o status."
+            return
+        try:
+            XanoClient().update_donation_status(
+                token=self.auth_token, donation_id=donation_id, status=status
+            )
+            self.api_success = "Status atualizado com sucesso."
+            self.load_catalog()
+        except XanoApiError as exc:
             self.api_error = str(exc)
 
     def update_profile(self) -> None:
@@ -226,6 +357,111 @@ def render_profile_form() -> rx.Component:
     )
 
 
+def render_donation_card(donation: dict[str, object]) -> rx.Component:
+    return rx.box(
+        rx.heading(donation["title"], size="4"),
+        rx.text(donation["description"]),
+        rx.text("Categoria: ", donation["category_id"]),
+        rx.text("Status: ", donation["status"]),
+        rx.hstack(
+            rx.button(
+                "Editar",
+                on_click=AuthState.edit_donation(donation),
+                variant="soft",
+            ),
+            rx.button(
+                "Excluir / confirmar",
+                on_click=AuthState.delete_donation(donation["id"]),
+                color_scheme="red",
+                variant="soft",
+            ),
+            rx.button(
+                "Marcar reservada",
+                on_click=AuthState.change_donation_status(
+                    donation["id"], "reservada"
+                ),
+                variant="soft",
+            ),
+            rx.button(
+                "Marcar concluída",
+                on_click=AuthState.change_donation_status(
+                    donation["id"], "concluída"
+                ),
+                variant="soft",
+            ),
+            spacing="2",
+        ),
+        padding="4",
+        border="1px solid #e5e7eb",
+        border_radius="md",
+        width="100%",
+    )
+
+
+def render_donation_form() -> rx.Component:
+    return rx.box(
+        rx.heading(
+            rx.cond(AuthState.donation_id == 0, "Nova doação", "Editar doação"),
+            size="5",
+        ),
+        rx.form(
+            rx.vstack(
+                rx.input(
+                    placeholder="Título do item",
+                    value=AuthState.donation_title,
+                    on_change=AuthState.set_donation_title,
+                    required=True,
+                ),
+                rx.text_area(
+                    placeholder="Descrição",
+                    value=AuthState.donation_description,
+                    on_change=AuthState.set_donation_description,
+                ),
+                rx.select(
+                    AuthState.category_names,
+                    value=AuthState.donation_category_id,
+                    on_change=AuthState.set_donation_category_id,
+                    placeholder="Selecione uma categoria",
+                    required=True,
+                ),
+                rx.hstack(
+                    rx.button("Salvar", type_="submit"),
+                    rx.button(
+                        "Cancelar",
+                        type_="button",
+                        on_click=AuthState.clear_donation_form,
+                        variant="soft",
+                    ),
+                ),
+                spacing="3",
+            ),
+            on_submit=AuthState.save_donation,
+        ),
+        padding="4",
+        border="1px solid #e5e7eb",
+        border_radius="md",
+        width="100%",
+    )
+
+
+def render_catalog() -> rx.Component:
+    return rx.vstack(
+        rx.heading("Catálogo de doações", size="6"),
+        rx.cond(
+            AuthState.session_user_id != "",
+            render_donation_form(),
+            rx.text("Faça login para cadastrar e manter suas doações."),
+        ),
+        rx.cond(
+            AuthState.donations.length() > 0,
+            rx.foreach(AuthState.donations, render_donation_card),
+            rx.text("Nenhuma doação disponível."),
+        ),
+        spacing="4",
+        width="100%",
+    )
+
+
 def index() -> rx.Component:
     return rx.container(
         rx.color_mode.button(position="top-right"),
@@ -238,10 +474,10 @@ def index() -> rx.Component:
                 rx.hstack(render_register_form(), render_login_form(), spacing="5", align="start", wrap="wrap"),
                 rx.vstack(
                     render_profile_form(),
-                    rx.text("Acesso restrito ao próprio perfil. O backend valida a propriedade do recurso."),
                     spacing="4",
                 ),
             ),
+            render_catalog(),
             spacing="5",
             justify="center",
             min_height="85vh",
@@ -252,4 +488,4 @@ def index() -> rx.Component:
 
 
 app = rx.App()
-app.add_page(index, on_load=AuthState.load_profile)
+app.add_page(index, on_load=AuthState.hydrate)

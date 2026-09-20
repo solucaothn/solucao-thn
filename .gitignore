@@ -9,3 +9,5 @@ assets/external/
 
 data/
 .aider-desk/
+
+.env
