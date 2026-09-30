@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" role="img" aria-labelledby="title">
+  <title id="title">Ilustração demonstrativa de educação</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F2C59"/>
+      <stop offset="1" stop-color="#D4AF37"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="560" rx="32" fill="url(#bg)"/>
+  <circle cx="480" cy="280" r="188" fill="#FFFFFF" opacity=".14"/>
+  <path d="M230 185c94-34 175-20 250 31v190c-75-51-156-65-250-31Zm500 0c-94-34-175-20-250 31v190c75-51 156-65 250-31Z" fill="#FFFFFF"/>
+  <path d="M480 216v190" stroke="#D4AF37" stroke-width="18"/>
+  <path d="M285 243c49-13 92-11 132 6m-132 38c49-13 92-11 132 6m126-44c40-17 83-19 132-6m-132 44c40-17 83-19 132-6" fill="none" stroke="#0F2C59" stroke-width="12" stroke-linecap="round" opacity=".65"/>
+</svg>

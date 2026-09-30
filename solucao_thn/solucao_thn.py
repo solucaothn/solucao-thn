@@ -2,6 +2,11 @@ import reflex as rx
 
 from rxconfig import config
 
+from .pages.campaign import campaign_page
+from .pages.checkout import checkout_page
+from .pages.home import home_page
+from .pages.landing import landing_page
+from .state import CampaignState
 from .xano_api import XanoApiError, XanoClient
 
 
@@ -39,6 +44,9 @@ class AuthState(rx.State):
     donation_category_id: str = ""
     donation_status: str = "disponível"
     pending_delete_id: int = 0
+    search_text: str = ""
+    search_category_name: str = ""
+    search_in_progress: bool = False
 
     def set_register_name(self, value: str) -> None:
         self.register_name = value
@@ -81,6 +89,12 @@ class AuthState(rx.State):
 
     def set_donation_status(self, value: str) -> None:
         self.donation_status = value
+
+    def set_search_text(self, value: str) -> None:
+        self.search_text = value
+
+    def set_search_category_name(self, value: str) -> None:
+        self.search_category_name = value
 
     @rx.var
     def category_names(self) -> list[str]:
@@ -159,13 +173,51 @@ class AuthState(rx.State):
         self.load_profile()
         self.load_catalog()
 
-    def load_catalog(self) -> None:
+    def _category_id_for_name(self, name: str) -> int | None:
+        if not name:
+            return None
+        for category in self.categories:
+            if str(category.get("name", "")) == name:
+                try:
+                    return int(category["id"])
+                except (KeyError, TypeError, ValueError):
+                    return None
+        return None
+
+    def load_catalog(
+        self, *, search: str = "", category_id: int | None = None
+    ) -> None:
         self.api_error = ""
         try:
             self.categories = XanoClient().categories()
-            self.donations = XanoClient().donations()
+            self.donations = XanoClient().donations(
+                search=search, category_id=category_id
+            )
         except XanoApiError as exc:
             self.api_error = str(exc)
+
+    def search_donations(self) -> None:
+        self.api_error = ""
+        self.api_success = ""
+        category_id = self._category_id_for_name(self.search_category_name)
+        if self.search_category_name and category_id is None:
+            self.api_error = "Selecione uma categoria válida para pesquisar."
+            return
+        self.search_in_progress = True
+        try:
+            self.donations = XanoClient().donations(
+                search=self.search_text,
+                category_id=category_id,
+            )
+        except XanoApiError as exc:
+            self.api_error = str(exc)
+        finally:
+            self.search_in_progress = False
+
+    def clear_search(self) -> None:
+        self.search_text = ""
+        self.search_category_name = ""
+        self.search_donations()
 
     def clear_donation_form(self) -> None:
         self.donation_id = 0
@@ -200,10 +252,19 @@ class AuthState(rx.State):
             return
         try:
             category_id = next(
-                int(category["id"])
-                for category in self.categories
-                if str(category.get("name", "")) == self.donation_category_id
+                (
+                    int(category["id"])
+                    for category in self.categories
+                    if str(category.get("name", ""))
+                    == self.donation_category_id
+                ),
+                None,
             )
+            if category_id is None:
+                self.api_error = (
+                    "Selecione uma categoria válida antes de salvar a doação."
+                )
+                return
             if self.donation_id:
                 XanoClient().update_donation(
                     token=self.auth_token,
@@ -222,7 +283,10 @@ class AuthState(rx.State):
                 )
                 self.api_success = "Doação cadastrada com sucesso."
             self.clear_donation_form()
-            self.load_catalog()
+            self.load_catalog(
+                search=self.search_text,
+                category_id=self._category_id_for_name(self.search_category_name),
+            )
         except (XanoApiError, ValueError) as exc:
             self.api_error = str(exc)
 
@@ -242,7 +306,10 @@ class AuthState(rx.State):
             )
             self.pending_delete_id = 0
             self.api_success = "Doação excluída com sucesso."
-            self.load_catalog()
+            self.load_catalog(
+                search=self.search_text,
+                category_id=self._category_id_for_name(self.search_category_name),
+            )
         except XanoApiError as exc:
             self.api_error = str(exc)
 
@@ -257,7 +324,10 @@ class AuthState(rx.State):
                 token=self.auth_token, donation_id=donation_id, status=status
             )
             self.api_success = "Status atualizado com sucesso."
-            self.load_catalog()
+            self.load_catalog(
+                search=self.search_text,
+                category_id=self._category_id_for_name(self.search_category_name),
+            )
         except XanoApiError as exc:
             self.api_error = str(exc)
 
@@ -332,6 +402,7 @@ def render_login_form() -> rx.Component:
         padding="4",
         border="1px solid #e5e7eb",
         border_radius="md",
+        id="login",
     )
 
 
@@ -444,9 +515,47 @@ def render_donation_form() -> rx.Component:
     )
 
 
+def render_search_form() -> rx.Component:
+    return rx.form(
+        rx.hstack(
+            rx.input(
+                placeholder="Buscar por título ou descrição",
+                value=AuthState.search_text,
+                on_change=AuthState.set_search_text,
+            ),
+            rx.select(
+                AuthState.category_names,
+                value=AuthState.search_category_name,
+                on_change=AuthState.set_search_category_name,
+                placeholder="Todas as categorias",
+            ),
+            rx.button(
+                rx.cond(
+                    AuthState.search_in_progress,
+                    "Buscando...",
+                    "Buscar",
+                ),
+                type_="submit",
+            ),
+            rx.button(
+                "Limpar",
+                type_="button",
+                on_click=AuthState.clear_search,
+                variant="soft",
+            ),
+            spacing="3",
+            wrap="wrap",
+            width="100%",
+        ),
+        on_submit=AuthState.search_donations,
+        width="100%",
+    )
+
+
 def render_catalog() -> rx.Component:
     return rx.vstack(
         rx.heading("Catálogo de doações", size="6"),
+        render_search_form(),
         rx.cond(
             AuthState.session_user_id != "",
             render_donation_form(),
@@ -459,15 +568,27 @@ def render_catalog() -> rx.Component:
         ),
         spacing="4",
         width="100%",
+        id="catalogo-criar-doacao",
     )
 
 
-def index() -> rx.Component:
+def app_home() -> rx.Component:
     return rx.container(
         rx.color_mode.button(position="top-right"),
         rx.vstack(
             rx.heading("DoaFácil", size="9"),
             rx.text("Fundação de identidade e autorização", size="5"),
+            rx.callout(
+                "Campanhas financeiras ainda não podem ser criadas. "
+                "Você pode entrar para cadastrar doações de itens.",
+                icon="info",
+                style={
+                    "background": "#FFFFFF",
+                    "color": "#0F2C59",
+                    "border": "1px solid #0F2C59",
+                },
+                width="100%",
+            ),
             render_status_box(),
             rx.cond(
                 AuthState.session_user_id == "",
@@ -488,4 +609,25 @@ def index() -> rx.Component:
 
 
 app = rx.App()
-app.add_page(index, on_load=AuthState.hydrate)
+app.add_page(
+    home_page,
+    route="/vaquinhas",
+    on_load=CampaignState.load_campaigns,
+)
+app.add_page(
+    campaign_page,
+    route="/vaquinhas/[campaign_id]",
+    on_load=CampaignState.load_campaign,
+)
+app.add_page(
+    checkout_page,
+    route="/checkout/[campaign_id]",
+    on_load=CampaignState.load_campaign,
+)
+app.add_page(landing_page, route="/", title="DoaFácil | Doar transforma")
+app.add_page(
+    app_home,
+    route="/app",
+    on_load=AuthState.hydrate,
+    title="DoaFácil | Minha conta",
+)
