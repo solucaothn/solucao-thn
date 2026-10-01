@@ -43,6 +43,7 @@ class XanoClient:
         group: Literal["auth", "catalog"],
         token: str | None = None,
         payload: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> Any:
         base_url = (
             self.auth_base_url if group == "auth" else self.catalog_base_url
@@ -57,6 +58,7 @@ class XanoClient:
 
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         final_url = f"{base_url}/{path.lstrip('/')}"
+        request_url = str(httpx.URL(final_url, params=params))
         logged_headers = {
             key: ("<redacted>" if key.lower() == "authorization" else value)
             for key, value in headers.items()
@@ -65,13 +67,13 @@ class XanoClient:
             "Xano request: method=%s group=%s url=%s headers=%s",
             method,
             group,
-            final_url,
+            request_url,
             logged_headers,
         )
         try:
             response = httpx.request(
                 method,
-                final_url,
+                request_url,
                 json=payload,
                 headers=headers,
                 timeout=10,
@@ -82,7 +84,7 @@ class XanoClient:
                 "headers=%s error=%s",
                 method,
                 group,
-                final_url,
+                request_url,
                 logged_headers,
                 exc,
             )
@@ -94,7 +96,7 @@ class XanoClient:
                 "status=%s body=%s",
                 method,
                 group,
-                final_url,
+                request_url,
                 logged_headers,
                 response.status_code,
                 response.text,
@@ -156,8 +158,21 @@ class XanoClient:
         result = self._request("GET", "/catalog/categories", group="catalog")
         return result if isinstance(result, list) else result.get("items", [])
 
-    def donations(self) -> list[dict[str, Any]]:
-        result = self._request("GET", "/catalog/donations", group="catalog")
+    def donations(
+        self, *, search: str = "", category_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {}
+        normalized_search = search.strip()
+        if normalized_search:
+            params["search"] = normalized_search
+        if category_id is not None:
+            params["category_id"] = category_id
+        result = self._request(
+            "GET",
+            "/catalog/donations",
+            group="catalog",
+            params=params,
+        )
         return result if isinstance(result, list) else result.get("items", [])
 
     def create_donation(

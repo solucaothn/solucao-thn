@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" role="img" aria-labelledby="title">
+  <title id="title">Ilustração demonstrativa de apoio à saúde</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F2C59"/>
+      <stop offset="1" stop-color="#D4AF37"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="560" rx="32" fill="url(#bg)"/>
+  <circle cx="480" cy="270" r="170" fill="#FFFFFF" opacity=".14"/>
+  <path d="M480 420S235 280 327 166c54-67 133-33 153 23 20-56 99-90 153-23 92 114-153 254-153 254Z" fill="#FFFFFF"/>
+  <path d="M480 340V222m-59 59h118" stroke="#D4AF37" stroke-width="28" stroke-linecap="round"/>
+</svg>

@@ -21,6 +21,6 @@
 
 ## 4. Segurança e integração
 
-- [ ] 4.1 Validar cada endpoint protegido com token válido, ausente, expirado e pertencente a outro usuário; verificar respostas de autenticação e autorização.
-- [ ] 4.2 Executar fluxo end-to-end de cadastro, edição, mudança de status, listagem e exclusão; verificar persistência e integridade no Xano.
+- [x] 4.1 Validar cada endpoint protegido com token válido, ausente, expirado e pertencente a outro usuário; verificar respostas de autenticação e autorização.
+- [x] 4.2 Executar fluxo end-to-end de cadastro, edição, mudança de status, listagem e exclusão; verificar persistência e integridade no Xano.
 - [x] 4.3 Executar build/testes do Reflex e validar que a interface usa somente endpoints do Xano para decisões de acesso.

@@ -1,14 +1,9 @@
+"""Public institutional landing page."""
+
 import reflex as rx
 
-from rxconfig import config
-
-from .pages.campaign import campaign_page
-from .pages.checkout import checkout_page
-from .pages.home import home_page
-from .pages.landing import landing_page
-from .state import CampaignState
-from .xano_api import XanoApiError, XanoClient
-
+from ..state import CampaignState
+from ..theme import BORDER, GOLD, GOLD_HOVER, MUTED, NAVY, PAGE, TEXT, WHITE
 
 PRIMARY = {
     "dark": "#0F4D3A",
@@ -36,7 +31,6 @@ DONATION_ITEMS = [
         "category": "Roupas",
         "location": "São Paulo, SP",
         "description": "Conjunto de peças em bom estado para crianças e adolescentes.",
-        "accent": "linear-gradient(135deg, #E8F7EF 0%, #86D5A8 100%)",
         "icon": "👕",
     },
     {
@@ -44,7 +38,6 @@ DONATION_ITEMS = [
         "category": "Alimentos",
         "location": "São Paulo, SP",
         "description": "Itens essenciais para compor uma cesta de apoio familiar.",
-        "accent": "linear-gradient(135deg, #FFF1D2 0%, #F4B740 100%)",
         "icon": "🥖",
     },
     {
@@ -52,7 +45,6 @@ DONATION_ITEMS = [
         "category": "Livros",
         "location": "São Paulo, SP",
         "description": "Material escolar e de leitura para apoiar estudos e aprendizagem.",
-        "accent": "linear-gradient(135deg, #FDE9D9 0%, #FFB98E 100%)",
         "icon": "📚",
     },
     {
@@ -60,7 +52,6 @@ DONATION_ITEMS = [
         "category": "Móveis",
         "location": "São Paulo, SP",
         "description": "Peça funcional para transformar um espaço de estudo ou trabalho.",
-        "accent": "linear-gradient(135deg, #EAF4FF 0%, #9BC3FF 100%)",
         "icon": "🪑",
     },
     {
@@ -68,7 +59,6 @@ DONATION_ITEMS = [
         "category": "Outros",
         "location": "São Paulo, SP",
         "description": "Brinquedos em bom estado para alegrar pequenas histórias.",
-        "accent": "linear-gradient(135deg, #F4E9FF 0%, #D7B7FF 100%)",
         "icon": "🎁",
     },
     {
@@ -76,633 +66,89 @@ DONATION_ITEMS = [
         "category": "Eletrônicos",
         "location": "São Paulo, SP",
         "description": "Equipamento útil para continuar estudos, trabalho e acesso ao futuro.",
-        "accent": "linear-gradient(135deg, #DEFAF4 0%, #68D1B0 100%)",
         "icon": "💻",
     },
 ]
 
 
-class AuthState(rx.State):
-    """UI state for a session authenticated by Xano."""
-
-    auth_token: str = rx.Cookie(
-        "",
-        name="xano_auth_token",
-        path="/",
-        max_age=86400,
-        secure=True,
-        same_site="lax",
-    )
-    session_user_id: str = ""
-    api_error: str = ""
-    api_success: str = ""
-    profile: dict[str, object] = {}
-
-    register_name: str = ""
-    register_email: str = ""
-    register_password: str = ""
-    register_city: str = ""
-    register_state: str = ""
-    login_email: str = ""
-    login_password: str = ""
-    profile_name: str = ""
-    profile_city: str = ""
-    profile_state: str = ""
-    donations: list[dict[str, object]] = []
-    categories: list[dict[str, object]] = []
-    donation_id: int = 0
-    donation_title: str = ""
-    donation_description: str = ""
-    donation_category_id: str = ""
-    donation_status: str = "disponível"
-    pending_delete_id: int = 0
-    search_text: str = ""
-    search_category_name: str = ""
-    search_in_progress: bool = False
-
-    def set_register_name(self, value: str) -> None:
-        self.register_name = value
-
-    def set_register_email(self, value: str) -> None:
-        self.register_email = value
-
-    def set_register_password(self, value: str) -> None:
-        self.register_password = value
-
-    def set_register_city(self, value: str) -> None:
-        self.register_city = value
-
-    def set_register_state(self, value: str) -> None:
-        self.register_state = value
-
-    def set_login_email(self, value: str) -> None:
-        self.login_email = value
-
-    def set_login_password(self, value: str) -> None:
-        self.login_password = value
-
-    def set_profile_name(self, value: str) -> None:
-        self.profile_name = value
-
-    def set_profile_city(self, value: str) -> None:
-        self.profile_city = value
-
-    def set_profile_state(self, value: str) -> None:
-        self.profile_state = value
-
-    def set_donation_title(self, value: str) -> None:
-        self.donation_title = value
-
-    def set_donation_description(self, value: str) -> None:
-        self.donation_description = value
-
-    def set_donation_category_id(self, value: str) -> None:
-        self.donation_category_id = value
-
-    def set_donation_status(self, value: str) -> None:
-        self.donation_status = value
-
-    def set_search_text(self, value: str) -> None:
-        self.search_text = value
-
-    def set_search_category_name(self, value: str) -> None:
-        self.search_category_name = value
-
-    @rx.var
-    def category_names(self) -> list[str]:
-        return [str(category.get("name", "")) for category in self.categories]
-
-    def _sync_profile_form(self) -> None:
-        self.profile_name = self.profile.get("name", "")
-        self.profile_city = self.profile.get("city", "")
-        self.profile_state = self.profile.get("state", "")
-
-    def register_user(self) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        try:
-            result = XanoClient().signup(
-                name=self.register_name,
-                email=self.register_email,
-                password=self.register_password,
-                city=self.register_city,
-                state=self.register_state,
-            )
-            self.auth_token = result["authToken"]
-            self.load_profile()
-            if not self.api_error:
-                self.api_success = "Cadastro realizado com sucesso."
-            self.register_name = ""
-            self.register_email = ""
-            self.register_password = ""
-            self.register_city = ""
-            self.register_state = ""
-        except (XanoApiError, KeyError) as exc:
-            self.api_error = str(exc)
-
-    def login_user(self) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        try:
-            result = XanoClient().login(
-                email=self.login_email,
-                password=self.login_password,
-            )
-            self.auth_token = result["authToken"]
-            self.load_profile()
-            if not self.api_error:
-                self.api_success = "Login realizado com sucesso."
-            self.login_email = ""
-            self.login_password = ""
-        except (XanoApiError, KeyError) as exc:
-            self.api_error = str(exc)
-
-    def logout(self) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        self.auth_token = ""
-        self.session_user_id = ""
-        self.profile = {}
-        self.profile_name = ""
-        self.profile_city = ""
-        self.profile_state = ""
-        self.pending_delete_id = 0
-
-    def load_profile(self) -> None:
-        if not self.auth_token:
-            return
-        try:
-            self.profile = XanoClient().profile(self.auth_token)
-            self.session_user_id = str(self.profile.get("id", ""))
-            self._sync_profile_form()
-        except XanoApiError as exc:
-            self.auth_token = ""
-            self.session_user_id = ""
-            self.profile = {}
-            self.api_error = str(exc)
-
-    def hydrate(self) -> None:
-        self.load_profile()
-        self.load_catalog()
-
-    def _category_id_for_name(self, name: str) -> int | None:
-        if not name:
-            return None
-        for category in self.categories:
-            if str(category.get("name", "")) == name:
-                try:
-                    return int(category["id"])
-                except (KeyError, TypeError, ValueError):
-                    return None
-        return None
-
-    def load_catalog(
-        self, *, search: str = "", category_id: int | None = None
-    ) -> None:
-        self.api_error = ""
-        try:
-            self.categories = XanoClient().categories()
-            self.donations = XanoClient().donations(
-                search=search, category_id=category_id
-            )
-        except XanoApiError as exc:
-            self.api_error = str(exc)
-
-    def search_donations(self) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        category_id = self._category_id_for_name(self.search_category_name)
-        if self.search_category_name and category_id is None:
-            self.api_error = "Selecione uma categoria válida para pesquisar."
-            return
-        self.search_in_progress = True
-        try:
-            self.donations = XanoClient().donations(
-                search=self.search_text,
-                category_id=category_id,
-            )
-        except XanoApiError as exc:
-            self.api_error = str(exc)
-        finally:
-            self.search_in_progress = False
-
-    def clear_search(self) -> None:
-        self.search_text = ""
-        self.search_category_name = ""
-        self.search_donations()
-
-    def clear_donation_form(self) -> None:
-        self.donation_id = 0
-        self.donation_title = ""
-        self.donation_description = ""
-        self.donation_category_id = ""
-        self.donation_status = "disponível"
-
-    def cancel_delete_confirmation(self) -> None:
-        self.pending_delete_id = 0
-
-    def edit_donation(self, donation: dict[str, object]) -> None:
-        self.donation_id = int(donation.get("id", 0))
-        self.donation_title = str(donation.get("title", ""))
-        self.donation_description = str(donation.get("description", ""))
-        category_id = str(donation.get("category_id", ""))
-        self.donation_category_id = next(
-            (
-                str(category.get("name", ""))
-                for category in self.categories
-                if str(category.get("id", "")) == category_id
-            ),
-            "",
-        )
-        self.donation_status = str(donation.get("status", "disponível"))
-
-    def save_donation(self) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        if not self.auth_token:
-            self.api_error = "Faça login para cadastrar uma doação."
-            return
-        try:
-            category_id = next(
-                (
-                    int(category["id"])
-                    for category in self.categories
-                    if str(category.get("name", ""))
-                    == self.donation_category_id
-                ),
-                None,
-            )
-            if category_id is None:
-                self.api_error = (
-                    "Selecione uma categoria válida antes de salvar a doação."
-                )
-                return
-            if self.donation_id:
-                XanoClient().update_donation(
-                    token=self.auth_token,
-                    donation_id=self.donation_id,
-                    category_id=category_id,
-                    title=self.donation_title,
-                    description=self.donation_description,
-                )
-                self.api_success = "Doação atualizada com sucesso."
-            else:
-                XanoClient().create_donation(
-                    token=self.auth_token,
-                    category_id=category_id,
-                    title=self.donation_title,
-                    description=self.donation_description,
-                )
-                self.api_success = "Doação cadastrada com sucesso."
-            self.clear_donation_form()
-            self.load_catalog(
-                search=self.search_text,
-                category_id=self._category_id_for_name(self.search_category_name),
-            )
-        except (XanoApiError, ValueError) as exc:
-            self.api_error = str(exc)
-
-    def delete_donation(self, donation_id: int) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        if not self.auth_token:
-            self.api_error = "Faça login para excluir uma doação."
-            return
-        if self.pending_delete_id != donation_id:
-            self.pending_delete_id = donation_id
-            self.api_success = "Clique novamente para confirmar a exclusão."
-            return
-        try:
-            XanoClient().delete_donation(
-                token=self.auth_token, donation_id=donation_id
-            )
-            self.pending_delete_id = 0
-            self.api_success = "Doação excluída com sucesso."
-            self.load_catalog(
-                search=self.search_text,
-                category_id=self._category_id_for_name(self.search_category_name),
-            )
-        except XanoApiError as exc:
-            self.api_error = str(exc)
-
-    def change_donation_status(self, donation_id: int, status: str) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        if not self.auth_token:
-            self.api_error = "Faça login para alterar o status."
-            return
-        try:
-            XanoClient().update_donation_status(
-                token=self.auth_token, donation_id=donation_id, status=status
-            )
-            self.api_success = "Status atualizado com sucesso."
-            self.load_catalog(
-                search=self.search_text,
-                category_id=self._category_id_for_name(self.search_category_name),
-            )
-        except XanoApiError as exc:
-            self.api_error = str(exc)
-
-    def update_profile(self) -> None:
-        self.api_error = ""
-        self.api_success = ""
-        if not self.auth_token:
-            self.api_error = "Faça login para atualizar o perfil."
-            return
-        try:
-            self.profile = XanoClient().update_profile(
-                token=self.auth_token,
-                name=self.profile_name,
-                city=self.profile_city,
-                state=self.profile_state,
-            )
-            self.session_user_id = str(self.profile.get("id", ""))
-            self._sync_profile_form()
-            self.api_success = "Perfil atualizado com sucesso."
-        except XanoApiError as exc:
-            self.api_error = str(exc)
-
-
-class LandingPageState(rx.State):
+class LandingState(rx.State):
     carousel_index: int = 0
 
-    def next_donation(self) -> None:
+    def next(self) -> None:
         self.carousel_index = (self.carousel_index + 1) % len(DONATION_ITEMS)
 
-    def prev_donation(self) -> None:
+    def prev(self) -> None:
         self.carousel_index = (self.carousel_index - 1) % len(DONATION_ITEMS)
 
     @rx.var
-    def featured_donations(self) -> list[dict[str, str]]:
+    def visible_cards(self) -> list[dict[str, str]]:
         return [
             DONATION_ITEMS[(self.carousel_index + offset) % len(DONATION_ITEMS)]
             for offset in range(4)
         ]
 
 
-def render_status_box() -> rx.Component:
-    return rx.box(
-        rx.cond(
-            AuthState.api_error != "",
-            rx.callout(AuthState.api_error, icon="warning", color_scheme="red", role="alert"),
-            rx.cond(
-                AuthState.api_success != "",
-                rx.callout(AuthState.api_success, icon="check", color_scheme="green"),
-                rx.text(""),
-            ),
-        ),
-        width="100%",
-    )
-
-
-def render_register_form() -> rx.Component:
-    return rx.box(
-        rx.heading("Cadastro", size="5"),
-        rx.form(
-            rx.vstack(
-                rx.input(placeholder="Nome completo", value=AuthState.register_name, on_change=AuthState.set_register_name),
-                rx.input(placeholder="E-mail", value=AuthState.register_email, on_change=AuthState.set_register_email),
-                rx.input(placeholder="Senha", type_="password", value=AuthState.register_password, on_change=AuthState.set_register_password),
-                rx.input(placeholder="Cidade", value=AuthState.register_city, on_change=AuthState.set_register_city),
-                rx.input(placeholder="Estado", value=AuthState.register_state, on_change=AuthState.set_register_state),
-                rx.button("Criar conta", type_="submit"),
-                spacing="3",
-            ),
-            on_submit=AuthState.register_user,
-        ),
-        padding="4",
-        border="1px solid #e5e7eb",
-        border_radius="md",
-    )
-
-
-def render_login_form() -> rx.Component:
-    return rx.box(
-        rx.heading("Login", size="5"),
-        rx.form(
-            rx.vstack(
-                rx.input(placeholder="E-mail", value=AuthState.login_email, on_change=AuthState.set_login_email),
-                rx.input(placeholder="Senha", type_="password", value=AuthState.login_password, on_change=AuthState.set_login_password),
-                rx.button("Entrar", type_="submit"),
-                spacing="3",
-            ),
-            on_submit=AuthState.login_user,
-        ),
-        padding="4",
-        border="1px solid #e5e7eb",
-        border_radius="md",
-        id="login",
-    )
-
-
-def render_profile_form() -> rx.Component:
-    return rx.box(
-        rx.heading("Meu perfil", size="5"),
-        rx.form(
-            rx.vstack(
-                rx.input(placeholder="Nome completo", value=AuthState.profile_name, on_change=AuthState.set_profile_name),
-                rx.input(placeholder="Cidade", value=AuthState.profile_city, on_change=AuthState.set_profile_city),
-                rx.input(placeholder="Estado", value=AuthState.profile_state, on_change=AuthState.set_profile_state),
-                rx.hstack(
-                    rx.button("Salvar alterações", type_="submit"),
-                    rx.button("Sair", on_click=AuthState.logout, variant="soft"),
-                ),
-                spacing="3",
-            ),
-            on_submit=AuthState.update_profile,
-        ),
-        padding="4",
-        border="1px solid #e5e7eb",
-        border_radius="md",
-    )
-
-
-def render_donation_card(donation: dict[str, object]) -> rx.Component:
-    return rx.box(
-        rx.heading(donation["title"], size="4"),
-        rx.text(donation["description"]),
-        rx.text("Categoria: ", donation["category_id"]),
-        rx.text("Status: ", donation["status"]),
-        rx.hstack(
-            rx.button(
-                "Editar",
-                on_click=AuthState.edit_donation(donation),
-                variant="soft",
-            ),
-            rx.button(
-                "Excluir / confirmar",
-                on_click=AuthState.delete_donation(donation["id"]),
-                color_scheme="red",
-                variant="soft",
-            ),
-            rx.button(
-                "Marcar reservada",
-                on_click=AuthState.change_donation_status(
-                    donation["id"], "reservada"
-                ),
-                variant="soft",
-            ),
-            rx.button(
-                "Marcar concluída",
-                on_click=AuthState.change_donation_status(
-                    donation["id"], "concluída"
-                ),
-                variant="soft",
-            ),
-            spacing="2",
-        ),
-        padding="4",
-        border="1px solid #e5e7eb",
-        border_radius="md",
-        width="100%",
-    )
-
-
-def render_donation_form() -> rx.Component:
-    return rx.box(
-        rx.heading(
-            rx.cond(AuthState.donation_id == 0, "Nova doação", "Editar doação"),
-            size="5",
-        ),
-        rx.form(
-            rx.vstack(
-                rx.input(
-                    placeholder="Título do item",
-                    value=AuthState.donation_title,
-                    on_change=AuthState.set_donation_title,
-                    required=True,
-                ),
-                rx.text_area(
-                    placeholder="Descrição",
-                    value=AuthState.donation_description,
-                    on_change=AuthState.set_donation_description,
-                ),
-                rx.select(
-                    AuthState.category_names,
-                    value=AuthState.donation_category_id,
-                    on_change=AuthState.set_donation_category_id,
-                    placeholder="Selecione uma categoria",
-                    required=True,
-                ),
-                rx.hstack(
-                    rx.button("Salvar", type_="submit"),
-                    rx.button(
-                        "Cancelar",
-                        type_="button",
-                        on_click=AuthState.clear_donation_form,
-                        variant="soft",
-                    ),
-                ),
-                spacing="3",
-            ),
-            on_submit=AuthState.save_donation,
-        ),
-        padding="4",
-        border="1px solid #e5e7eb",
-        border_radius="md",
-        width="100%",
-    )
-
-
-def render_search_form() -> rx.Component:
-    return rx.form(
-        rx.hstack(
-            rx.input(
-                placeholder="Buscar por título ou descrição",
-                value=AuthState.search_text,
-                on_change=AuthState.set_search_text,
-            ),
-            rx.select(
-                AuthState.category_names,
-                value=AuthState.search_category_name,
-                on_change=AuthState.set_search_category_name,
-                placeholder="Todas as categorias",
-            ),
-            rx.button(
-                rx.cond(
-                    AuthState.search_in_progress,
-                    "Buscando...",
-                    "Buscar",
-                ),
-                type_="submit",
-            ),
-            rx.button(
-                "Limpar",
-                type_="button",
-                on_click=AuthState.clear_search,
-                variant="soft",
-            ),
-            spacing="3",
-            wrap="wrap",
-            width="100%",
-        ),
-        on_submit=AuthState.search_donations,
-        width="100%",
-    )
-
-
-def render_catalog() -> rx.Component:
-    return rx.vstack(
-        rx.heading("Catálogo de doações", size="6"),
-        render_search_form(),
-        rx.cond(
-            AuthState.session_user_id != "",
-            render_donation_form(),
-            rx.text("Faça login para cadastrar e manter suas doações."),
-        ),
-        rx.cond(
-            AuthState.donations.length() > 0,
-            rx.foreach(AuthState.donations, render_donation_card),
-            rx.text("Nenhuma doação disponível."),
-        ),
-        spacing="4",
-        width="100%",
-        id="catalogo-criar-doacao",
-    )
-
-
-def render_nav_link(label: str, href: str) -> rx.Component:
-    return rx.link(
-        rx.text(label, color=PRIMARY["text"], font_size="0.95rem", font_weight="500"),
-        href=href,
-        style={"text_decoration": "none"},
-    )
-
-
-def render_home_navbar() -> rx.Component:
+def landing_header() -> rx.Component:
     return rx.box(
         rx.container(
             rx.hstack(
                 rx.link(
-                    rx.text("DoaFácil", font_size="1.75rem", font_weight="700", color=PRIMARY["dark"]),
-                    href="#top",
+                    rx.hstack(
+                        rx.box(
+                            "♥",
+                            color=PRIMARY["green"],
+                            font_size="1.8rem",
+                            font_weight="900",
+                        ),
+                        rx.text(
+                            "DoaFácil",
+                            color=PRIMARY["dark"],
+                            font_size="1.5rem",
+                            font_weight="800",
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    href="/",
                     style={"text_decoration": "none"},
                 ),
                 rx.hstack(
-                    render_nav_link("Explorar doações", "#explorar"),
-                    render_nav_link("Como funciona", "#como-funciona"),
-                    render_nav_link("Categorias", "#categorias"),
+                    rx.link("Explorar doações", href="#explorar", color=PRIMARY["text"], text_decoration="none"),
+                    rx.link("Como funciona", href="#como-funciona", color=PRIMARY["text"], text_decoration="none"),
+                    rx.link("Categorias", href="#categorias", color=PRIMARY["text"], text_decoration="none"),
                     spacing="7",
                     display=["none", "none", "flex"],
                 ),
                 rx.hstack(
                     rx.link(
-                        rx.button("Entrar", variant="ghost", color=PRIMARY["dark"], bg="transparent", border="1px solid rgba(18,53,42,0.12)", border_radius="999px", px="4", py="2"),
-                        href="#entrar",
+                        rx.button(
+                            "Entrar",
+                            variant="ghost",
+                            color=PRIMARY["dark"],
+                            bg="transparent",
+                            border="1px solid rgba(18,53,42,0.12)",
+                            border_radius="999px",
+                            px="4",
+                            py="2",
+                        ),
+                        href="/app#login",
                     ),
-                    rx.button(
-                        "Quero doar",
-                        bg=PRIMARY["green"],
-                        color="white",
-                        border_radius="999px",
-                        px="5",
-                        py="2.5",
-                        box_shadow="0 10px 24px rgba(24,165,102,0.28)",
+                    rx.link(
+                        rx.button(
+                            "Quero doar",
+                            bg=PRIMARY["green"],
+                            color="white",
+                            border_radius="999px",
+                            px="5",
+                            py="2.5",
+                            box_shadow="0 10px 24px rgba(24,165,102,0.28)",
+                        ),
+                        href="#explorar",
                     ),
                     spacing="3",
                 ),
-                justify="between",
                 align="center",
+                justify="between",
                 width="100%",
             ),
             max_width="1200px",
@@ -711,7 +157,7 @@ def render_home_navbar() -> rx.Component:
             padding_y="4",
         ),
         width="100%",
-        background="rgba(255,255,255,0.85)",
+        background="rgba(255,255,255,0.9)",
         backdrop_filter="blur(10px)",
         border_bottom="1px solid rgba(18,53,42,0.06)",
         position="sticky",
@@ -720,13 +166,19 @@ def render_home_navbar() -> rx.Component:
     )
 
 
-def render_home_hero() -> rx.Component:
+def hero_section() -> rx.Component:
     return rx.box(
         rx.container(
             rx.hstack(
                 rx.vstack(
                     rx.box(
-                        rx.text("DOAR PODE TRANSFORMAR UM DIA", color=PRIMARY["green"], font_size="0.76rem", font_weight="700", letter_spacing="0.13em"),
+                        rx.text(
+                            "DOAR PODE TRANSFORMAR UM DIA",
+                            color=PRIMARY["green"],
+                            font_size="0.76rem",
+                            font_weight="700",
+                            letter_spacing="0.13em",
+                        ),
                         bg="rgba(24,165,102,0.08)",
                         border="1px solid rgba(24,165,102,0.14)",
                         border_radius="999px",
@@ -748,23 +200,29 @@ def render_home_hero() -> rx.Component:
                         max_width="560px",
                     ),
                     rx.hstack(
-                        rx.button(
-                            "Quero doar",
-                            bg=PRIMARY["green"],
-                            color="white",
-                            border_radius="999px",
-                            px="6",
-                            py="3",
-                            box_shadow="0 16px 30px rgba(24,165,102,0.24)",
+                        rx.link(
+                            rx.button(
+                                "Quero doar",
+                                bg=PRIMARY["green"],
+                                color="white",
+                                border_radius="999px",
+                                px="6",
+                                py="3",
+                                box_shadow="0 16px 30px rgba(24,165,102,0.24)",
+                            ),
+                            href="#explorar",
                         ),
-                        rx.button(
-                            "Encontrar uma doação",
-                            bg="white",
-                            color=PRIMARY["dark"],
-                            border="1px solid rgba(18,53,42,0.1)",
-                            border_radius="999px",
-                            px="6",
-                            py="3",
+                        rx.link(
+                            rx.button(
+                                "Encontrar uma doação",
+                                bg="white",
+                                color=PRIMARY["dark"],
+                                border="1px solid rgba(18,53,42,0.1)",
+                                border_radius="999px",
+                                px="6",
+                                py="3",
+                            ),
+                            href="#explorar",
                         ),
                         spacing="4",
                         wrap="wrap",
@@ -916,7 +374,7 @@ def render_home_hero() -> rx.Component:
     )
 
 
-def render_search_section() -> rx.Component:
+def search_section() -> rx.Component:
     return rx.box(
         rx.container(
             rx.box(
@@ -981,10 +439,11 @@ def render_search_section() -> rx.Component:
         background="white",
         margin_top="-26px",
         padding_bottom="8",
+        id="explorar",
     )
 
 
-def render_impact_stats() -> rx.Component:
+def impact_stats() -> rx.Component:
     return rx.box(
         rx.container(
             rx.hstack(
@@ -1029,7 +488,7 @@ def render_impact_stats() -> rx.Component:
     )
 
 
-def render_category_section() -> rx.Component:
+def category_section() -> rx.Component:
     cards = []
     for item in CATEGORY_ITEMS:
         cards.append(
@@ -1078,12 +537,7 @@ def render_category_section() -> rx.Component:
                     font_size="1.05rem",
                     text_align="center",
                 ),
-                rx.grid(
-                    *cards,
-                    columns="3",
-                    spacing="4",
-                    width="100%",
-                ),
+                rx.grid(*cards, columns="3", spacing="4", width="100%"),
                 spacing="6",
                 width="100%",
             ),
@@ -1094,27 +548,11 @@ def render_category_section() -> rx.Component:
         ),
         width="100%",
         background="white",
+        id="categorias",
     )
 
 
-class DonationCarouselState(rx.State):
-    index: int = 0
-
-    def next(self) -> None:
-        self.index = (self.index + 1) % len(DONATION_ITEMS)
-
-    def prev(self) -> None:
-        self.index = (self.index - 1) % len(DONATION_ITEMS)
-
-    @rx.var
-    def visible_cards(self) -> list[dict[str, str]]:
-        return [
-            DONATION_ITEMS[(self.index + offset) % len(DONATION_ITEMS)]
-            for offset in range(4)
-        ]
-
-
-def render_featured_donations_carousel() -> rx.Component:
+def featured_section() -> rx.Component:
     return rx.box(
         rx.container(
             rx.vstack(
@@ -1132,7 +570,7 @@ def render_featured_donations_carousel() -> rx.Component:
                     rx.hstack(
                         rx.button(
                             "←",
-                            on_click=DonationCarouselState.prev,
+                            on_click=LandingState.prev,
                             bg="white",
                             color=PRIMARY["dark"],
                             border="1px solid rgba(18,53,42,0.08)",
@@ -1142,7 +580,7 @@ def render_featured_donations_carousel() -> rx.Component:
                         ),
                         rx.button(
                             "→",
-                            on_click=DonationCarouselState.next,
+                            on_click=LandingState.next,
                             bg=PRIMARY["green"],
                             color="white",
                             border_radius="999px",
@@ -1157,7 +595,7 @@ def render_featured_donations_carousel() -> rx.Component:
                 ),
                 rx.grid(
                     rx.foreach(
-                        DonationCarouselState.visible_cards,
+                        LandingState.visible_cards,
                         lambda item: rx.box(
                             rx.box(
                                 rx.box(
@@ -1208,7 +646,7 @@ def render_featured_donations_carousel() -> rx.Component:
                             width="10px",
                             height="10px",
                             border_radius="999px",
-                            bg=rx.cond(DonationCarouselState.index == idx, PRIMARY["green"], "rgba(18,53,42,0.18)"),
+                            bg=rx.cond(LandingState.carousel_index == idx, PRIMARY["green"], "rgba(18,53,42,0.18)"),
                             transition="all 0.2s ease",
                         ),
                     ),
@@ -1229,7 +667,7 @@ def render_featured_donations_carousel() -> rx.Component:
     )
 
 
-def render_how_it_works() -> rx.Component:
+def how_it_works() -> rx.Component:
     return rx.box(
         rx.container(
             rx.vstack(
@@ -1279,10 +717,11 @@ def render_how_it_works() -> rx.Component:
         ),
         width="100%",
         background="white",
+        id="como-funciona",
     )
 
 
-def render_security_section() -> rx.Component:
+def trust_section() -> rx.Component:
     return rx.box(
         rx.container(
             rx.vstack(
@@ -1348,7 +787,7 @@ def render_security_section() -> rx.Component:
     )
 
 
-def render_impact_story() -> rx.Component:
+def impact_story() -> rx.Component:
     return rx.box(
         rx.container(
             rx.hstack(
@@ -1420,7 +859,7 @@ def render_impact_story() -> rx.Component:
                         spacing="4",
                     ),
                     rx.box(
-                        rx.text("”,", color=PRIMARY["green"], font_size="4rem", font_weight="700"),
+                        rx.text("”", color=PRIMARY["green"], font_size="4rem", font_weight="700"),
                         position="absolute",
                         top="-10px",
                         right="36px",
@@ -1452,7 +891,7 @@ def render_impact_story() -> rx.Component:
     )
 
 
-def render_emotional_cta() -> rx.Component:
+def emotional_cta() -> rx.Component:
     return rx.box(
         rx.container(
             rx.box(
@@ -1494,7 +933,7 @@ def render_emotional_cta() -> rx.Component:
     )
 
 
-def render_final_cta() -> rx.Component:
+def final_cta() -> rx.Component:
     return rx.box(
         rx.container(
             rx.box(
@@ -1535,7 +974,7 @@ def render_final_cta() -> rx.Component:
     )
 
 
-def render_footer() -> rx.Component:
+def institutional_footer() -> rx.Component:
     return rx.box(
         rx.container(
             rx.grid(
@@ -1570,7 +1009,7 @@ def render_footer() -> rx.Component:
                     rx.text("Comunidade", color="white", font_weight="700"),
                     rx.text("Explorar doações", color="rgba(255,255,255,0.7)"),
                     rx.text("Quero doar", color="rgba(255,255,255,0.7)"),
-                    rx.text("Entrar", color="rgba(255,255,255,0.7)"),
+                    rx.link("Entrar", href="/app#login", style={"color": "rgba(255,255,255,0.7)", "text_decoration": "none"}),
                     spacing="3",
                     align="start",
                 ),
@@ -1588,51 +1027,23 @@ def render_footer() -> rx.Component:
     )
 
 
-def index() -> rx.Component:
-    return rx.box(
-        rx.color_mode.button(position="top-right"),
-        rx.vstack(
-            render_home_navbar(),
-            render_home_hero(),
-            render_search_section(),
-            render_impact_stats(),
-            render_category_section(),
-            render_featured_donations_carousel(),
-            render_how_it_works(),
-            render_security_section(),
-            render_impact_story(),
-            render_emotional_cta(),
-            render_final_cta(),
-            render_footer(),
-            width="100%",
-            spacing="0",
-            background=PRIMARY["background"],
-            color=PRIMARY["text"],
-        ),
+def landing_page() -> rx.Component:
+    return rx.vstack(
+        landing_header(),
+        hero_section(),
+        search_section(),
+        impact_stats(),
+        category_section(),
+        featured_section(),
+        how_it_works(),
+        trust_section(),
+        impact_story(),
+        emotional_cta(),
+        final_cta(),
+        institutional_footer(),
         width="100%",
+        min_height="100vh",
+        background=PRIMARY["background"],
+        color=PRIMARY["text"],
+        spacing="0",
     )
-
-
-app = rx.App()
-app.add_page(
-    home_page,
-    route="/vaquinhas",
-    on_load=CampaignState.load_campaigns,
-)
-app.add_page(
-    campaign_page,
-    route="/vaquinhas/[campaign_id]",
-    on_load=CampaignState.load_campaign,
-)
-app.add_page(
-    checkout_page,
-    route="/checkout/[campaign_id]",
-    on_load=CampaignState.load_campaign,
-)
-app.add_page(landing_page, route="/", title="DoaFácil | Doar transforma")
-app.add_page(
-    app_home,
-    route="/app",
-    on_load=AuthState.hydrate,
-    title="DoaFácil | Minha conta",
-)

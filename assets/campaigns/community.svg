@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" role="img" aria-labelledby="title">
+  <title id="title">Ilustração demonstrativa de comunidade</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F2C59"/>
+      <stop offset="1" stop-color="#D4AF37"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="560" rx="32" fill="url(#bg)"/>
+  <circle cx="480" cy="280" r="188" fill="#FFFFFF" opacity=".14"/>
+  <path d="M260 292h440c-14 113-91 174-220 174s-206-61-220-174Z" fill="#FFFFFF"/>
+  <path d="M282 270c33-57 75-84 127-81 31-56 105-56 142 0 52-3 94 24 127 81Z" fill="#D4AF37"/>
+  <path d="M220 259h520" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+  <path d="M370 195c-28-44-10-87 30-97m70 92c-12-45 14-80 57-82m41 96c7-39 41-57 78-47" fill="none" stroke="#FFFFFF" stroke-width="15" stroke-linecap="round"/>
+</svg>
