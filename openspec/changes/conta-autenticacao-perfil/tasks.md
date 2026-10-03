@@ -18,4 +18,4 @@
 
 ## 4. Revisão de integração
 
-- [ ] 4.1 Executar `xano workspace push -d ./xano --dry-run` e revisar que o plano contém somente as alterações previstas, sem realizar o push.
+- [x] 4.1 Executar `xano workspace push -d ./xano --dry-run` e revisar que o plano contém somente as alterações previstas, sem realizar o push.
