@@ -43,3 +43,12 @@ Trabalhe em branches, sem alterar a `main` diretamente.
 Nunca use `git push --force` sem autorização explícita.
 Idioma
 Escreva documentação, artefatos do OpenSpec e comentários relevantes em português brasileiro. Nomes de variáveis e de arquivos de código seguem o padrão já usado no projeto.
+## Frontend
+
+O frontend do projeto deve ser implementado exclusivamente com Reflex.
+
+Utilize os mecanismos próprios do Reflex para componentes, estado, eventos, páginas e interação.
+
+Não introduza outra tecnologia de frontend para substituir ou complementar o Reflex, salvo quando houver uma alteração arquitetural explicitamente aprovada.
+
+Use o ambiente virtual `.venv` com `pip`; não misture `uv` e `pip`. Ao instalar uma nova biblioteca, atualize o `requirements.txt` junto com a mudança correspondente.
