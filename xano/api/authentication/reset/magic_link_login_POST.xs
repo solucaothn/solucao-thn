@@ -82,11 +82,6 @@ query "reset/magic-link-login" verb=POST {
       input = {
         user_id : $user.id
         action  : "login_for_password_reset"
-        metadata: {
-        user_id   : $user1.id
-        email     : $user1.email
-        created_at: $user1.created_at
-      }
       }
     } as $event_log
   }

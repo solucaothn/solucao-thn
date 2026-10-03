@@ -13,7 +13,7 @@
 
 ## 3. Privacidade dos eventos
 
-- [ ] 3.1 Remover metadados livres da função de gravação e atualizar todos os chamadores identificados; manter a coluna histórica e verificar que novos eventos preservam ator, ação e data sem metadados pessoais.
+- [x] 3.1 Remover metadados livres da função de gravação e atualizar todos os chamadores identificados; manter a coluna histórica e verificar que novos eventos preservam ator, ação e data sem metadados pessoais.
 - [ ] 3.2 Validar os arquivos XanoScript alterados com o Xano Developer MCP e executar os cenários de cadastro, login, sessão, recuperação de senha e boas-vindas em ambiente de teste; inspecionar os novos registros para confirmar ausência de metadados e preservar a resposta do endpoint de histórico.
 
 ## 4. Revisão de integração

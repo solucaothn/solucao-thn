@@ -49,11 +49,6 @@ query "auth/signup" verb=POST {
       input = {
         user_id : $user.id
         action  : "signup"
-        metadata: {
-        user_id   : $user.id
-        email     : $user.email
-        created_at: $user.created_at
-      }
       }
     } as $event_log
   }
