@@ -19,7 +19,6 @@ query "auth/me" verb=GET {
       input = {
         user_id : $user.id
         action  : "get_auth_user"
-        metadata: $user
       }
     } as $event_log
   }

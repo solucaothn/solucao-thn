@@ -42,7 +42,6 @@ query "message/send_welcome_email" verb=POST {
       input = {
         user_id : $input.user_id
         action  : "welcome_email_sent"
-        metadata: {}
       }
     } as $event_log
   }
