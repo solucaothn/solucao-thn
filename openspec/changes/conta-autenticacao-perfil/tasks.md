@@ -2,8 +2,8 @@
 
 ## 1. Sincronização e inventário do Xano
 
-- [ ] 1.1 Executar `xano workspace pull -d ./xano` e revisar as diferenças locais com as alterações do workspace compartilhado; concluir apenas após reconciliar os arquivos afetados sem descartar trabalho existente.
-- [ ] 1.2 Inventariar todas as chamadas do logger e gravações diretas em `event_log` após a sincronização; verificar que cadastro, login, sessão, recuperação de senha e boas-vindas estão cobertos.
+- [x] 1.1 Executar `xano workspace pull -d ./xano` e revisar as diferenças locais com as alterações do workspace compartilhado; concluir apenas após reconciliar os arquivos afetados sem descartar trabalho existente.
+- [x] 1.2 Inventariar todas as chamadas do logger e gravações diretas em `event_log` após a sincronização; verificar que cadastro, login, sessão, recuperação de senha e boas-vindas estão cobertos.
 
 ## 2. Contratos de conta
 
