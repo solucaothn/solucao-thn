@@ -91,6 +91,8 @@ O DoaFácil **não é**:
 | Especificação | OpenSpec | Organizar o desenvolvimento em mudanças planejadas, especificações e tarefas |
 | Versionamento | Git + GitHub | Histórico, branches, colaboração e recuperação de versões |
 
+Reflex será utilizado como tecnologia exclusiva para implementação do frontend da aplicação.
+
 O frontend consome as APIs do backend. As regras de negócio e a persistência ficam no Xano.
 
 ## 9. Princípios de desenvolvimento
