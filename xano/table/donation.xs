@@ -10,6 +10,10 @@ table donation {
     int category_id
     text title filters=trim|min:1
     text description? filters=trim
+    image? photo
+    enum? condition {
+      values = ["Ótimo", "Bom", "Regular"]
+    }
     enum status? {
       values = ["disponível", "reservada", "concluída"]
     }
