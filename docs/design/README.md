@@ -29,9 +29,21 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
   - **Desapego em grupo**: doar vários itens de uma vez. **Fora do MVP**; exibir como "Em breve" ou omitir.
 - Barra de busca: campo de texto "Buscar doações", filtro **Categoria**, filtro **Localização** e botão **Buscar**.
 
+### 03-secao-institucional-e-rodape.png — Seção institucional e rodapé
+
+**Fora da change `home-publica-doacoes-recentes`. Será uma change própria.**
+
+- Título "Doar no DoaFácil é simples e seguro." e frase de apoio.
+- Quatro cartões com imagem, ícone, categoria, título e link "Saiba mais": Solidariedade, Segurança, Nossa missão e Passo a passo.
+- Desejo do grupo: o carrossel de cartões poderá ter vídeos no futuro. Usar vídeos incorporados de um link (por exemplo, YouTube), sem versionar arquivos de vídeo no Git. Na primeira versão, imagens.
+- Os destinos dos "Saiba mais" não existem ainda.
+- Rodapé em fundo escuro, com logotipo, "Fale conosco" e colunas de links rápidos.
+
+A confirmar com o grupo antes de implementar (vieram da referência do Vakinha e podem não se aplicar): selo de segurança, CNPJ e cidade, horário de atendimento, "Busca por recibo", "Verificação de links" e o cartão "Conheça histórias de quem doou e quem recebeu".
+
 ## Telas ainda sem desenho
 
-Login e cadastro, catálogo (Explorar Doações), detalhe da doação, formulário de cadastro da doação, Como funciona, Categorias, rodapé do site.
+Login e cadastro, catálogo (Explorar Doações), detalhe da doação, formulário de cadastro da doação, Como funciona, Categorias.
 
 ## Referência de estrutura (Vakinha)
 
@@ -63,3 +75,5 @@ Aproveitar a ideia de:
 ![Tela inicial](01-home.png)
 
 ![Comece por aqui](02-comece-aqui.png)
+
+![Seção institucional e rodapé](03-secao-institucional-e-rodape.png)
