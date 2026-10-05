@@ -204,12 +204,27 @@ class HomeState(rx.State):
 
 def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
     return rx.box(
-        rx.image(
-            src=donation["photo"],
-            alt=donation["title"],
-            width="100%",
-            height="250px",
-            object_fit="cover",
+        rx.cond(
+            donation["photo"] == GENERIC_DONATION_IMAGE,
+            rx.image(
+                src=donation["photo"],
+                alt=donation["title"],
+                position="absolute",
+                top="4%",
+                left="16%",
+                width="68%",
+                height="68%",
+                object_fit="contain",
+            ),
+            rx.image(
+                src=donation["photo"],
+                alt=donation["title"],
+                position="absolute",
+                inset="0",
+                width="100%",
+                height="100%",
+                object_fit="cover",
+            ),
         ),
         rx.cond(
             donation["is_new"],
@@ -218,21 +233,26 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
                 position="absolute",
                 top="12px",
                 left="12px",
-                color_scheme="green",
+                background="#C62828",
+                color="white",
             ),
             rx.fragment(),
         ),
-        rx.vstack(
-            rx.heading(
-                donation["title"],
-                size="4",
-                color="white",
-                no_of_lines=2,
-            ),
-            rx.text(
-                donation["condition_label"],
-                color="white",
-                font_size="0.9rem",
+        rx.hstack(
+            rx.vstack(
+                rx.heading(
+                    donation["title"],
+                    size="4",
+                    color="white",
+                    no_of_lines=2,
+                ),
+                rx.text(
+                    donation["condition_label"],
+                    color="white",
+                    font_size="0.9rem",
+                ),
+                align="start",
+                spacing="1",
             ),
             rx.button(
                 "Acessar",
@@ -240,19 +260,28 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
                 variant="solid",
                 size="2",
                 cursor="default",
+                flex_shrink="0",
             ),
-            align="start",
-            spacing="2",
+            align="end",
+            justify="between",
             position="absolute",
             bottom="0",
+            left="0",
             width="100%",
             padding="16px",
-            background="linear-gradient(transparent, rgba(0, 0, 0, 0.78))",
+            min_height="48%",
+            background=(
+                "linear-gradient(180deg, transparent 0%, "
+                "rgba(0, 0, 0, 0.78) 55%)"
+            ),
         ),
         position="relative",
         overflow="hidden",
         border_radius="16px",
         min_width="0",
+        width="100%",
+        aspect_ratio="1 / 1",
+        background="#FFF6E8",
         box_shadow="0 4px 16px rgba(39, 39, 39, 0.12)",
     )
 
@@ -279,12 +308,10 @@ def donation_count_view() -> rx.Component:
             font_weight="600",
             color="#333333",
         ),
-        align="center",
+        align="start",
         spacing="1",
-        padding="20px",
-        background="white",
-        border_radius="16px",
-        box_shadow="0 4px 16px rgba(39, 39, 39, 0.08)",
+        width={"initial": "100%", "lg": "150px"},
+        flex_shrink="0",
     )
 
 
@@ -319,6 +346,8 @@ def recent_donations_view() -> rx.Component:
         align="stretch",
         spacing="5",
         width="100%",
+        flex="1",
+        min_width="0",
     )
 
 
@@ -335,9 +364,24 @@ def index() -> rx.Component:
                 ),
                 rx.spacer(),
                 rx.hstack(
-                    rx.link("Explorar Doações", href="#", color="#333333"),
-                    rx.link("Como funciona", href="#", color="#333333"),
-                    rx.link("Categorias", href="#", color="#333333"),
+                    rx.link(
+                        "Explorar Doações",
+                        href="#",
+                        color="#168447",
+                        font_weight="700",
+                    ),
+                    rx.link(
+                        "Como funciona",
+                        href="#",
+                        color="#168447",
+                        font_weight="700",
+                    ),
+                    rx.link(
+                        "Categorias",
+                        href="#",
+                        color="#168447",
+                        font_weight="700",
+                    ),
                     spacing="5",
                     display={"initial": "none", "lg": "flex"},
                 ),
@@ -346,12 +390,14 @@ def index() -> rx.Component:
                     rx.button(
                         "Entrar",
                         variant="outline",
-                        color_scheme="green",
+                        color="#168447",
+                        border_color="#168447",
                         size="3",
                     ),
                     rx.button(
                         "Quero Doar",
-                        color_scheme="green",
+                        background="#168447",
+                        color="white",
                         size="3",
                     ),
                     spacing="3",
@@ -363,32 +409,35 @@ def index() -> rx.Component:
                 padding="12px 24px",
             ),
             width="100%",
-            background="white",
-            box_shadow="0 2px 12px rgba(39, 39, 39, 0.06)",
+            background="#FFF6E8",
         ),
         rx.vstack(
             rx.vstack(
                 rx.heading(
                     "Doar é fácil.",
                     " No DoaFácil, o que sobra em você vira recomeço para alguém.",
-                    size={"initial": "7", "md": "8"},
+                    size={"initial": "7", "md": "9"},
                     color="#333333",
                     text_align="center",
-                    max_width="850px",
+                    font_weight="700",
+                    max_width="1120px",
                     line_height="1.2",
                 ),
-                donation_count_view(),
                 align="center",
-                spacing="6",
+                justify="center",
                 width="100%",
                 padding_top={"initial": "48px", "md": "72px"},
                 padding_bottom={"initial": "44px", "md": "64px"},
             ),
-            rx.box(
+            rx.hstack(
+                donation_count_view(),
                 recent_donations_view(),
+                align="center",
+                spacing={"initial": "6", "lg": "8"},
                 width="100%",
-                max_width="1200px",
+                max_width="1280px",
                 padding_x="24px",
+                flex_direction={"initial": "column", "lg": "row"},
             ),
             # TODO: adicionar a ilustração de pessoas quando o recurso aprovado estiver disponível.
             align="center",
