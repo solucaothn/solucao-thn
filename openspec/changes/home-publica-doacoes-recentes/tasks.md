@@ -10,11 +10,11 @@
 
 ## 2. Home pública no Reflex
 
-- [ ] 2.1 Disponibilizar no projeto os recursos visuais aprovados necessários à home — logotipo, ilustração do rodapé e imagem genérica — e extrair cores e fontes do Figma; verificar que os arquivos locais existem e não se usa a captura de tela inteira como interface.
-- [ ] 2.2 Integrar a página Reflex aos endpoints públicos de recentes e contagem; verificar estados de carregamento e falha independentes, sem converter falhas em zero ou lista vazia.
-- [ ] 2.3 Implementar cabeçalho, frase de destaque, contagem, seção de cartões e ilustração no rodapé conforme o README de design; verificar presença dos elementos e ausência de “Pessoas alcançadas”.
-- [ ] 2.4 Implementar cartões com etiqueta “NOVO” baseada em `created_at` nos últimos sete dias, fallback de imagem, texto “Condição não informada” e botão “Acessar” sem navegação; adicionar verificações para itens com e sem dados opcionais e para os limites temporais da etiqueta.
-- [ ] 2.5 Implementar e verificar o estado vazio da seção quando não há doações recentes, mantendo visíveis os demais elementos da home.
+- [x] 2.1 Usar `assets/logo.svg` e `assets/doacao-generica.svg`, conferir a paleta disponível nos recursos e nas referências PNG e não reproduzir a captura inteira; como a ilustração de pessoas não chegou, omiti-la sem substituto e deixar TODO no código. Registrar que o Figma respondeu 403 e que a escolha exata de fontes fica pendente de acesso.
+- [x] 2.2 Integrar a página Reflex aos endpoints públicos de recentes e contagem; verificar estados de carregamento e falha independentes, sem converter falhas em zero ou lista vazia.
+- [x] 2.3 Implementar cabeçalho, frase de destaque, contagem e seção de cartões conforme o README de design; verificar presença dos elementos, ausência de “Pessoas alcançadas” e ausência da seção institucional/rodapé escuro.
+- [x] 2.4 Implementar cartões com etiqueta “NOVO” baseada em `created_at` nos últimos sete dias, fallback de imagem, texto “Condição não informada” e botão “Acessar” sem navegação; adicionar verificações para itens com e sem dados opcionais e para os limites temporais da etiqueta.
+- [x] 2.5 Implementar e verificar o estado vazio da seção quando não há doações recentes, mantendo visíveis os demais elementos da home.
 
 ## 3. Verificação integrada
 
