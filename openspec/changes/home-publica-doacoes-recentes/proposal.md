@@ -8,7 +8,7 @@ A home pública do DoaFácil ainda não existe no frontend, e os contratos locai
 
 - Adicionar à doação os campos opcionais de foto e condição, com os valores Ótimo, Bom e Regular.
 - Disponibilizar um endpoint público para listar as quatro doações disponíveis mais recentes, com os dados necessários aos cartões da home, e um endpoint público para contar todas as doações disponíveis.
-- Implementar a home no Reflex com cabeçalho, frase de destaque, contagem, cartões recentes com etiqueta NOVO para doações criadas nos últimos sete dias e ilustração no rodapé.
+- Implementar a home no Reflex com cabeçalho, frase de destaque, contagem e cartões recentes com etiqueta NOVO para doações criadas nos últimos sete dias; a ilustração aprovada será exibida quando estiver disponível.
 - Exibir imagem genérica quando a doação não tiver foto e “Condição não informada” quando não houver condição.
 - Manter o botão “Acessar” visível, sem navegação nesta change.
 - Excluir do MVP “Pessoas alcançadas”; a busca, Explorar Doações, detalhe, formulário, “Comece por aqui”, login/cadastro no frontend e administração permanecem fora do escopo.
@@ -27,5 +27,5 @@ Nenhuma. O projeto ainda não possui specs consolidadas.
 ## Impact
 
 - Xano: tabela `donation` e endpoints do catálogo para foto, condição, listagem pública limitada às quatro doações disponíveis mais recentes e contagem de doações disponíveis.
-- Reflex: página inicial e recursos visuais locais para logotipo, imagem genérica e ilustração do rodapé, conforme referências de `docs/design/`.
+- Reflex: página inicial e recursos visuais locais para logotipo e imagem genérica, conforme referências de `docs/design/`. Se a ilustração aprovada do rodapé ainda não estiver disponível, omiti-la sem substituto e manter um TODO.
 - Compatibilidade: foto e condição permanecem opcionais; doações existentes sem esses dados continuam listáveis.

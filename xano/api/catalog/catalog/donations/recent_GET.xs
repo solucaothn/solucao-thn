@@ -52,4 +52,5 @@ query "catalog/donations/recent" verb=GET {
   }
 
   response = $cards
+  guid = "ivxNAT4qZ1P5zI4-5fYtvWX_CYE"
 }

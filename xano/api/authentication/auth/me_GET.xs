@@ -16,10 +16,7 @@ query "auth/me" verb=GET {
   
     // Create an event log for get user record
     function.run "Quick Start/log_event" {
-      input = {
-        user_id : $user.id
-        action  : "get_auth_user"
-      }
+      input = {user_id: $user.id, action: "get_auth_user"}
     } as $event_log
   }
 

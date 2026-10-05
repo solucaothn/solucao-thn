@@ -46,10 +46,7 @@ query "auth/signup" verb=POST {
   
     // Create an event log for signup
     function.run "Quick Start/log_event" {
-      input = {
-        user_id : $user.id
-        action  : "signup"
-      }
+      input = {user_id: $user.id, action: "signup"}
     } as $event_log
   }
 

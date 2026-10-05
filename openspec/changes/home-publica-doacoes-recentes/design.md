@@ -4,7 +4,7 @@
 
 Ver a motivação e o escopo em `proposal.md` e os contratos observáveis em `specs/public-donation-discovery/spec.md` e `specs/public-home/spec.md`.
 
-O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui a tabela `donation`, com status, título, categoria e datas, além de uma listagem de catálogo ordenada por criação que aceita busca e categoria. Essa listagem não seleciona apenas doações disponíveis, não tem limite e não retorna foto ou condição. O schema e os contratos locais não possuem foto nem condição. O diretório `assets/` contém apenas o favicon; as imagens de referência estão em `docs/design/`, e o README indica extrair cores e fontes do Figma.
+O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui a tabela `donation`, com status, título, categoria e datas, além de uma listagem de catálogo ordenada por criação que aceita busca e categoria. Essa listagem não seleciona apenas doações disponíveis, não tem limite e não retorna foto ou condição. Essa change adiciona os campos e contratos necessários. `assets/` contém o logotipo e a imagem genérica; a ilustração de pessoas não foi entregue.
 
 ## Goals / Non-Goals
 
@@ -33,6 +33,7 @@ O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui
 4. **Usar um único critério de status para cards e estatística.** “Em circulação” significa status `disponível`, conforme os status já existentes no schema local. Doações reservadas e concluídas não entram nem na lista nem na contagem. Isso evita que o número mostrado pareça incompatível com os itens que a home oferece.
 
 5. **Consumir ambos os endpoints pela camada de estado do Reflex.** A página carrega contagem e cards sem autenticação. Falha de uma operação não será convertida em zero ou lista vazia: cada seção comunica indisponibilidade sem fabricar conteúdo, permitindo que a outra seção continue utilizável. Lista vazia recebe estado vazio explícito.
+   A variável `XANO_API_URL` deve conter a URL base do grupo de API Catalog; a página acrescenta os caminhos dos endpoints `catalog/donations/recent` e `catalog/donations/count`. Essa configuração de endpoint é distinta de `PUBLIC_BASE_URL`, usada pelo Xano para montar URLs das fotos.
 
 6. **Derivar “NOVO” no frontend a partir de `created_at`.** Aplicar a janela de sete dias definida no design sem armazenar uma etiqueta derivada no Xano. A comparação usa o instante atual e não a data de atualização do registro.
 
@@ -40,15 +41,15 @@ O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui
 
 8. **Manter “Acessar” visível e sem destino nesta change.** Como não existe ainda tela de detalhe aprovada, o controle será apresentado sem link ou ação de navegação, evitando apontar para rota inexistente. A integração será feita quando catálogo/detalhe entrar no escopo.
 
-9. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex. Logotipo, ilustração do rodapé, placeholder genérico, cores e fontes devem vir de recursos aprovados do projeto/Figma; os PNGs de referência servem para composição visual.
+9. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex. `assets/logo.svg` e `assets/doacao-generica.svg` são os recursos disponíveis. A ilustração de pessoas ainda não chegou: omiti-la sem substituto e manter um TODO no código. Usar as cores dos recursos e as referências PNG enquanto o Figma não puder ser consultado; não introduzir fontes externas. Nesta sessão, o Figma respondeu HTTP 403, então a escolha exata de fontes fica pendente de acesso. A seção institucional e o rodapé escuro descritos no README são outra change.
 
 ## Risks / Trade-offs
 
 - [O workspace Xano compartilhado pode divergir dos arquivos locais ou conter alterações concorrentes] → executar `xano workspace pull -d ./xano`, reconciliar as diferenças sem sobrescrever trabalho alheio e revisar `xano workspace push -d ./xano --dry-run`; não fazer push nesta change sem aprovação.
-- [A origem Xano configurada pode estar ausente ou incorreta] → documentar `PUBLIC_BASE_URL` como configuração necessária e falhar explicitamente ao montar URL de foto se ela não estiver configurada; não embutir uma origem presumida.
+- [As origens Xano configuradas podem estar ausentes ou incorretas] → documentar `PUBLIC_BASE_URL` como configuração necessária para montar URL de foto e `XANO_API_URL` como URL base do grupo Catalog; não embutir uma origem presumida.
 - [O endpoint público expõe conteúdo e imagens de doações] → retornar somente os campos aprovados para os cards, não incluir dados do doador ou identificadores pessoais e verificar que somente doações disponíveis e fotos destinadas à exibição pública são retornadas.
 - [A contagem pode mudar entre chamadas concorrentes à lista e à contagem] → tratar os endpoints como leituras independentes; não prometer consistência transacional entre duas requisições distintas.
-- [Os recursos visuais ainda não estão no diretório local de assets] → localizar/exportar os recursos aprovados do Figma durante a implementação; não substituir a home por uma captura estática nem introduzir dependência externa de imagem.
+- [A ilustração de pessoas ainda não foi fornecida e o Figma está inacessível] → omitir a ilustração sem substituto, manter o TODO, usar referências locais sem introduzir dependência externa e ajustar tipografia exata quando o acesso ao Figma for restabelecido.
 
 ## Migration Plan
 
