@@ -12,4 +12,5 @@ query "catalog/donations/count" verb=GET {
   }
 
   response = {count: $count}
+  guid = "YEXKnQBYZADVz16JATEzR0T7mPs"
 }
