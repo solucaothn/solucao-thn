@@ -2,11 +2,11 @@
 
 ## 1. Contratos públicos do Xano
 
-- [ ] 1.1 Executar `xano workspace pull -d ./xano`, revisar diferenças compartilhadas e reconciliar os arquivos do escopo sem descartar alterações locais preexistentes; verificar o estado final com `git diff`.
-- [ ] 1.2 Consultar a documentação Xano e definir com o Developer MCP a representação opcional da foto e sua URL pública; adicionar à doação foto opcional e condição opcional restrita a Ótimo, Bom ou Regular; validar que registros existentes sem esses campos continuam íntegros.
+- [x] 1.1 Executar `xano workspace pull -d ./xano`, revisar diferenças compartilhadas e reconciliar os arquivos do escopo sem descartar alterações locais preexistentes; verificar o estado final com `git diff`.
+- [x] 1.2 Consultar a documentação Xano e definir com o Developer MCP a representação opcional da foto e sua URL pública; adicionar à doação foto opcional e condição opcional restrita a Ótimo, Bom ou Regular; validar que registros existentes sem esses campos continuam íntegros.
 - [ ] 1.3 Criar endpoint público de doações recentes com até quatro registros disponíveis, ordenados por data de criação decrescente e somente com campos dos cartões; verificar chamada sem autenticação, filtro de status, ordenação, limite, campos retornados e valores ausentes.
 - [ ] 1.4 Criar endpoint público de contagem de doações disponíveis; verificar chamada sem autenticação, contagem de todos os registros disponíveis e resposta zero sem registros disponíveis.
-- [ ] 1.5 Validar com o Xano Developer MCP todos os arquivos XanoScript alterados e executar `xano workspace push -d ./xano --dry-run`; revisar que o plano contém apenas o escopo desta change e não executar push como parte dessas tasks.
+- [x] 1.5 Validar com o Xano Developer MCP todos os arquivos XanoScript alterados e executar `xano workspace push -d ./xano --dry-run`; revisar que o plano contém apenas o escopo desta change e não executar push como parte dessas tasks.
 
 ## 2. Home pública no Reflex
 

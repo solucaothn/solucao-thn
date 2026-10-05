@@ -28,22 +28,24 @@ O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui
 
 2. **Criar contratos de leitura próprios para a home.** Manter a listagem existente, que já suporta busca e categoria, evita mudar comportamento do catálogo fora desta change. O novo endpoint de recentes será público, retornará somente as quatro doações disponíveis mais recentes, ordenadas por `created_at` decrescente, e incluirá apenas os dados necessários aos cards: identificador, data de criação, título, foto e condição. Foto será exposta como URL consumível pelo navegador ou valor nulo, nunca como detalhe interno do armazenamento. O endpoint de contagem será público e contará todas as doações disponíveis, independentemente do limite da listagem.
 
-3. **Usar um único critério de status para cards e estatística.** “Em circulação” significa status `disponível`, conforme os status já existentes no schema local. Doações reservadas e concluídas não entram nem na lista nem na contagem. Isso evita que o número mostrado pareça incompatível com os itens que a home oferece.
+3. **Montar URLs públicas no Xano.** Uma foto será armazenada como arquivo público no tipo nativo de imagem do Xano. O endpoint montará sua URL completa com `$env.PUBLIC_BASE_URL` e o caminho persistido, sem expor a estrutura de storage ao Reflex. `PUBLIC_BASE_URL` é uma configuração não secreta que precisa conter apenas a origem da instância Xano; ela não deve ser embutida no código nem ser confundida com a URL base do endpoint de API.
 
-4. **Consumir ambos os endpoints pela camada de estado do Reflex.** A página carrega contagem e cards sem autenticação. Falha de uma operação não será convertida em zero ou lista vazia: cada seção comunica indisponibilidade sem fabricar conteúdo, permitindo que a outra seção continue utilizável. Lista vazia recebe estado vazio explícito.
+4. **Usar um único critério de status para cards e estatística.** “Em circulação” significa status `disponível`, conforme os status já existentes no schema local. Doações reservadas e concluídas não entram nem na lista nem na contagem. Isso evita que o número mostrado pareça incompatível com os itens que a home oferece.
 
-5. **Derivar “NOVO” no frontend a partir de `created_at`.** Aplicar a janela de sete dias definida no design sem armazenar uma etiqueta derivada no Xano. A comparação usa o instante atual e não a data de atualização do registro.
+5. **Consumir ambos os endpoints pela camada de estado do Reflex.** A página carrega contagem e cards sem autenticação. Falha de uma operação não será convertida em zero ou lista vazia: cada seção comunica indisponibilidade sem fabricar conteúdo, permitindo que a outra seção continue utilizável. Lista vazia recebe estado vazio explícito.
 
-6. **Renderizar fallback local para campos opcionais.** Foto ausente usa um recurso genérico local; condição ausente mostra “Condição não informada”. A foto genérica não será armazenada como se fosse a foto real da doação.
+6. **Derivar “NOVO” no frontend a partir de `created_at`.** Aplicar a janela de sete dias definida no design sem armazenar uma etiqueta derivada no Xano. A comparação usa o instante atual e não a data de atualização do registro.
 
-7. **Manter “Acessar” visível e sem destino nesta change.** Como não existe ainda tela de detalhe aprovada, o controle será apresentado sem link ou ação de navegação, evitando apontar para rota inexistente. A integração será feita quando catálogo/detalhe entrar no escopo.
+7. **Renderizar fallback local para campos opcionais.** Foto ausente usa um recurso genérico local; condição ausente mostra “Condição não informada”. A foto genérica não será armazenada como se fosse a foto real da doação.
 
-8. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex. Logotipo, ilustração do rodapé, placeholder genérico, cores e fontes devem vir de recursos aprovados do projeto/Figma; os PNGs de referência servem para composição visual.
+8. **Manter “Acessar” visível e sem destino nesta change.** Como não existe ainda tela de detalhe aprovada, o controle será apresentado sem link ou ação de navegação, evitando apontar para rota inexistente. A integração será feita quando catálogo/detalhe entrar no escopo.
+
+9. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex. Logotipo, ilustração do rodapé, placeholder genérico, cores e fontes devem vir de recursos aprovados do projeto/Figma; os PNGs de referência servem para composição visual.
 
 ## Risks / Trade-offs
 
 - [O workspace Xano compartilhado pode divergir dos arquivos locais ou conter alterações concorrentes] → executar `xano workspace pull -d ./xano`, reconciliar as diferenças sem sobrescrever trabalho alheio e revisar `xano workspace push -d ./xano --dry-run`; não fazer push nesta change sem aprovação.
-- [O tipo e o tratamento de URLs de arquivo podem diferir da expectativa do frontend] → consultar documentação Xano e validar com o MCP antes de implementar; o contrato público retorna apenas URL apropriada para exibição ou nulo.
+- [A origem Xano configurada pode estar ausente ou incorreta] → documentar `PUBLIC_BASE_URL` como configuração necessária e falhar explicitamente ao montar URL de foto se ela não estiver configurada; não embutir uma origem presumida.
 - [O endpoint público expõe conteúdo e imagens de doações] → retornar somente os campos aprovados para os cards, não incluir dados do doador ou identificadores pessoais e verificar que somente doações disponíveis e fotos destinadas à exibição pública são retornadas.
 - [A contagem pode mudar entre chamadas concorrentes à lista e à contagem] → tratar os endpoints como leituras independentes; não prometer consistência transacional entre duas requisições distintas.
 - [Os recursos visuais ainda não estão no diretório local de assets] → localizar/exportar os recursos aprovados do Figma durante a implementação; não substituir a home por uma captura estática nem introduzir dependência externa de imagem.
