@@ -39,10 +39,7 @@ query "message/send_welcome_email" verb=POST {
   
     // Log welcome email sent for user
     function.run "Quick Start/log_event" {
-      input = {
-        user_id : $input.user_id
-        action  : "welcome_email_sent"
-      }
+      input = {user_id: $input.user_id, action: "welcome_email_sent"}
     } as $event_log
   }
 

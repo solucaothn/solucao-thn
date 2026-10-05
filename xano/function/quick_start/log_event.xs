@@ -6,7 +6,6 @@ function "Quick Start/log_event" {
   
     // A description of the action performed by the user (e.g., 'login', 'created_invoice').
     text action
-  
   }
 
   stack {
