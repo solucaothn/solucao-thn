@@ -206,6 +206,19 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
     return rx.box(
         rx.cond(
             donation["photo"] == GENERIC_DONATION_IMAGE,
+            rx.fragment(),
+            rx.image(
+                src=donation["photo"],
+                alt=donation["title"],
+                position="absolute",
+                inset="0",
+                width="100%",
+                height="100%",
+                object_fit="cover",
+            ),
+        ),
+        rx.cond(
+            donation["photo"] == GENERIC_DONATION_IMAGE,
             rx.image(
                 src=donation["photo"],
                 alt=donation["title"],
@@ -216,15 +229,7 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
                 height="68%",
                 object_fit="contain",
             ),
-            rx.image(
-                src=donation["photo"],
-                alt=donation["title"],
-                position="absolute",
-                inset="0",
-                width="100%",
-                height="100%",
-                object_fit="cover",
-            ),
+            rx.fragment(),
         ),
         rx.cond(
             donation["is_new"],
@@ -238,50 +243,58 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
             ),
             rx.fragment(),
         ),
-        rx.hstack(
-            rx.vstack(
-                rx.heading(
-                    donation["title"],
-                    size="4",
-                    color="white",
-                    no_of_lines=2,
-                ),
-                rx.text(
-                    donation["condition_label"],
-                    color="white",
-                    font_size="0.9rem",
-                ),
-                align="start",
-                spacing="1",
+        rx.vstack(
+            rx.heading(
+                donation["title"],
+                font_size="1.1rem",
+                font_weight="700",
+                color="white",
+                no_of_lines=2,
+            ),
+            rx.text(
+                donation["condition_label"],
+                color="white",
+                font_size="0.85rem",
+                white_space="normal",
+                width="100%",
+                overflow_wrap="anywhere",
             ),
             rx.button(
                 "Acessar",
                 color_scheme="green",
                 variant="solid",
-                size="2",
+                size="1",
                 cursor="default",
-                flex_shrink="0",
+                align_self="end",
             ),
-            align="end",
-            justify="between",
+            align="start",
+            spacing="2",
             position="absolute",
             bottom="0",
             left="0",
             width="100%",
             padding="16px",
             min_height="48%",
-            background=(
+            background=rx.cond(
+                donation["photo"] == GENERIC_DONATION_IMAGE,
                 "linear-gradient(180deg, transparent 0%, "
-                "rgba(0, 0, 0, 0.78) 55%)"
+                "rgba(15, 123, 62, 0.92) 55%)",
+                "linear-gradient(180deg, transparent 0%, "
+                "rgba(0, 0, 0, 0.78) 55%)",
             ),
         ),
         position="relative",
         overflow="hidden",
         border_radius="16px",
         min_width="0",
-        width="100%",
+        width="260px",
+        max_width="100%",
         aspect_ratio="1 / 1",
-        background="#FFF6E8",
+        background=rx.cond(
+            donation["photo"] == GENERIC_DONATION_IMAGE,
+            "#DDF3E5",
+            "#FFF6E8",
+        ),
         box_shadow="0 4px 16px rgba(39, 39, 39, 0.12)",
     )
 
@@ -296,7 +309,7 @@ def donation_count_view() -> rx.Component:
                 rx.text(HomeState.count_error, color="#9B2C2C"),
                 rx.text(
                     HomeState.donation_count,
-                    font_size="2rem",
+                    font_size="3rem",
                     font_weight="700",
                     color="#1EAB59",
                 ),
@@ -304,9 +317,10 @@ def donation_count_view() -> rx.Component:
         ),
         rx.text(
             "Doações em circulação",
-            font_size="1.1rem",
+            font_size="1rem",
             font_weight="600",
             color="#333333",
+            white_space="nowrap",
         ),
         align="start",
         spacing="1",
@@ -316,8 +330,27 @@ def donation_count_view() -> rx.Component:
 
 
 def recent_donations_view() -> rx.Component:
+    donation_count = HomeState.donations.length()
+    group_width = rx.cond(
+        donation_count == 0,
+        "100%",
+        rx.cond(
+            donation_count == 1,
+            "260px",
+            rx.cond(
+                donation_count == 2,
+                "536px",
+                rx.cond(donation_count == 3, "812px", "1104px"),
+            ),
+        ),
+    )
+
     return rx.vstack(
-        rx.heading("Doações mais recentes", size="6", color="#333333"),
+        rx.heading(
+            "Doações mais recentes",
+            font_size="1.5rem",
+            color="#333333",
+        ),
         rx.cond(
             HomeState.donations_loading,
             rx.text("Carregando doações recentes...", color="#555555"),
@@ -330,14 +363,12 @@ def recent_donations_view() -> rx.Component:
                         "Ainda não há doações recentes.",
                         color="#555555",
                     ),
-                    rx.grid(
+                    rx.flex(
                         rx.foreach(HomeState.donations, donation_card),
-                        columns={
-                            "initial": "1fr",
-                            "sm": "repeat(2, minmax(0, 1fr))",
-                            "lg": "repeat(4, minmax(0, 1fr))",
-                        },
-                        spacing="4",
+                        wrap="wrap",
+                        justify="center",
+                        align="start",
+                        gap="16px",
                         width="100%",
                     ),
                 ),
@@ -345,9 +376,10 @@ def recent_donations_view() -> rx.Component:
         ),
         align="stretch",
         spacing="5",
-        width="100%",
-        flex="1",
+        width=group_width,
+        max_width="100%",
         min_width="0",
+        margin_x="auto",
     )
 
 
@@ -419,18 +451,18 @@ def index() -> rx.Component:
                 rx.heading(
                     "Doar é fácil.",
                     " No DoaFácil, o que sobra em você vira recomeço para alguém.",
-                    size={"initial": "7", "md": "9"},
+                    font_size={"initial": "2rem", "md": "2.75rem"},
                     color="#333333",
                     text_align="center",
                     font_weight="700",
-                    max_width="1120px",
+                    max_width="900px",
                     line_height="1.2",
                 ),
                 align="center",
                 justify="center",
                 width="100%",
-                padding_top={"initial": "48px", "md": "72px"},
-                padding_bottom={"initial": "44px", "md": "64px"},
+                padding_top="3rem",
+                padding_bottom="2.5rem",
             ),
             rx.hstack(
                 donation_count_view(),
@@ -438,7 +470,7 @@ def index() -> rx.Component:
                 align="center",
                 spacing={"initial": "6", "lg": "8"},
                 width="100%",
-                max_width="1280px",
+                max_width="1200px",
                 padding_x="24px",
                 flex_direction={"initial": "column", "lg": "row"},
             ),
