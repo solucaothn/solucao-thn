@@ -369,20 +369,23 @@ def index() -> rx.Component:
                         href="#",
                         color="#168447",
                         font_weight="700",
+                        white_space="nowrap",
                     ),
                     rx.link(
                         "Como funciona",
                         href="#",
                         color="#168447",
                         font_weight="700",
+                        white_space="nowrap",
                     ),
                     rx.link(
                         "Categorias",
                         href="#",
                         color="#168447",
                         font_weight="700",
+                        white_space="nowrap",
                     ),
-                    spacing="5",
+                    spacing="6",
                     display={"initial": "none", "lg": "flex"},
                 ),
                 rx.spacer(),
@@ -409,7 +412,7 @@ def index() -> rx.Component:
                 padding="12px 24px",
             ),
             width="100%",
-            background="#FFF6E8",
+            background="white",
         ),
         rx.vstack(
             rx.vstack(
@@ -439,20 +442,34 @@ def index() -> rx.Component:
                 padding_x="24px",
                 flex_direction={"initial": "column", "lg": "row"},
             ),
-            # TODO: adicionar a ilustração de pessoas quando o recurso aprovado estiver disponível.
             align="center",
             spacing="7",
             width="100%",
-            min_height="calc(100vh - 96px)",
+            flex="1",
             padding_bottom="56px",
             background="#FFF6E8",
         ),
+        rx.image(
+            src="/ilustracao-rodape.png",
+            alt="Pessoas reunidas na comunidade DoaFácil",
+            width="100%",
+            height="auto",
+            display="block",
+            object_fit="contain",
+            flex_shrink="0",
+        ),
+        display="flex",
+        flex_direction="column",
         width="100%",
         min_height="100vh",
         background="#FFF6E8",
-        font_family="Arial, Helvetica, sans-serif",
+        font_family="'LINE Seed JP', Arial, sans-serif",
     )
 
 
-app = rx.App()
+app = rx.App(
+    stylesheets=[
+        "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
+    ]
+)
 app.add_page(index, on_load=HomeState.load_home_data)

@@ -7,17 +7,13 @@ Define a apresentação da página inicial pública do DoaFácil e como seus ele
 ## ADDED Requirements
 
 ### Requirement: Apresentação da home pública
-A home SHALL apresentar o cabeçalho, a frase de destaque, a estatística “Doações em circulação” e a seção “Doações mais recentes” conforme as referências do design, além da ilustração aprovada no rodapé quando o recurso estiver disponível.
+A home SHALL apresentar o cabeçalho, a frase de destaque, a estatística “Doações em circulação”, a seção “Doações mais recentes” e a ilustração aprovada no rodapé conforme as referências do design.
 
 #### Scenario: Abrir a home sem autenticação
 - **WHEN** uma pessoa acessa a página inicial sem sessão
 - **THEN** a página apresenta o logotipo, os links Explorar Doações, Como funciona e Categorias, os botões Entrar e Quero Doar, a frase de destaque, a estatística e a seção de doações recentes
 - **AND** não exibe a estatística “Pessoas alcançadas”
-- **AND** apresenta a ilustração aprovada no rodapé quando o recurso estiver disponível
-
-#### Scenario: Ilustração do rodapé ainda indisponível
-- **WHEN** o recurso aprovado da ilustração de pessoas ainda não está disponível no projeto
-- **THEN** a home omite a ilustração sem criar um substituto e o código mantém um TODO para adicioná-la quando o recurso chegar
+- **AND** apresenta a ilustração aprovada ocupando toda a largura no rodapé da página, mantendo sua proporção
 
 ### Requirement: Exibição da contagem em circulação
 A home SHALL apresentar na estatística “Doações em circulação” a quantidade retornada pelo serviço público de contagem de doações disponíveis.
