@@ -4,7 +4,7 @@
 
 Ver a motivação e o escopo em `proposal.md` e os contratos observáveis em `specs/public-donation-discovery/spec.md` e `specs/public-home/spec.md`.
 
-O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui a tabela `donation`, com status, título, categoria e datas, além de uma listagem de catálogo ordenada por criação que aceita busca e categoria. Essa listagem não seleciona apenas doações disponíveis, não tem limite e não retorna foto ou condição. Essa change adiciona os campos e contratos necessários. `assets/` contém o logotipo e a imagem genérica; a ilustração de pessoas não foi entregue.
+O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui a tabela `donation`, com status, título, categoria e datas, além de uma listagem de catálogo ordenada por criação que aceita busca e categoria. Essa listagem não seleciona apenas doações disponíveis, não tem limite e não retorna foto ou condição. Essa change adiciona os campos e contratos necessários. `assets/` contém o logotipo, a imagem genérica e a ilustração de pessoas aprovada para o rodapé.
 
 ## Goals / Non-Goals
 
@@ -41,7 +41,7 @@ O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui
 
 8. **Manter “Acessar” visível e sem destino nesta change.** Como não existe ainda tela de detalhe aprovada, o controle será apresentado sem link ou ação de navegação, evitando apontar para rota inexistente. A integração será feita quando catálogo/detalhe entrar no escopo.
 
-9. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex. `assets/logo.svg` e `assets/doacao-generica.svg` são os recursos disponíveis. A ilustração de pessoas ainda não chegou: omiti-la sem substituto e manter um TODO no código. Usar as cores dos recursos e as referências PNG enquanto o Figma não puder ser consultado; não introduzir fontes externas. Nesta sessão, o Figma respondeu HTTP 403, então a escolha exata de fontes fica pendente de acesso. A seção institucional e o rodapé escuro descritos no README são outra change.
+9. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex usando `assets/logo.svg`, `assets/doacao-generica.svg` e `assets/ilustracao-rodape.png`. A ilustração ocupa a largura do rodapé sem distorção. Usar a fonte LINE Seed JP por stylesheet do app, com Arial e sans-serif como alternativas; cores seguem os recursos e referências aprovados. A seção institucional e o rodapé escuro descritos no README são outra change.
 
 ## Risks / Trade-offs
 
@@ -49,7 +49,7 @@ O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui
 - [As origens Xano configuradas podem estar ausentes ou incorretas] → documentar `PUBLIC_BASE_URL` como configuração necessária para montar URL de foto e `XANO_API_URL` como URL base do grupo Catalog; não embutir uma origem presumida.
 - [O endpoint público expõe conteúdo e imagens de doações] → retornar somente os campos aprovados para os cards, não incluir dados do doador ou identificadores pessoais e verificar que somente doações disponíveis e fotos destinadas à exibição pública são retornadas.
 - [A contagem pode mudar entre chamadas concorrentes à lista e à contagem] → tratar os endpoints como leituras independentes; não prometer consistência transacional entre duas requisições distintas.
-- [A ilustração de pessoas ainda não foi fornecida e o Figma está inacessível] → omitir a ilustração sem substituto, manter o TODO, usar referências locais sem introduzir dependência externa e ajustar tipografia exata quando o acesso ao Figma for restabelecido.
+- [A stylesheet do Google Fonts pode falhar ou ficar indisponível] → usar Arial e sans-serif como alternativas locais, preservando a legibilidade da home.
 
 ## Migration Plan
 
