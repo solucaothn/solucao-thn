@@ -7,11 +7,12 @@ Define as seções complementares da home pública do DoaFácil, apresentando ca
 ## ADDED Requirements
 
 ### Requirement: Ordem do conteúdo complementar
-A home SHALL apresentar as seções complementares em uma ordem definida após as doações recentes.
+A home SHALL preservar a ilustração logo após as doações recentes e apresentar as seções complementares na ordem definida.
 
 #### Scenario: Percorrer as seções da home
 - **WHEN** uma pessoa percorre a home pública de cima para baixo
-- **THEN** “Comece por aqui” aparece abaixo de “Doações mais recentes”
+- **THEN** a ilustração de pessoas permanece logo abaixo de “Doações mais recentes”
+- **AND** “Comece por aqui” aparece abaixo da ilustração
 - **AND** a seção institucional aparece depois de “Comece por aqui”
 - **AND** o rodapé aparece depois da seção institucional, no final da página
 

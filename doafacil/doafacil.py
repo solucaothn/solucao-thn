@@ -306,7 +306,13 @@ def donation_count_view() -> rx.Component:
             rx.text("Carregando...", color="#555555"),
             rx.cond(
                 HomeState.count_error != "",
-                rx.text(HomeState.count_error, color="#9B2C2C"),
+                rx.text(
+                    HomeState.count_error,
+                    color="#9B2C2C",
+                    width="100%",
+                    white_space="normal",
+                    overflow_wrap="anywhere",
+                ),
                 rx.text(
                     HomeState.donation_count,
                     font_size="3rem",
@@ -324,7 +330,8 @@ def donation_count_view() -> rx.Component:
         ),
         align="start",
         spacing="1",
-        width={"initial": "100%", "lg": "150px"},
+        style={"width": rx.breakpoints(initial="100%", lg="150px")},
+        min_width="0",
         flex_shrink="0",
     )
 
@@ -356,7 +363,13 @@ def recent_donations_view() -> rx.Component:
             rx.text("Carregando doações recentes...", color="#555555"),
             rx.cond(
                 HomeState.donations_error != "",
-                rx.text(HomeState.donations_error, color="#9B2C2C"),
+                rx.text(
+                    HomeState.donations_error,
+                    color="#9B2C2C",
+                    width="100%",
+                    white_space="normal",
+                    overflow_wrap="anywhere",
+                ),
                 rx.cond(
                     HomeState.donations.length() == 0,
                     rx.text(
@@ -383,6 +396,311 @@ def recent_donations_view() -> rx.Component:
     )
 
 
+def start_here_card(
+    title: str,
+    description: str,
+    icon_name: str,
+    coming_soon: bool = False,
+) -> rx.Component:
+    return rx.vstack(
+        rx.box(
+            rx.icon(icon_name, size=28, color="white"),
+            display="flex",
+            align_items="center",
+            justify_content="center",
+            width="64px",
+            height="64px",
+            border_radius="50%",
+            background="#2DBF72",
+        ),
+        rx.heading(
+            title,
+            font_size="1.4rem",
+            font_weight="700",
+            color="#333333",
+            text_align="center",
+        ),
+        rx.text(
+            description,
+            font_size="1.1rem",
+            line_height="1.25",
+            color="#666666",
+            text_align="center",
+        ),
+        rx.badge(
+            "Em breve",
+            color="#168447",
+            background="#E3F5EA",
+            border_radius="999px",
+        )
+        if coming_soon
+        else rx.text(
+            "→",
+            font_size="2rem",
+            line_height="1",
+            color="#333333",
+            aria_hidden=True,
+        ),
+        align="center",
+        justify="between",
+        spacing="4",
+        style={
+            "width": rx.breakpoints(
+                initial="100%", md="calc((100% - 32px) / 3)"
+            )
+        },
+        min_height="280px",
+        padding="28px 24px 16px",
+        background="white",
+        border="1px solid #E3E0DA",
+        border_radius="16px",
+        box_shadow="0 3px 12px rgba(39, 39, 39, 0.08)",
+    )
+
+
+def start_here_section() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.text(
+                "COMECE POR AQUI",
+                font_size="1rem",
+                font_weight="700",
+                letter_spacing="0.08em",
+                color="#168447",
+            ),
+            rx.heading(
+                "Quer criar uma doação?",
+                font_weight="700",
+                color="#333333",
+                style={"fontSize": rx.breakpoints(initial="2rem", md="2.5rem")},
+            ),
+            rx.flex(
+                start_here_card(
+                    "Para você mesmo",
+                    "Escolha um item disponível e receba de alguém que está desapegando.",
+                    "user-round",
+                ),
+                start_here_card(
+                    "Ajude quem precisa",
+                    "Cadastre um objeto que você não usa mais e encontre quem precisa.",
+                    "hand-heart",
+                ),
+                start_here_card(
+                    "Desapego em grupo",
+                    "Para família ou uma empresa que quer doar vários itens de uma vez.",
+                    "briefcase",
+                    coming_soon=True,
+                ),
+                wrap="wrap",
+                style={
+                    "flexDirection": rx.breakpoints(
+                        initial="column", md="row"
+                    )
+                },
+                justify="center",
+                align="stretch",
+                gap="16px",
+                width="100%",
+            ),
+            align="stretch",
+            spacing="5",
+            width="100%",
+            max_width="1200px",
+            margin="0 auto",
+            padding="64px 24px 80px",
+        ),
+        width="100%",
+        background="#FFF6E8",
+    )
+
+
+def institutional_card(
+    category: str,
+    title: str,
+    icon_name: str,
+    background: str,
+) -> rx.Component:
+    return rx.vstack(
+        rx.icon(icon_name, size=30, color="white"),
+        rx.vstack(
+            rx.text(
+                category,
+                font_size="0.85rem",
+                color="#F4F4F4",
+            ),
+            rx.heading(
+                title,
+                font_size="1.15rem",
+                font_weight="700",
+                color="white",
+                line_height="1.2",
+            ),
+            rx.text(
+                "Saiba mais",
+                font_size="0.95rem",
+                font_weight="700",
+                color="white",
+                text_decoration="underline",
+            ),
+            align="start",
+            spacing="2",
+            width="100%",
+        ),
+        align="start",
+        justify="between",
+        spacing="6",
+        style={
+            "width": rx.breakpoints(
+                initial="100%",
+                sm="calc((100% - 16px) / 2)",
+                lg="calc((100% - 48px) / 4)",
+            )
+        },
+        min_height="270px",
+        padding="24px",
+        background=background,
+        border_radius="16px",
+        box_shadow="0 4px 14px rgba(20, 35, 28, 0.12)",
+    )
+
+
+def institutional_section() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.heading(
+                "Doar no DoaFácil é simples e seguro.",
+                font_weight="700",
+                color="#333333",
+                text_align="center",
+                style={"fontSize": rx.breakpoints(initial="2rem", md="2.5rem")},
+            ),
+            rx.text(
+                "Doações já circularam por aqui, conectando quem tem com quem precisa. "
+                "Transparência em cada etapa, do anúncio à entrega.",
+                font_size="1.1rem",
+                line_height="1.5",
+                color="#4A4A4A",
+                text_align="center",
+                max_width="820px",
+            ),
+            rx.flex(
+                institutional_card(
+                    "Solidariedade",
+                    "Conheça histórias de quem doou e quem recebeu",
+                    "hand-heart",
+                    "linear-gradient(145deg, #168447 0%, #333333 100%)",
+                ),
+                institutional_card(
+                    "Segurança",
+                    "Como funciona a autenticação e proteção dos seus dados",
+                    "shield-check",
+                    "linear-gradient(145deg, #333333 0%, #168447 100%)",
+                ),
+                institutional_card(
+                    "Nossa missão",
+                    "Descubra por que criamos o DoaFácil",
+                    "heart",
+                    "linear-gradient(145deg, #656B70 0%, #333333 100%)",
+                ),
+                institutional_card(
+                    "Passo a passo",
+                    "Veja como criar sua doação em poucos minutos",
+                    "circle-check",
+                    "linear-gradient(145deg, #168447 0%, #5B6262 100%)",
+                ),
+                wrap="wrap",
+                style={
+                    "flexDirection": rx.breakpoints(
+                        initial="column", sm="row"
+                    )
+                },
+                justify="center",
+                align="stretch",
+                gap="16px",
+                width="100%",
+            ),
+            align="center",
+            spacing="5",
+            width="100%",
+            max_width="1200px",
+            margin="0 auto",
+            padding="72px 24px 80px",
+        ),
+        width="100%",
+        background="#EEEDEA",
+    )
+
+
+def public_home_footer() -> rx.Component:
+    link_groups = (
+        ("Quem somos", "Doações"),
+        ("Criar doações", "Doações mais recentes"),
+        ("Política de privacidade", "Termos de uso"),
+        ("Dúvidas frequentes", "Segurança e transparência"),
+    )
+    return rx.box(
+        rx.vstack(
+            rx.image(
+                src="/logo.svg",
+                alt="DoaFácil",
+                width="160px",
+                height="58px",
+                object_fit="contain",
+                filter="brightness(0) invert(1)",
+            ),
+            rx.text(
+                "Links rápidos",
+                font_size="1.1rem",
+                font_weight="700",
+                color="#2DBF72",
+            ),
+            rx.flex(
+                *[
+                    rx.vstack(
+                        *[
+                            rx.text(
+                                label,
+                                color="#F5F5F5",
+                                font_size="0.95rem",
+                            )
+                            for label in group
+                        ],
+                        align="start",
+                        spacing="3",
+                        style={"width": rx.breakpoints(initial="100%", md="25%")},
+                    )
+                    for group in link_groups
+                ],
+                style={
+                    "flexDirection": rx.breakpoints(
+                        initial="column", md="row"
+                    )
+                },
+                align="start",
+                gap="4",
+                width="100%",
+            ),
+            rx.text(
+                "Projeto acadêmico DoaFácil",
+                color="#D7D7D7",
+                font_size="0.9rem",
+                border_top="1px solid #515151",
+                padding_top="20px",
+                width="100%",
+            ),
+            align="start",
+            spacing="5",
+            width="100%",
+            max_width="1200px",
+            margin="0 auto",
+            padding="48px 24px 32px",
+        ),
+        width="100%",
+        background="#252525",
+        color="white",
+    )
+
+
 def index() -> rx.Component:
     return rx.box(
         rx.box(
@@ -390,35 +708,33 @@ def index() -> rx.Component:
                 rx.image(
                     src="/logo.svg",
                     alt="DoaFácil",
-                    width="190px",
+                    style={"width": rx.breakpoints(initial="100px", md="190px")},
                     height="72px",
                     object_fit="contain",
                 ),
                 rx.spacer(),
-                rx.hstack(
-                    rx.link(
-                        "Explorar Doações",
-                        href="#",
-                        color="#168447",
-                        font_weight="700",
-                        white_space="nowrap",
-                    ),
-                    rx.link(
-                        "Como funciona",
-                        href="#",
-                        color="#168447",
-                        font_weight="700",
-                        white_space="nowrap",
-                    ),
-                    rx.link(
-                        "Categorias",
-                        href="#",
-                        color="#168447",
-                        font_weight="700",
-                        white_space="nowrap",
-                    ),
-                    spacing="6",
-                    display={"initial": "none", "lg": "flex"},
+                rx.desktop_only(
+                    rx.hstack(
+                        rx.text(
+                            "Explorar Doações",
+                            color="#168447",
+                            font_weight="700",
+                            white_space="nowrap",
+                        ),
+                        rx.text(
+                            "Como funciona",
+                            color="#168447",
+                            font_weight="700",
+                            white_space="nowrap",
+                        ),
+                        rx.text(
+                            "Categorias",
+                            color="#168447",
+                            font_weight="700",
+                            white_space="nowrap",
+                        ),
+                        spacing="6",
+                    )
                 ),
                 rx.spacer(),
                 rx.hstack(
@@ -427,13 +743,13 @@ def index() -> rx.Component:
                         variant="outline",
                         color="#168447",
                         border_color="#168447",
-                        size="3",
+                        size="2",
                     ),
                     rx.button(
                         "Quero Doar",
                         background="#168447",
                         color="white",
-                        size="3",
+                        size="2",
                     ),
                     spacing="3",
                 ),
@@ -451,12 +767,15 @@ def index() -> rx.Component:
                 rx.heading(
                     "Doar é fácil.",
                     " No DoaFácil, o que sobra em você vira recomeço para alguém.",
-                    font_size={"initial": "2rem", "md": "2.75rem"},
                     color="#333333",
                     text_align="center",
                     font_weight="700",
                     max_width="900px",
+                    width="100%",
                     line_height="1.2",
+                    white_space="normal",
+                    overflow_wrap="anywhere",
+                    style={"fontSize": rx.breakpoints(initial="2rem", md="2.75rem")},
                 ),
                 align="center",
                 justify="center",
@@ -468,11 +787,15 @@ def index() -> rx.Component:
                 donation_count_view(),
                 recent_donations_view(),
                 align="center",
-                spacing={"initial": "6", "lg": "8"},
+                spacing="6",
                 width="100%",
                 max_width="1200px",
                 padding_x="24px",
-                flex_direction={"initial": "column", "lg": "row"},
+                style={
+                    "flexDirection": rx.breakpoints(
+                        initial="column", lg="row"
+                    )
+                },
             ),
             align="center",
             spacing="7",
@@ -490,6 +813,9 @@ def index() -> rx.Component:
             object_fit="contain",
             flex_shrink="0",
         ),
+        start_here_section(),
+        institutional_section(),
+        public_home_footer(),
         display="flex",
         flex_direction="column",
         width="100%",

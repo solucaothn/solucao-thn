@@ -13,8 +13,54 @@ from doafacil.doafacil import (
     _load_count_result,
     _load_donations_result,
     _parse_donations,
+    index,
+    institutional_section,
+    public_home_footer,
+    start_here_section,
     _xano_endpoints,
 )
+
+
+def _component_contents(component: object) -> list[str]:
+    contents: list[str] = []
+
+    def collect(value: object) -> None:
+        if hasattr(value, "contents"):
+            text = value.contents
+            if isinstance(text, str):
+                contents.append(text)
+            elif type(text).__name__ == "LiteralStringVar":
+                contents.append(text._var_value)
+        if hasattr(value, "children"):
+            collect(value.children)
+        elif isinstance(value, dict):
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child)
+
+    collect(component)
+    return contents
+
+
+def _component_nodes(component: object) -> list[object]:
+    nodes: list[object] = []
+
+    def collect(value: object) -> None:
+        if hasattr(value, "event_triggers"):
+            nodes.append(value)
+        if hasattr(value, "children"):
+            collect(value.children)
+        elif isinstance(value, dict):
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child)
+
+    collect(component)
+    return nodes
 
 
 class PublicHomeTests(unittest.TestCase):
@@ -190,6 +236,167 @@ class PublicHomeTests(unittest.TestCase):
 
         self.assertIsInstance(count_result, httpx.HTTPStatusError)
         self.assertEqual(donations_result, [])
+
+    def test_start_here_section_content_and_controls(self) -> None:
+        section = start_here_section()
+        contents = _component_contents(section)
+
+        for text in (
+            "COMECE POR AQUI",
+            "Quer criar uma doação?",
+            "Para você mesmo",
+            "Escolha um item disponível e receba de alguém que está desapegando.",
+            "Ajude quem precisa",
+            "Cadastre um objeto que você não usa mais e encontre quem precisa.",
+            "Desapego em grupo",
+            "Para família ou uma empresa que quer doar vários itens de uma vez.",
+            "Em breve",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, contents)
+
+        self.assertEqual(contents.count("→"), 2)
+        self.assertNotIn("Buscar doações", contents)
+        for node in _component_nodes(section):
+            self.assertFalse(getattr(node, "href", None))
+            self.assertFalse(getattr(node, "event_triggers", {}))
+
+    def test_institutional_section_content_and_controls(self) -> None:
+        section = institutional_section()
+        contents = _component_contents(section)
+
+        for text in (
+            "Doar no DoaFácil é simples e seguro.",
+            "Doações já circularam por aqui, conectando quem tem com quem precisa. "
+            "Transparência em cada etapa, do anúncio à entrega.",
+            "Solidariedade",
+            "Conheça histórias de quem doou e quem recebeu",
+            "Segurança",
+            "Como funciona a autenticação e proteção dos seus dados",
+            "Nossa missão",
+            "Descubra por que criamos o DoaFácil",
+            "Passo a passo",
+            "Veja como criar sua doação em poucos minutos",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, contents)
+
+        self.assertEqual(contents.count("Saiba mais"), 4)
+        nodes = _component_nodes(section)
+        gradient_cards = [
+            node
+            for node in nodes
+            if str(getattr(node, "background", "")).startswith("linear-gradient")
+        ]
+        self.assertEqual(len(gradient_cards), 4)
+        for node in nodes:
+            self.assertFalse(getattr(node, "href", None))
+            self.assertFalse(getattr(node, "event_triggers", {}))
+            self.assertFalse(getattr(node, "src", None))
+
+    def test_footer_content_and_non_navigating_controls(self) -> None:
+        footer = public_home_footer()
+        contents = _component_contents(footer)
+
+        for text in (
+            "Links rápidos",
+            "Quem somos",
+            "Doações",
+            "Criar doações",
+            "Doações mais recentes",
+            "Política de privacidade",
+            "Termos de uso",
+            "Dúvidas frequentes",
+            "Segurança e transparência",
+            "Projeto acadêmico DoaFácil",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, contents)
+
+        for excluded in (
+            "Selo de segurança",
+            "CNPJ",
+            "cidade",
+            "horário de atendimento",
+            "Busca por recibo",
+            "Verificação de links",
+        ):
+            self.assertNotIn(excluded, contents)
+
+        nodes = _component_nodes(footer)
+        footer_logo = next(
+            node
+            for node in nodes
+            if getattr(getattr(node, "src", None), "_var_value", None)
+            == "/logo.svg"
+        )
+        self.assertEqual(footer_logo.filter, "brightness(0) invert(1)")
+        for node in nodes:
+            self.assertFalse(getattr(node, "href", None))
+            self.assertFalse(getattr(node, "event_triggers", {}))
+
+    def test_card_sections_stack_on_narrow_screens(self) -> None:
+        for section, expected_breakpoint in (
+            (start_here_section(), {"0px": "column", "62em": "row"}),
+            (institutional_section(), {"0px": "column", "48em": "row"}),
+        ):
+            with self.subTest(breakpoint=expected_breakpoint):
+                directions = [
+                    {
+                        breakpoint: getattr(value, "_var_value", value)
+                        for breakpoint, value in node.style["flexDirection"].items()
+                    }
+                    for node in _component_nodes(section)
+                    if "flexDirection" in getattr(node, "style", {})
+                ]
+                self.assertEqual(directions, [expected_breakpoint])
+
+                cards = [
+                    node
+                    for node in _component_nodes(section)
+                    if getattr(node, "min_height", None) is not None
+                ]
+                self.assertEqual(
+                    len(cards),
+                    3 if "62em" in expected_breakpoint else 4,
+                )
+                self.assertTrue(
+                    all(
+                        getattr(
+                            card.style["width"]["0px"],
+                            "_var_value",
+                            card.style["width"]["0px"],
+                        )
+                        == "100%"
+                        for card in cards
+                    )
+                )
+
+    def test_home_places_illustration_and_sections_in_requested_order(self) -> None:
+        page = index()
+        content = page.children
+
+        self.assertIn(
+            "Doações mais recentes",
+            _component_contents(content[1]),
+        )
+        self.assertEqual(
+            getattr(content[2].src, "_var_value", None),
+            "/ilustracao-rodape.png",
+        )
+        self.assertIn("COMECE POR AQUI", _component_contents(content[3]))
+        self.assertIn(
+            "Doar no DoaFácil é simples e seguro.",
+            _component_contents(content[4]),
+        )
+        self.assertIn(
+            "Links rápidos",
+            _component_contents(content[5]),
+        )
+
+        for node in _component_nodes(page):
+            self.assertFalse(getattr(node, "href", None))
+            self.assertFalse(getattr(node, "event_triggers", {}))
 
 
 if __name__ == "__main__":

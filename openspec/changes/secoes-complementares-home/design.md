@@ -4,7 +4,7 @@
 
 Ver motivação e escopo em `proposal.md` e contratos observáveis em `specs/public-home-content/spec.md`.
 
-A home atual está concentrada em `doafacil/doafacil.py`, usa componentes Reflex, carrega LINE Seed JP por stylesheet e mantém as cores creme `#FFF6E8`, verde `#168447` e cinza escuro `#333333`. O conteúdo novo entra depois da seção de doações recentes. O README de design e as imagens 02 e 03 fornecem os textos e a composição visual; o texto aprovado neste change prevalece sobre elementos incompatíveis presentes nas capturas.
+A home atual está concentrada em `doafacil/doafacil.py`, usa componentes Reflex, carrega LINE Seed JP por stylesheet e mantém as cores creme `#FFF6E8`, verde `#168447` e cinza escuro `#333333`. A ilustração permanece no local atual, logo após as doações recentes; o conteúdo novo vem depois dela na ordem “Comece por aqui”, seção institucional e rodapé. O README de design e as imagens 02 e 03 fornecem os textos e a composição visual; o texto aprovado neste change prevalece sobre elementos incompatíveis presentes nas capturas.
 
 ## Goals / Non-Goals
 

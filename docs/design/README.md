@@ -23,6 +23,7 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 ### 02-comece-aqui.png — Cartões de entrada
 
 - Na home, esta seção aparece após "Doações mais recentes" e antes da seção institucional e do rodapé.
+- A ilustração das pessoas permanece logo abaixo de "Doações mais recentes" e antes desta seção.
 - Etiqueta "COMECE POR AQUI" e título.
 - Três cartões:
   - **Para você mesmo**: "Escolha um item disponível e receba de alguém que está desapegando."
@@ -70,6 +71,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 9. Os controles das seções novas, inclusive setas e links, não navegam nesta change porque suas páginas de destino ainda não existem.
 10. O rodapé da home usa fundo escuro, logotipo, os oito links rápidos definidos acima e "Projeto acadêmico DoaFácil"; não inclui selo de segurança, CNPJ, cidade, horário de atendimento, "Busca por recibo" ou "Verificação de links" da referência do Vakinha.
 11. As seções novas mantêm a fonte LINE Seed JP e a paleta já usada na home; a área principal segue creme e o rodapé é escuro.
+12. A ilustração das pessoas permanece na posição atual, logo abaixo das doações recentes; depois dela aparecem "Comece por aqui", a seção institucional e o rodapé escuro, nessa ordem.
 
 ## O que o design exige do backend (Xano) e ainda não existe
 
