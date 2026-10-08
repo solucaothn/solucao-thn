@@ -4,7 +4,7 @@
 
 Ver motivação e escopo em `proposal.md` e contratos observáveis em `specs/public-home-content/spec.md`.
 
-A home atual está concentrada em `doafacil/doafacil.py`, usa componentes Reflex, carrega LINE Seed JP por stylesheet e mantém as cores creme `#FFF6E8`, verde `#168447` e cinza escuro `#333333`. A ilustração permanece no local atual, logo após as doações recentes; o conteúdo novo vem depois dela na ordem “Comece por aqui”, seção institucional e rodapé. O README de design e as imagens 02 e 03 fornecem os textos e a composição visual; o texto aprovado neste change prevalece sobre elementos incompatíveis presentes nas capturas.
+A home atual está concentrada em `doafacil/doafacil.py`, usa componentes Reflex, carrega LINE Seed JP por stylesheet e mantém as cores creme `#FFF6E8`, verde `#168447` e cinza escuro `#333333`. A ilustração permanece no local atual, logo após as doações recentes; o conteúdo novo vem depois dela na ordem “Comece por aqui”, seção institucional e rodapé. O README de design e as imagens 02 e 03 fornecem os textos e a composição visual; o texto aprovado neste change prevalece sobre elementos incompatíveis presentes nas capturas. As decisões abaixo substituem a exclusão anterior da busca visual em “Comece por aqui”.
 
 ## Goals / Non-Goals
 
@@ -26,19 +26,21 @@ A home atual está concentrada em `doafacil/doafacil.py`, usa componentes Reflex
 
 2. **Manter os controles como conteúdo sem navegação.** Os links de rodapé e “Saiba mais” podem preservar a aparência de link, e as setas dos dois primeiros cartões podem ser decorativas, mas nenhum controle recebe destino ou ação até que as respectivas páginas sejam aprovadas. “Desapego em grupo” fica visualmente indisponível com “Em breve” e sem seta.
 
-3. **Usar os textos aprovados no README e na referência.** A primeira seção usa o título “Quer criar uma doação?” e os textos descritivos da imagem 02. Os cartões institucionais usam as categorias e títulos visíveis na imagem 03, inclusive “Conheça histórias de quem doou e quem recebeu” para Solidariedade, confirmado pelo grupo. Nenhum texto é buscado no backend.
+3. **Usar os textos aprovados no README e na referência.** A primeira seção usa o título “Quer criar uma doação?”, a frase de apoio “Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa.” e os textos dos cartões da imagem 02. A barra de busca é apenas visual, com campo de texto, seletores e botão inertes; não consulta backend, busca nem navega. Os cartões institucionais usam as categorias e títulos visíveis na imagem 03, inclusive “Conheça histórias de quem doou e quem recebeu” para Solidariedade, confirmado pelo grupo.
 
 4. **Representar cartões institucionais com ícones e degradês, não mídia.** Usar ícones disponíveis por meio dos componentes Reflex, mantendo a paleta verde/cinza, em vez das fotos da captura. Vídeos, imagens dos cartões e dependências de ícones externas foram considerados e ficam fora do escopo aprovado.
 
-5. **Aplicar layout fluido com coluna em telas estreitas.** Em telas amplas os cartões podem ocupar linhas lado a lado conforme a largura; em telas estreitas devem formar coluna, sem corte ou sobreposição. Isso preserva a leitura sem introduzir uma nova abordagem de frontend.
+5. **Aplicar layout fluido com coluna em telas estreitas.** Em telas amplas os cartões podem ocupar linhas lado a lado conforme a largura; em telas estreitas devem formar coluna, sem corte ou sobreposição. Os campos da barra visual também se empilham em telas estreitas. Isso preserva a leitura sem introduzir uma nova abordagem de frontend.
 
-6. **Construir o rodapé apenas com conteúdo próprio aprovado.** Usar fundo escuro, logotipo, título “Links rápidos”, lista exata dos oito links e a linha acadêmica. Não acrescentar contato, redes sociais ou itens legados do Vakinha removidos pela decisão do grupo.
+6. **Construir o rodapé apenas com conteúdo próprio aprovado.** Usar fundo escuro e logotipo; abaixo dele, posicionar “Fale conosco” e “Links rápidos” lado a lado, empilhando-os em telas estreitas. “Fale conosco” contém somente “Clique aqui para falar conosco”, sem navegação. Os links rápidos mantêm a lista exata dos oito links em tamanho reduzido, seguidos da linha acadêmica. Não acrescentar horário, e-mail, telefone, redes sociais ou itens legados do Vakinha removidos pela decisão do grupo.
+
+7. **Manter a ilustração integrada ao fim da seção de doações.** Exibi-la em largura total, como último elemento da seção, sem margem ou faixa creme entre a imagem e “Comece por aqui”.
 
 ## Risks / Trade-offs
 
 - [A imagem de referência contém elementos herdados e diferentes do conteúdo aprovado] → tratar os textos e exclusões registrados no README como fonte normativa e validar os itens visíveis contra a spec.
 - [Links com aparência interativa, mas sem destino, podem sugerir navegação] → manter explicitamente os controles inertes nesta versão e não usar hrefs fictícios.
-- [A quantidade de cartões pode exceder o espaço em telas estreitas] → verificar disposição em coluna e legibilidade em viewport estreita durante a implementação.
+- [A quantidade de cartões e controles pode exceder o espaço em telas estreitas] → verificar disposição em coluna e legibilidade em viewport estreita durante a implementação.
 
 ## Migration Plan
 

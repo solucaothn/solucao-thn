@@ -474,6 +474,14 @@ def start_here_section() -> rx.Component:
                 color="#333333",
                 style={"fontSize": rx.breakpoints(initial="2rem", md="2.5rem")},
             ),
+            rx.text(
+                "Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa.",
+                font_weight="700",
+                color="#333333",
+                line_height="1.3",
+                max_width="900px",
+                style={"fontSize": rx.breakpoints(initial="1.2rem", md="1.5rem")},
+            ),
             rx.flex(
                 start_here_card(
                     "Para você mesmo",
@@ -502,12 +510,108 @@ def start_here_section() -> rx.Component:
                 gap="16px",
                 width="100%",
             ),
+            rx.flex(
+                rx.vstack(
+                    rx.text(
+                        "Buscar doações",
+                        font_size="0.95rem",
+                        font_weight="700",
+                        color="#333333",
+                    ),
+                    rx.input(
+                        placeholder="O que você está procurando?",
+                        width="100%",
+                        background="#FFF8EC",
+                        border="1px solid #BEBAB2",
+                        border_radius="8px",
+                    ),
+                    align="stretch",
+                    spacing="2",
+                    style={
+                        "width": rx.breakpoints(
+                            initial="100%", md="calc((100% - 48px) / 4)"
+                        )
+                    },
+                ),
+                rx.vstack(
+                    rx.text(
+                        "Categoria",
+                        font_size="0.95rem",
+                        font_weight="700",
+                        color="#333333",
+                    ),
+                    rx.select(
+                        [
+                            "Todas as categorias",
+                            "Roupas",
+                            "Móveis",
+                            "Livros",
+                            "Eletrônicos",
+                            "Brinquedos",
+                            "Outros",
+                        ],
+                        default_value="Todas as categorias",
+                        width="100%",
+                    ),
+                    align="stretch",
+                    spacing="2",
+                    style={
+                        "width": rx.breakpoints(
+                            initial="100%", md="calc((100% - 48px) / 4)"
+                        )
+                    },
+                ),
+                rx.vstack(
+                    rx.text(
+                        "Localização",
+                        font_size="0.95rem",
+                        font_weight="700",
+                        color="#333333",
+                    ),
+                    rx.select(
+                        ["Todas as localizações"],
+                        default_value="Todas as localizações",
+                        width="100%",
+                    ),
+                    align="stretch",
+                    spacing="2",
+                    style={
+                        "width": rx.breakpoints(
+                            initial="100%", md="calc((100% - 48px) / 4)"
+                        )
+                    },
+                ),
+                rx.button(
+                    "Buscar",
+                    background="#252525",
+                    color="white",
+                    align_self="end",
+                    style={
+                        "width": rx.breakpoints(
+                            initial="100%", md="calc((100% - 48px) / 4)"
+                        )
+                    },
+                ),
+                wrap="wrap",
+                style={
+                    "flexDirection": rx.breakpoints(
+                        initial="column", md="row"
+                    )
+                },
+                align="stretch",
+                justify="between",
+                gap="16px",
+                width="100%",
+                padding="32px 24px",
+                background="#FFF8EC",
+                border_radius="12px",
+            ),
             align="stretch",
             spacing="5",
             width="100%",
             max_width="1200px",
             margin="0 auto",
-            padding="64px 24px 80px",
+            padding="0 24px 80px",
         ),
         width="100%",
         background="#FFF6E8",
@@ -648,29 +752,65 @@ def public_home_footer() -> rx.Component:
                 object_fit="contain",
                 filter="brightness(0) invert(1)",
             ),
-            rx.text(
-                "Links rápidos",
-                font_size="1.1rem",
-                font_weight="700",
-                color="#2DBF72",
-            ),
             rx.flex(
-                *[
-                    rx.vstack(
+                rx.vstack(
+                    rx.text(
+                        "Fale conosco",
+                        font_size="1rem",
+                        font_weight="700",
+                        color="#2DBF72",
+                    ),
+                    rx.text(
+                        "Clique aqui para falar conosco",
+                        color="#F5F5F5",
+                        font_size="0.85rem",
+                        text_decoration="underline",
+                    ),
+                    align="start",
+                    spacing="1",
+                    style={"width": rx.breakpoints(initial="100%", md="28%")},
+                ),
+                rx.vstack(
+                    rx.text(
+                        "Links rápidos",
+                        font_size="1rem",
+                        font_weight="700",
+                        color="#2DBF72",
+                    ),
+                    rx.flex(
                         *[
-                            rx.text(
-                                label,
-                                color="#F5F5F5",
-                                font_size="0.95rem",
+                            rx.vstack(
+                                *[
+                                    rx.text(
+                                        label,
+                                        color="#F5F5F5",
+                                        font_size="0.85rem",
+                                    )
+                                    for label in group
+                                ],
+                                align="start",
+                                spacing="1",
+                                style={
+                                    "width": rx.breakpoints(
+                                        initial="50%", md="25%"
+                                    )
+                                },
                             )
-                            for label in group
+                            for group in link_groups
                         ],
+                        wrap="wrap",
                         align="start",
-                        spacing="3",
-                        style={"width": rx.breakpoints(initial="100%", md="25%")},
-                    )
-                    for group in link_groups
-                ],
+                        gap="0",
+                        width="100%",
+                    ),
+                    align="start",
+                    spacing="2",
+                    style={
+                        "width": rx.breakpoints(
+                            initial="100%", md="calc(72% - 16px)"
+                        )
+                    },
+                ),
                 style={
                     "flexDirection": rx.breakpoints(
                         initial="column", md="row"
@@ -801,7 +941,7 @@ def index() -> rx.Component:
             spacing="7",
             width="100%",
             flex="1",
-            padding_bottom="56px",
+            padding_bottom="0",
             background="#FFF6E8",
         ),
         rx.image(
@@ -810,6 +950,8 @@ def index() -> rx.Component:
             width="100%",
             height="auto",
             display="block",
+            margin_top="0",
+            margin_bottom="0",
             object_fit="contain",
             flex_shrink="0",
         ),

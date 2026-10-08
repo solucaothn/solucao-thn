@@ -244,6 +244,7 @@ class PublicHomeTests(unittest.TestCase):
         for text in (
             "COMECE POR AQUI",
             "Quer criar uma doação?",
+            "Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa.",
             "Para você mesmo",
             "Escolha um item disponível e receba de alguém que está desapegando.",
             "Ajude quem precisa",
@@ -251,13 +252,30 @@ class PublicHomeTests(unittest.TestCase):
             "Desapego em grupo",
             "Para família ou uma empresa que quer doar vários itens de uma vez.",
             "Em breve",
+            "Buscar doações",
+            "Categoria",
+            "Todas as categorias",
+            "Localização",
+            "Todas as localizações",
+            "Buscar",
         ):
             with self.subTest(text=text):
                 self.assertIn(text, contents)
 
         self.assertEqual(contents.count("→"), 2)
-        self.assertNotIn("Buscar doações", contents)
-        for node in _component_nodes(section):
+        nodes = _component_nodes(section)
+        placeholders = [
+            getattr(node, "placeholder", None)
+            for node in nodes
+        ]
+        self.assertTrue(
+            any(
+                getattr(value, "_var_value", value)
+                == "O que você está procurando?"
+                for value in placeholders
+            )
+        )
+        for node in nodes:
             self.assertFalse(getattr(node, "href", None))
             self.assertFalse(getattr(node, "event_triggers", {}))
 
@@ -299,6 +317,8 @@ class PublicHomeTests(unittest.TestCase):
         contents = _component_contents(footer)
 
         for text in (
+            "Fale conosco",
+            "Clique aqui para falar conosco",
             "Links rápidos",
             "Quem somos",
             "Doações",
@@ -318,12 +338,24 @@ class PublicHomeTests(unittest.TestCase):
             "CNPJ",
             "cidade",
             "horário de atendimento",
+            "E-mail",
+            "Telefone",
             "Busca por recibo",
             "Verificação de links",
         ):
             self.assertNotIn(excluded, contents)
 
         nodes = _component_nodes(footer)
+        footer_directions = [
+            {
+                breakpoint: getattr(value, "_var_value", value)
+                for breakpoint, value in node.style["flexDirection"].items()
+            }
+            for node in nodes
+            if "flexDirection" in getattr(node, "style", {})
+        ]
+        self.assertEqual(footer_directions, [{"0px": "column", "62em": "row"}])
+
         footer_logo = next(
             node
             for node in nodes
@@ -349,7 +381,11 @@ class PublicHomeTests(unittest.TestCase):
                     for node in _component_nodes(section)
                     if "flexDirection" in getattr(node, "style", {})
                 ]
-                self.assertEqual(directions, [expected_breakpoint])
+                self.assertEqual(
+                    directions,
+                    [expected_breakpoint]
+                    * (2 if "62em" in expected_breakpoint else 1),
+                )
 
                 cards = [
                     node
@@ -371,7 +407,6 @@ class PublicHomeTests(unittest.TestCase):
                         for card in cards
                     )
                 )
-
     def test_home_places_illustration_and_sections_in_requested_order(self) -> None:
         page = index()
         content = page.children
@@ -384,6 +419,11 @@ class PublicHomeTests(unittest.TestCase):
             getattr(content[2].src, "_var_value", None),
             "/ilustracao-rodape.png",
         )
+        self.assertEqual(content[1].padding_bottom, "0")
+        self.assertEqual(content[2].width, "100%")
+        self.assertEqual(content[2].display, "block")
+        self.assertEqual(content[2].margin_top, "0")
+        self.assertEqual(content[2].margin_bottom, "0")
         self.assertIn("COMECE POR AQUI", _component_contents(content[3]))
         self.assertIn(
             "Doar no DoaFácil é simples e seguro.",

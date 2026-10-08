@@ -23,14 +23,16 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 ### 02-comece-aqui.png — Cartões de entrada
 
 - Na home, esta seção aparece após "Doações mais recentes" e antes da seção institucional e do rodapé.
-- A ilustração das pessoas permanece logo abaixo de "Doações mais recentes" e antes desta seção.
+- A ilustração das pessoas permanece logo abaixo de "Doações mais recentes", em toda a largura e encostada à base da seção; não deve haver faixa de fundo creme entre ela e esta seção.
 - Etiqueta "COMECE POR AQUI" e título.
+- Abaixo do título, exibir em destaque e negrito: "Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa."
 - Três cartões:
   - **Para você mesmo**: "Escolha um item disponível e receba de alguém que está desapegando."
   - **Ajude quem precisa**: "Cadastre um objeto que você não usa mais e encontre quem precisa."
   - **Desapego em grupo**: "Para família ou uma empresa que quer doar vários itens de uma vez." Exibir a etiqueta **Em breve** e não exibir seta.
 - As setas dos dois primeiros cartões são decorativas; nenhum cartão ou controle navega nesta change.
-- Não incluir barra de busca. A busca pertence à página Explorar Doações.
+- Abaixo dos cartões, incluir uma barra de busca somente visual: campo "Buscar doações" com placeholder "O que você está procurando?", seletor "Categoria" com a opção "Todas as categorias", seletor "Localização" com a opção "Todas as localizações" e botão "Buscar". Nenhum campo ou botão realiza busca ou navega.
+- Em telas estreitas, os campos da barra ficam em coluna.
 
 ### 03-secao-institucional-e-rodape.png — Seção institucional e rodapé
 
@@ -44,7 +46,9 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
   - **Nossa missão** — "Descubra por que criamos o DoaFácil".
   - **Passo a passo** — "Veja como criar sua doação em poucos minutos".
 - Os cartões usam fundos em degradê verde e cinza. Os destinos de "Saiba mais" ainda não existem; os controles não navegam nesta change.
-- Rodapé em fundo escuro com logotipo, o título "Links rápidos" e os links: Quem somos, Doações, Criar doações, Doações mais recentes, Política de privacidade, Termos de uso, Dúvidas frequentes e Segurança e transparência. Incluir a linha "Projeto acadêmico DoaFácil".
+- Rodapé em fundo escuro com logotipo; abaixo dele, duas colunas: "Fale conosco", com o texto "Clique aqui para falar conosco" sem navegação, e "Links rápidos", com os links Quem somos, Doações, Criar doações, Doações mais recentes, Política de privacidade, Termos de uso, Dúvidas frequentes e Segurança e transparência em tamanho reduzido e com pouco espaço entre linhas. Em telas estreitas, as colunas ficam empilhadas.
+- Incluir a linha "Projeto acadêmico DoaFácil".
+- Não incluir horário, e-mail ou telefone em "Fale conosco".
 - Não incluir selo de segurança, CNPJ ou cidade, horário de atendimento, "Busca por recibo" ou "Verificação de links", itens herdados da referência do Vakinha.
 - Em telas estreitas, os cartões das seções ficam em coluna.
 
@@ -66,12 +70,13 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 4. A estatística "Pessoas alcançadas" **não entra** na primeira versão. Só "Doações em circulação".
 5. **Desapego em grupo** (vários itens de uma vez) fica fora do MVP.
 6. O rótulo do estado do item é **Condição** (Ótimo, Bom, Regular), para não confundir com o estado geográfico nem com o status da doação.
-7. Na seção "Comece por aqui", exibir "Desapego em grupo" com a etiqueta "Em breve" e sem seta; a busca permanece exclusiva da página Explorar Doações.
+7. Na seção "Comece por aqui", exibir "Desapego em grupo" com a etiqueta "Em breve" e sem seta. A barra abaixo dos cartões é apenas visual nesta home e não executa busca nem navega; a busca funcional permanece exclusiva da página Explorar Doações.
 8. Na seção institucional, usar os quatro cartões Solidariedade, Segurança, Nossa missão e Passo a passo com ícones, categorias, títulos e "Saiba mais", sem fotos ou vídeos; usar degradês verde e cinza. O cartão Solidariedade mantém o título "Conheça histórias de quem doou e quem recebeu", conforme a imagem de referência.
 9. Os controles das seções novas, inclusive setas e links, não navegam nesta change porque suas páginas de destino ainda não existem.
 10. O rodapé da home usa fundo escuro, logotipo, os oito links rápidos definidos acima e "Projeto acadêmico DoaFácil"; não inclui selo de segurança, CNPJ, cidade, horário de atendimento, "Busca por recibo" ou "Verificação de links" da referência do Vakinha.
 11. As seções novas mantêm a fonte LINE Seed JP e a paleta já usada na home; a área principal segue creme e o rodapé é escuro.
-12. A ilustração das pessoas permanece na posição atual, logo abaixo das doações recentes; depois dela aparecem "Comece por aqui", a seção institucional e o rodapé escuro, nessa ordem.
+12. A ilustração das pessoas permanece logo abaixo das doações recentes, ocupa toda a largura e encosta à base da seção, sem faixa de fundo creme entre ela e "Comece por aqui"; depois aparecem essa seção, a seção institucional e o rodapé escuro, nessa ordem.
+13. O rodapé inclui "Fale conosco" com "Clique aqui para falar conosco", sem navegação nem dados de horário, e-mail ou telefone. O bloco fica ao lado de "Links rápidos" abaixo do logotipo em telas largas e empilhado em telas estreitas; título e links rápidos usam tipografia menor e linhas mais compactas.
 
 ## O que o design exige do backend (Xano) e ainda não existe
 
