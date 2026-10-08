@@ -30,3 +30,8 @@
 
 - [x] 6.1 Atualizar esta change, a spec, o design e `docs/design/README.md` para documentar a primeira tela ocupando no mínimo 100vh com ilustração no limite inferior, os espaçamentos e alinhamento de “Comece por aqui”, os controles de busca com aparência ativa e o logotipo colorido e tipografia menor no rodapé.
 - [x] 6.2 Implementar os ajustes visuais em Reflex e ampliar os testes para cobrir a composição de primeira dobra, espaçamentos e alinhamento dos cartões, aparência da busca e tratamento do logotipo/rodapé; executar `python -m unittest discover -s tests -v` e conferir os layouts estreito e largo.
+
+## 7. Refinamento de “Comece por aqui”
+
+- [x] 7.1 Atualizar a spec, o design, as tarefas e `docs/design/README.md` com o padding superior reduzido, line-height dos textos e contraste explícito do placeholder e seletores da busca visual.
+- [x] 7.2 Ajustar os estilos da seção e da busca visual, atualizar testes sem modificar a primeira dobra ou comportamento, e executar `python -m unittest discover -s tests -v`.

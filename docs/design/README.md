@@ -35,9 +35,9 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 - As setas dos dois primeiros cartões são decorativas; nenhum cartão ou controle navega nesta change.
 - Abaixo dos cartões, incluir uma barra de busca somente visual: campo "Buscar doações" com placeholder "O que você está procurando?", seletor "Categoria" com a opção "Todas as categorias", seletor "Localização" com a opção "Todas as localizações" e botão "Buscar". Nenhum campo ou botão realiza busca ou navega.
 - Em telas estreitas, os campos da barra ficam em coluna.
-- A seção usa padding vertical próximo de 5rem. Espaços: cerca de 0.75rem entre etiqueta e título, 1rem entre título e frase, 2.5rem entre frase e cartões, e 3rem entre cartões e busca.
+- A seção usa padding superior próximo de 2.5rem e mantém o padding inferior atual de cerca de 5rem. Espaços: cerca de 0.75rem entre etiqueta e título, 1rem entre título e frase, 2.5rem entre frase e cartões, e 3rem entre cartões e busca. Line-height aproximado de 1.2 no título e 1.4 na frase.
 - Cartões usam gap de cerca de 1.5rem e padding de cerca de 2rem; conteúdo alinhado no topo e seta ou "Em breve" no rodapé.
-- Campo e seletores têm fundo branco, borda cinza clara e texto legível (aparência ativa), embora a busca continue sem ação.
+- Campo e seletores têm fundo branco e borda cinza clara; texto digitado em #333 e placeholder/valores dos seletores em cinza escuro legível (aparência ativa), embora a busca continue sem ação.
 
 ### 03-secao-institucional-e-rodape.png — Seção institucional e rodapé
 

@@ -308,7 +308,12 @@ class PublicHomeTests(unittest.TestCase):
             == "O que você está procurando?"
         )
         self.assertEqual(search_input.background, "white")
+        self.assertEqual(search_input.color, "#333333")
         self.assertEqual(search_input.border, "1px solid #C8C8C8")
+        self.assertEqual(
+            search_input._placeholder,
+            {"color": "#6B6B6B", "opacity": "1"},
+        )
         search_selects = [
             node
             for node in form_nodes
@@ -318,6 +323,7 @@ class PublicHomeTests(unittest.TestCase):
         self.assertTrue(
             all(
                 select.children[0].background == "white"
+                and select.children[0].color == "#6B6B6B"
                 and select.children[0].border == "1px solid #C8C8C8"
                 for select in search_selects
             )
@@ -419,13 +425,15 @@ class PublicHomeTests(unittest.TestCase):
     def test_start_here_spacing_and_card_alignment(self) -> None:
         section = start_here_section()
         container = section.children[0]
-        self.assertEqual(container.padding, "5rem 24px")
+        self.assertEqual(container.padding, "2.5rem 24px 5rem")
         self.assertEqual(self._value(container.spacing), "0")
 
         contents = container.children
         self.assertEqual(contents[0].margin_bottom, "0.75rem")
         self.assertEqual(contents[1].margin_bottom, "1rem")
+        self.assertEqual(contents[1].line_height, "1.2")
         self.assertEqual(contents[2].margin_bottom, "2.5rem")
+        self.assertEqual(contents[2].line_height, "1.4")
         self.assertEqual(contents[3].margin_bottom, "3rem")
         self.assertEqual(contents[3].gap, "1.5rem")
 

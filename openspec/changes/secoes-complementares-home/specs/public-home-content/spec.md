@@ -42,10 +42,11 @@ A home SHALL apresentar a seção “Comece por aqui” abaixo da ilustração, 
 - **AND** abaixo dos cartões há uma barra visual com o campo “Buscar doações” e placeholder “O que você está procurando?”, o seletor “Categoria” com a opção “Todas as categorias”, o seletor “Localização” com a opção “Todas as localizações” e o botão “Buscar”
 - **AND** a barra não executa busca nem navega
 - **AND** em telas estreitas os campos e o botão ficam em coluna
-- **AND** a seção usa aproximadamente 5rem de padding vertical
+- **AND** a seção usa aproximadamente 2.5rem de padding superior e mantém o padding inferior atual de aproximadamente 5rem
 - **AND** há aproximadamente 0.75rem entre etiqueta e título, 1rem entre título e frase, 2.5rem entre frase e cartões, e 3rem entre cartões e barra visual
+- **AND** o título tem line-height de aproximadamente 1.2 e a frase tem line-height de aproximadamente 1.4
 - **AND** os cartões usam gap aproximado de 1.5rem e padding interno aproximado de 2rem, com conteúdo superior alinhado e seta ou “Em breve” no rodapé
-- **AND** o campo e seletores da barra têm fundo branco, borda cinza clara e textos legíveis, sem aparência desabilitada
+- **AND** o campo e seletores da barra têm fundo branco, borda cinza clara e texto digitado em #333; o placeholder e os valores dos seletores usam cinza escuro legível, sem aparência desabilitada
 
 ### Requirement: Conteúdo institucional da home
 A home SHALL apresentar o título, o texto de apoio e os cartões institucionais definidos para o DoaFácil.
