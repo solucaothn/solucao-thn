@@ -25,3 +25,8 @@
 - [x] 5.1 Atualizar a spec, o design e `docs/design/README.md` para registrar a ilustração em largura total sem faixa entre seções, a frase de destaque e a barra visual de busca sem ação, além do contato e do layout compacto do rodapé.
 - [x] 5.2 Ajustar a ilustração para encostar à base da seção; incluir a frase de apoio e a barra visual com campo, seletores e botão inertes; verificar os textos, a ordem e o empilhamento dos controles em tela estreita.
 - [x] 5.3 Acrescentar “Fale conosco” ao rodapé em coluna ao lado dos links rápidos, com tipografia e espaçamento reduzidos e layout empilhado em telas estreitas; atualizar testes e executar `python -m unittest discover -s tests -v`.
+
+## 6. Ajustes de altura da primeira tela e refinamento visual
+
+- [x] 6.1 Atualizar esta change, a spec, o design e `docs/design/README.md` para documentar a primeira tela ocupando no mínimo 100vh com ilustração no limite inferior, os espaçamentos e alinhamento de “Comece por aqui”, os controles de busca com aparência ativa e o logotipo colorido e tipografia menor no rodapé.
+- [x] 6.2 Implementar os ajustes visuais em Reflex e ampliar os testes para cobrir a composição de primeira dobra, espaçamentos e alinhamento dos cartões, aparência da busca e tratamento do logotipo/rodapé; executar `python -m unittest discover -s tests -v` e conferir os layouts estreito e largo.

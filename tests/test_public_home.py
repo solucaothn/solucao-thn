@@ -63,7 +63,30 @@ def _component_nodes(component: object) -> list[object]:
     return nodes
 
 
+def _all_component_nodes(component: object) -> list[object]:
+    nodes: list[object] = []
+
+    def collect(value: object) -> None:
+        if hasattr(value, "tag") or hasattr(value, "component_name"):
+            nodes.append(value)
+        if hasattr(value, "children"):
+            collect(value.children)
+        elif isinstance(value, dict):
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child)
+
+    collect(component)
+    return nodes
+
+
 class PublicHomeTests(unittest.TestCase):
+    @staticmethod
+    def _value(value: object) -> object:
+        return getattr(value, "_var_value", value)
+
     def test_endpoint_urls_use_xano_api_url_environment_variable(self) -> None:
         with patch.dict(
             os.environ,
@@ -275,6 +298,30 @@ class PublicHomeTests(unittest.TestCase):
                 for value in placeholders
             )
         )
+        form_nodes = _all_component_nodes(section)
+        search_input = next(
+            node
+            for node in form_nodes
+            if getattr(
+                getattr(node, "placeholder", None), "_var_value", None
+            )
+            == "O que você está procurando?"
+        )
+        self.assertEqual(search_input.background, "white")
+        self.assertEqual(search_input.border, "1px solid #C8C8C8")
+        search_selects = [
+            node
+            for node in form_nodes
+            if type(node).__name__ == "SelectRoot"
+        ]
+        self.assertEqual(len(search_selects), 2)
+        self.assertTrue(
+            all(
+                select.children[0].background == "white"
+                and select.children[0].border == "1px solid #C8C8C8"
+                for select in search_selects
+            )
+        )
         for node in nodes:
             self.assertFalse(getattr(node, "href", None))
             self.assertFalse(getattr(node, "event_triggers", {}))
@@ -362,10 +409,69 @@ class PublicHomeTests(unittest.TestCase):
             if getattr(getattr(node, "src", None), "_var_value", None)
             == "/logo.svg"
         )
-        self.assertEqual(footer_logo.filter, "brightness(0) invert(1)")
+        self.assertFalse(getattr(footer_logo, "filter", None))
+        self.assertEqual(footer_logo.width, "160px")
+        self.assertEqual(footer_logo.height, "58px")
         for node in nodes:
             self.assertFalse(getattr(node, "href", None))
             self.assertFalse(getattr(node, "event_triggers", {}))
+
+    def test_start_here_spacing_and_card_alignment(self) -> None:
+        section = start_here_section()
+        container = section.children[0]
+        self.assertEqual(container.padding, "5rem 24px")
+        self.assertEqual(self._value(container.spacing), "0")
+
+        contents = container.children
+        self.assertEqual(contents[0].margin_bottom, "0.75rem")
+        self.assertEqual(contents[1].margin_bottom, "1rem")
+        self.assertEqual(contents[2].margin_bottom, "2.5rem")
+        self.assertEqual(contents[3].margin_bottom, "3rem")
+        self.assertEqual(contents[3].gap, "1.5rem")
+
+        cards = [
+            node
+            for node in _component_nodes(section)
+            if getattr(node, "padding", None) == "2rem"
+        ]
+        self.assertEqual(len(cards), 3)
+        for card in cards:
+            self.assertEqual(card.padding, "2rem")
+            self.assertEqual(self._value(card.justify), "between")
+            self.assertEqual(len(card.children), 2)
+            self.assertEqual(
+                self._value(card.style["width"]["62em"]),
+                "calc((100% - 48px) / 3)",
+            )
+            self.assertEqual(self._value(card.children[0].align), "center")
+            self.assertEqual(self._value(card.children[0].justify), "start")
+
+    def test_first_viewport_contains_header_content_and_illustration(self) -> None:
+        page = index()
+        first_view = page.children[0]
+        self.assertEqual(first_view.min_height, "100vh")
+        self.assertEqual(self._value(first_view.spacing), "0")
+        self.assertEqual(len(first_view.children), 3)
+
+        header, main_content, illustration = first_view.children
+        self.assertEqual(header.background, "white")
+        self.assertEqual(main_content.flex, "1")
+        self.assertEqual(
+            getattr(illustration.src, "_var_value", None),
+            "/ilustracao-rodape.png",
+        )
+        self.assertEqual(illustration.width, "100%")
+        self.assertEqual(illustration.display, "block")
+        self.assertEqual(illustration.margin_top, "0")
+        self.assertEqual(illustration.margin_bottom, "0")
+        first_view_content = _component_contents(first_view)
+        self.assertIn("Doar é fácil.", first_view_content)
+        self.assertIn("Doações mais recentes", first_view_content)
+        self.assertNotIn("COMECE POR AQUI", first_view_content)
+        self.assertEqual(
+            _component_contents(page.children[1])[0],
+            "COMECE POR AQUI",
+        )
 
     def test_card_sections_stack_on_narrow_screens(self) -> None:
         for section, expected_breakpoint in (
@@ -387,10 +493,13 @@ class PublicHomeTests(unittest.TestCase):
                     * (2 if "62em" in expected_breakpoint else 1),
                 )
 
+                expected_padding = (
+                    "2rem" if "62em" in expected_breakpoint else "24px"
+                )
                 cards = [
                     node
                     for node in _component_nodes(section)
-                    if getattr(node, "min_height", None) is not None
+                    if getattr(node, "padding", None) == expected_padding
                 ]
                 self.assertEqual(
                     len(cards),
@@ -413,25 +522,26 @@ class PublicHomeTests(unittest.TestCase):
 
         self.assertIn(
             "Doações mais recentes",
-            _component_contents(content[1]),
+            _component_contents(content[0]),
         )
         self.assertEqual(
-            getattr(content[2].src, "_var_value", None),
+            getattr(content[0].children[2].src, "_var_value", None),
             "/ilustracao-rodape.png",
         )
-        self.assertEqual(content[1].padding_bottom, "0")
-        self.assertEqual(content[2].width, "100%")
-        self.assertEqual(content[2].display, "block")
-        self.assertEqual(content[2].margin_top, "0")
-        self.assertEqual(content[2].margin_bottom, "0")
-        self.assertIn("COMECE POR AQUI", _component_contents(content[3]))
+        self.assertEqual(content[0].min_height, "100vh")
+        self.assertEqual(self._value(content[0].spacing), "0")
+        self.assertEqual(content[0].children[2].width, "100%")
+        self.assertEqual(content[0].children[2].display, "block")
+        self.assertEqual(content[0].children[2].margin_top, "0")
+        self.assertEqual(content[0].children[2].margin_bottom, "0")
+        self.assertIn("COMECE POR AQUI", _component_contents(content[1]))
         self.assertIn(
             "Doar no DoaFácil é simples e seguro.",
-            _component_contents(content[4]),
+            _component_contents(content[2]),
         )
         self.assertIn(
             "Links rápidos",
-            _component_contents(content[5]),
+            _component_contents(content[3]),
         )
 
         for node in _component_nodes(page):

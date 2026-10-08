@@ -18,6 +18,17 @@ A home SHALL preservar a ilustração em largura total, encostada à base da se�
 - **AND** a seção institucional aparece depois de “Comece por aqui”
 - **AND** o rodapé aparece depois da seção institucional, no final da página
 
+### Requirement: Primeira dobra da home
+A primeira tela da home SHALL agrupar cabeçalho, destaque, doações recentes e ilustração em uma área com altura mínima de 100vh, posicionando a ilustração no limite inferior quando o conteúdo couber, sem cortar conteúdo quando ultrapassar a altura da janela.
+
+#### Scenario: Exibir o início da home na altura da janela
+- **WHEN** a home é exibida em uma janela com espaço vertical suficiente
+- **THEN** cabeçalho, frase de destaque, doações recentes e ilustração ocupam a primeira tela
+- **AND** a ilustração encosta à borda inferior da primeira tela
+- **AND** nenhum elemento de “Comece por aqui”, nem sua etiqueta, aparece antes da rolagem
+- **WHEN** o conteúdo inicial excede a altura da janela
+- **THEN** a primeira área cresce para acomodá-lo sem cortar conteúdo
+
 ### Requirement: Seção Comece por aqui
 A home SHALL apresentar a seção “Comece por aqui” abaixo da ilustração, com o conteúdo e os controles visuais aprovados no design.
 
@@ -31,6 +42,10 @@ A home SHALL apresentar a seção “Comece por aqui” abaixo da ilustração, 
 - **AND** abaixo dos cartões há uma barra visual com o campo “Buscar doações” e placeholder “O que você está procurando?”, o seletor “Categoria” com a opção “Todas as categorias”, o seletor “Localização” com a opção “Todas as localizações” e o botão “Buscar”
 - **AND** a barra não executa busca nem navega
 - **AND** em telas estreitas os campos e o botão ficam em coluna
+- **AND** a seção usa aproximadamente 5rem de padding vertical
+- **AND** há aproximadamente 0.75rem entre etiqueta e título, 1rem entre título e frase, 2.5rem entre frase e cartões, e 3rem entre cartões e barra visual
+- **AND** os cartões usam gap aproximado de 1.5rem e padding interno aproximado de 2rem, com conteúdo superior alinhado e seta ou “Em breve” no rodapé
+- **AND** o campo e seletores da barra têm fundo branco, borda cinza clara e textos legíveis, sem aparência desabilitada
 
 ### Requirement: Conteúdo institucional da home
 A home SHALL apresentar o título, o texto de apoio e os cartões institucionais definidos para o DoaFácil.
@@ -50,7 +65,11 @@ A home SHALL apresentar um rodapé escuro com a identidade e os links rápidos a
 - **WHEN** uma pessoa acessa a home pública
 - **THEN** o rodapé apresenta o logotipo e, abaixo dele, as colunas “Fale conosco” e “Links rápidos”
 - **AND** “Fale conosco” apresenta “Clique aqui para falar conosco” sem navegação
+- **AND** o logotipo do rodapé usa o arquivo colorido sem filtros ou recoloração
 - **AND** “Links rápidos” apresenta os links “Quem somos”, “Doações”, “Criar doações”, “Doações mais recentes”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” em tamanho reduzido e com pouco espaço entre linhas
+- **AND** os títulos do rodapé usam aproximadamente 0.95rem e os links e textos usam aproximadamente 0.8rem
+- **AND** “Clique aqui para falar conosco” não é sublinhado
+- **AND** “Projeto acadêmico DoaFácil” usa aproximadamente 0.8rem
 - **AND** as colunas ficam lado a lado em telas largas e em coluna em telas estreitas
 - **AND** apresenta a linha “Projeto acadêmico DoaFácil”
 - **AND** os links não navegam para outra página

@@ -36,6 +36,14 @@ A home atual está concentrada em `doafacil/doafacil.py`, usa componentes Reflex
 
 7. **Manter a ilustração integrada ao fim da seção de doações.** Exibi-la em largura total, como último elemento da seção, sem margem ou faixa creme entre a imagem e “Comece por aqui”.
 
+8. **Compor a primeira dobra como uma área de viewport.** Agrupar cabeçalho, destaque, contagem/doações recentes e ilustração numa coluna com `min-height: 100vh`; o conteúdo central cresce e ocupa o espaço livre e a ilustração permanece no fim da área. Quando o conteúdo excede a viewport, o contêiner cresce naturalmente em vez de aplicar altura fixa ou recortar elementos. “Comece por aqui” é irmão seguinte dessa área e não pode aparecer na primeira tela.
+
+9. **Dar respiro e hierarquia consistentes à seção de entrada.** Usar padding vertical próximo de `5rem`; controlar os espaços entre etiqueta/título (`0.75rem`), título/frase (`1rem`), frase/cartões (`2.5rem`) e cartões/busca (`3rem`). Cartões usam aproximadamente `1.5rem` de gap e `2rem` de padding. O conteúdo (ícone, título e descrição) começa alinhado no topo em cada cartão, e seta/etiqueta é mantida no rodapé por uma composição interna flexível.
+
+10. **Manter a busca visual legível e ativa.** Campo e seletores ficam com fundo branco, borda cinza clara e texto legível; são apenas visuais quanto à busca, sem handler que execute filtro ou navegação.
+
+11. **Preservar o arquivo original do logotipo no rodapé.** Usar `/logo.svg` como no cabeçalho, sem filtro CSS ou recoloração. O contraste no fundo escuro deve ser observado e relatado, não corrigido com mudança de cor não aprovada. Reduzir títulos do rodapé para cerca de `0.95rem`, links e textos para `0.8rem`, com linhas compactas; “Clique aqui para falar conosco” não recebe sublinhado.
+
 ## Risks / Trade-offs
 
 - [A imagem de referência contém elementos herdados e diferentes do conteúdo aprovado] → tratar os textos e exclusões registrados no README como fonte normativa e validar os itens visíveis contra a spec.
