@@ -62,3 +62,27 @@ A home SHALL exibir os dados retornados para cada doação recente com título, 
 #### Scenario: Falha ao carregar as doações recentes
 - **WHEN** o serviço de listagem falha
 - **THEN** a home informa que as doações recentes não puderam ser carregadas e não apresenta cartões fictícios
+
+#### Scenario: Item inválido em uma lista de doações recentes
+- **WHEN** a resposta contém um ou mais itens inválidos e ao menos um item válido
+- **THEN** a home ignora somente os itens inválidos e exibe os cartões válidos
+
+#### Scenario: Nenhum item válido na resposta
+- **WHEN** a resposta contém itens, mas nenhum deles é válido
+- **THEN** a home informa que as doações recentes não puderam ser carregadas
+
+#### Scenario: Cartões recentes em carrossel
+- **WHEN** existem uma ou mais doações recentes válidas
+- **THEN** os cartões são exibidos em uma única linha horizontal, sem quebra
+- **AND** cada cartão tem largura fixa aproximada de 280px
+- **AND** há espaçamento aproximado de 1.25rem entre cartões
+- **AND** o carrossel permite rolagem horizontal com scroll-snap no eixo X e alinhamento inicial
+- **AND** são exibidos no máximo quatro cartões
+- **AND** em telas estreitas o carrossel ocupa a largura disponível e continua rolável horizontalmente
+- **AND** em telas largas a contagem reserva 14rem sem encolher, o rótulo pode quebrar em linhas e o carrossel ocupa apenas o espaço restante sem sobreposição
+- **AND** em telas estreitas a contagem ocupa toda a largura acima do título e do carrossel
+- **AND** a rolagem horizontal fica restrita ao carrossel, sem rolagem horizontal da página
+
+#### Scenario: Contagem e mensagem de erro sem sobreposição
+- **WHEN** a contagem falha
+- **THEN** a mensagem de erro e o rótulo “Doações em circulação” permanecem visíveis em áreas distintas, sem sobreposição

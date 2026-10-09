@@ -19,3 +19,6 @@
 ## 3. Verificação integrada
 
 - [ ] 3.1 Executar as verificações automatizadas relevantes do Reflex e percorrer manualmente a home com respostas reais ou controladas dos endpoints; confirmar visualmente o layout contra as referências aprovadas e registrar os comandos/resultados usados para validar a change.
+- [x] 3.2 Atualizar spec e design para registrar o carrossel horizontal de uma linha, o descarte isolado de itens inválidos e o layout sem sobreposição no estado de erro; implementar e cobrir esses comportamentos com testes, sem alterar Xano, endpoints ou a primeira tela fora da seção de doações recentes.
+- [x] 3.3 Executar `python -m unittest discover -s tests -v` e verificar no navegador, inclusive em viewport de 390px, que o carrossel permanece em uma linha com rolagem horizontal e que a contagem/erro não se sobrepõem.
+- [x] 3.4 Reservar 14rem para a contagem em telas largas, permitir quebra do rótulo, manter o carrossel no espaço restante e confirmar a ausência de sobreposição ou rolagem horizontal da página em 1440px, 1024px e 390px.
