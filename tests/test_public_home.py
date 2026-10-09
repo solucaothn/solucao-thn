@@ -13,6 +13,7 @@ from doafacil.doafacil import (
     _load_count_result,
     _load_donations_result,
     _parse_donations,
+    app,
     index,
     institutional_section,
     public_home_footer,
@@ -308,11 +309,16 @@ class PublicHomeTests(unittest.TestCase):
             == "O que você está procurando?"
         )
         self.assertEqual(search_input.background, "white")
+        self.assertEqual(search_input.id, "public-home-search")
         self.assertEqual(search_input.color, "#333333")
         self.assertEqual(search_input.border, "1px solid #C8C8C8")
         self.assertEqual(
             search_input._placeholder,
-            {"color": "#6B6B6B", "opacity": "1"},
+            {"color": "#6b6b6b", "opacity": 1},
+        )
+        self.assertEqual(
+            app.style["#public-home-search::placeholder"],
+            {"color": "#6b6b6b", "opacity": "1"},
         )
         search_selects = [
             node
@@ -418,6 +424,48 @@ class PublicHomeTests(unittest.TestCase):
         self.assertFalse(getattr(footer_logo, "filter", None))
         self.assertEqual(footer_logo.width, "160px")
         self.assertEqual(footer_logo.height, "58px")
+        text_nodes = {
+            contents[0]: node
+            for node in _all_component_nodes(footer)
+            if type(node).__name__ == "Text"
+            and (contents := _component_contents(node))
+        }
+        self.assertEqual(text_nodes["Fale conosco"].font_size, "15px")
+        self.assertEqual(
+            text_nodes["Links rápidos"].font_size,
+            "15px",
+        )
+        self.assertEqual(
+            text_nodes["Clique aqui para falar conosco"].font_size,
+            "13px",
+        )
+        self.assertEqual(
+            text_nodes["Projeto acadêmico DoaFácil"].font_size,
+            "12px",
+        )
+        link_labels = (
+            "Quem somos",
+            "Doações",
+            "Criar doações",
+            "Doações mais recentes",
+            "Política de privacidade",
+            "Termos de uso",
+            "Dúvidas frequentes",
+            "Segurança e transparência",
+        )
+        for label in link_labels:
+            self.assertEqual(text_nodes[label].font_size, "13px")
+        link_stacks = [
+            node
+            for node in _all_component_nodes(footer)
+            if getattr(
+                getattr(node, "style", {}).get("rowGap"),
+                "_var_value",
+                getattr(node, "style", {}).get("rowGap"),
+            )
+            == "6px"
+        ]
+        self.assertEqual(len(link_stacks), 4)
         for node in nodes:
             self.assertFalse(getattr(node, "href", None))
             self.assertFalse(getattr(node, "event_triggers", {}))
@@ -429,10 +477,10 @@ class PublicHomeTests(unittest.TestCase):
         self.assertEqual(self._value(container.spacing), "0")
 
         contents = container.children
-        self.assertEqual(contents[0].margin_bottom, "0.75rem")
-        self.assertEqual(contents[1].margin_bottom, "1rem")
+        self.assertEqual(contents[0].margin_bottom, "1rem")
+        self.assertEqual(contents[1].margin_bottom, "1.5rem")
         self.assertEqual(contents[1].line_height, "1.2")
-        self.assertEqual(contents[2].margin_bottom, "2.5rem")
+        self.assertEqual(contents[2].margin_bottom, "3rem")
         self.assertEqual(contents[2].line_height, "1.4")
         self.assertEqual(contents[3].margin_bottom, "3rem")
         self.assertEqual(contents[3].gap, "1.5rem")

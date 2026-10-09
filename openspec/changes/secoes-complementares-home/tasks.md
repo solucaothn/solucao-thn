@@ -35,3 +35,8 @@
 
 - [x] 7.1 Atualizar a spec, o design, as tarefas e `docs/design/README.md` com o padding superior reduzido, line-height dos textos e contraste explícito do placeholder e seletores da busca visual.
 - [x] 7.2 Ajustar os estilos da seção e da busca visual, atualizar testes sem modificar a primeira dobra ou comportamento, e executar `python -m unittest discover -s tests -v`.
+
+## 8. Ajustes visuais após verificação no navegador
+
+- [x] 8.1 Atualizar spec, design, tarefas e `docs/design/README.md` com os novos espaçamentos da seção, estilos explícitos do placeholder e tipografia do rodapé.
+- [x] 8.2 Aplicar os estilos apenas nas áreas solicitadas, atualizar testes, executar `python -m unittest discover -s tests -v` e confirmar por Playwright os estilos computados e as distâncias em pixels, sem modificar a primeira dobra ou comportamento.

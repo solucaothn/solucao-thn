@@ -499,7 +499,7 @@ def start_here_section() -> rx.Component:
                 font_weight="700",
                 letter_spacing="0.08em",
                 color="#168447",
-                margin_bottom="0.75rem",
+                margin_bottom="1rem",
             ),
             rx.heading(
                 "Quer criar uma doação?",
@@ -507,7 +507,7 @@ def start_here_section() -> rx.Component:
                 color="#333333",
                 line_height="1.2",
                 style={"fontSize": rx.breakpoints(initial="2rem", md="2.5rem")},
-                margin_bottom="1rem",
+                margin_bottom="1.5rem",
             ),
             rx.text(
                 "Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa.",
@@ -516,7 +516,7 @@ def start_here_section() -> rx.Component:
                 line_height="1.4",
                 max_width="900px",
                 style={"fontSize": rx.breakpoints(initial="1.2rem", md="1.5rem")},
-                margin_bottom="2.5rem",
+                margin_bottom="3rem",
             ),
             rx.flex(
                 start_here_card(
@@ -557,6 +557,7 @@ def start_here_section() -> rx.Component:
                     ),
                     rx.input(
                         placeholder="O que você está procurando?",
+                        id="public-home-search",
                         width="100%",
                         background="white",
                         color="#333333",
@@ -564,8 +565,8 @@ def start_here_section() -> rx.Component:
                         border_radius="8px",
                         opacity="1",
                         _placeholder={
-                            "color": "#6B6B6B",
-                            "opacity": "1",
+                            "color": "#6b6b6b",
+                            "opacity": 1,
                         },
                     ),
                     align="stretch",
@@ -796,14 +797,14 @@ def public_home_footer() -> rx.Component:
                 rx.vstack(
                     rx.text(
                         "Fale conosco",
-                        font_size="0.95rem",
+                        font_size="15px",
                         font_weight="700",
                         color="#2DBF72",
                     ),
                     rx.text(
                         "Clique aqui para falar conosco",
                         color="#F5F5F5",
-                        font_size="0.8rem",
+                        font_size="13px",
                     ),
                     align="start",
                     spacing="1",
@@ -812,7 +813,7 @@ def public_home_footer() -> rx.Component:
                 rx.vstack(
                     rx.text(
                         "Links rápidos",
-                        font_size="0.95rem",
+                        font_size="15px",
                         font_weight="700",
                         color="#2DBF72",
                     ),
@@ -823,13 +824,14 @@ def public_home_footer() -> rx.Component:
                                     rx.text(
                                         label,
                                         color="#F5F5F5",
-                                        font_size="0.8rem",
+                                        font_size="13px",
                                     )
                                     for label in group
                                 ],
                                 align="start",
-                                spacing="1",
+                                spacing="0",
                                 style={
+                                    "rowGap": "6px",
                                     "width": rx.breakpoints(
                                         initial="50%", md="25%"
                                     )
@@ -862,7 +864,7 @@ def public_home_footer() -> rx.Component:
             rx.text(
                 "Projeto acadêmico DoaFácil",
                 color="#D7D7D7",
-                font_size="0.8rem",
+                font_size="12px",
                 border_top="1px solid #515151",
                 padding_top="20px",
                 width="100%",
@@ -1020,6 +1022,12 @@ def index() -> rx.Component:
 
 
 app = rx.App(
+    style={
+        "#public-home-search::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        }
+    },
     stylesheets=[
         "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
     ]

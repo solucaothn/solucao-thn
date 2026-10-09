@@ -43,10 +43,10 @@ A home SHALL apresentar a seção “Comece por aqui” abaixo da ilustração, 
 - **AND** a barra não executa busca nem navega
 - **AND** em telas estreitas os campos e o botão ficam em coluna
 - **AND** a seção usa aproximadamente 2.5rem de padding superior e mantém o padding inferior atual de aproximadamente 5rem
-- **AND** há aproximadamente 0.75rem entre etiqueta e título, 1rem entre título e frase, 2.5rem entre frase e cartões, e 3rem entre cartões e barra visual
+- **AND** há aproximadamente 1rem entre etiqueta e título, 1.5rem entre título e frase, 3rem entre frase e cartões, e 3rem entre cartões e barra visual
 - **AND** o título tem line-height de aproximadamente 1.2 e a frase tem line-height de aproximadamente 1.4
 - **AND** os cartões usam gap aproximado de 1.5rem e padding interno aproximado de 2rem, com conteúdo superior alinhado e seta ou “Em breve” no rodapé
-- **AND** o campo e seletores da barra têm fundo branco, borda cinza clara e texto digitado em #333; o placeholder e os valores dos seletores usam cinza escuro legível, sem aparência desabilitada
+- **AND** o campo e seletores da barra têm fundo branco, borda cinza clara e texto digitado em #333; o placeholder usa explicitamente a cor #6b6b6b e opacidade 1, e os valores dos seletores usam cinza escuro legível, sem aparência desabilitada
 
 ### Requirement: Conteúdo institucional da home
 A home SHALL apresentar o título, o texto de apoio e os cartões institucionais definidos para o DoaFácil.
@@ -68,9 +68,9 @@ A home SHALL apresentar um rodapé escuro com a identidade e os links rápidos a
 - **AND** “Fale conosco” apresenta “Clique aqui para falar conosco” sem navegação
 - **AND** o logotipo do rodapé usa o arquivo colorido sem filtros ou recoloração
 - **AND** “Links rápidos” apresenta os links “Quem somos”, “Doações”, “Criar doações”, “Doações mais recentes”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” em tamanho reduzido e com pouco espaço entre linhas
-- **AND** os títulos do rodapé usam aproximadamente 0.95rem e os links e textos usam aproximadamente 0.8rem
+- **AND** os títulos do rodapé usam 15px, os links e “Clique aqui para falar conosco” usam 13px com espaço de 6px entre as linhas, e “Projeto acadêmico DoaFácil” usa 12px
 - **AND** “Clique aqui para falar conosco” não é sublinhado
-- **AND** “Projeto acadêmico DoaFácil” usa aproximadamente 0.8rem
+- **AND** “Projeto acadêmico DoaFácil” usa 12px
 - **AND** as colunas ficam lado a lado em telas largas e em coluna em telas estreitas
 - **AND** apresenta a linha “Projeto acadêmico DoaFácil”
 - **AND** os links não navegam para outra página
