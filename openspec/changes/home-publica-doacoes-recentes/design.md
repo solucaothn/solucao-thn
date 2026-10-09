@@ -43,6 +43,10 @@ O frontend Reflex ainda é a página inicial de exemplo. O Xano local já possui
 
 9. **Usar os materiais visuais aprovados, sem reproduzir a captura inteira como interface.** A home será construída com componentes Reflex usando `assets/logo.svg`, `assets/doacao-generica.svg` e `assets/ilustracao-rodape.png`. A ilustração ocupa a largura do rodapé sem distorção. Usar a fonte LINE Seed JP por stylesheet do app, com Arial e sans-serif como alternativas; cores seguem os recursos e referências aprovados. A seção institucional e o rodapé escuro descritos no README são outra change.
 
+10. **Manter as doações recentes em um carrossel horizontal responsivo.** Cartões válidos ficam em uma única linha, com largura fixa aproximada de `280px`, gap de `1.25rem`, `overflow-x: auto` e scroll-snap horizontal alinhado ao início. A barra de rolagem é fina e discreta. O limite de quatro itens do endpoint permanece. Em telas largas, a contagem reserva `14rem`, não encolhe e pode quebrar o rótulo em duas linhas; o carrossel usa somente a largura restante. Em telas estreitas a contagem ocupa a linha acima do título e do carrossel, que rola dentro da largura disponível sem provocar rolagem horizontal da página.
+
+11. **Isolar erros de itens da resposta.** Validar cada registro individualmente: itens inválidos são descartados sem impedir a exibição dos válidos; uma resposta não vazia sem nenhum item válido mostra estado de falha, enquanto uma lista vazia continua sendo um estado vazio. Erros da contagem permanecem no fluxo vertical de seu próprio bloco e não podem sobrepor o rótulo da contagem nem o carrossel.
+
 ## Risks / Trade-offs
 
 - [O workspace Xano compartilhado pode divergir dos arquivos locais ou conter alterações concorrentes] → executar `xano workspace pull -d ./xano`, reconciliar as diferenças sem sobrescrever trabalho alheio e revisar `xano workspace push -d ./xano --dry-run`; não fazer push nesta change sem aprovação.

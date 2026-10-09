@@ -14,9 +14,11 @@ from doafacil.doafacil import (
     _load_donations_result,
     _parse_donations,
     app,
+    donation_count_view,
     index,
     institutional_section,
     public_home_footer,
+    recent_donations_view,
     start_here_section,
     _xano_endpoints,
 )
@@ -134,6 +136,30 @@ class PublicHomeTests(unittest.TestCase):
 
     def test_empty_recent_response_stays_empty(self) -> None:
         self.assertEqual(_parse_donations([]), [])
+
+    def test_recent_response_skips_invalid_items_and_keeps_valid_ones(self) -> None:
+        valid_item = {
+            "id": 12,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "title": "Cadeira",
+            "photo": None,
+            "condition": None,
+        }
+        donations = _parse_donations(
+            [
+                {"id": 11, "created_at": valid_item["created_at"]},
+                valid_item,
+                "item inválido",
+            ]
+        )
+
+        self.assertEqual(len(donations), 1)
+        self.assertEqual(donations[0]["id"], 12)
+        self.assertEqual(donations[0]["title"], "Cadeira")
+
+    def test_recent_response_with_no_valid_items_is_reported_as_failure(self) -> None:
+        with self.assertRaisesRegex(ValueError, "nenhum"):
+            _parse_donations([{"id": 1, "title": ""}])
 
     def test_recent_endpoint_payload_maps_card_fields(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:
@@ -501,6 +527,45 @@ class PublicHomeTests(unittest.TestCase):
             )
             self.assertEqual(self._value(card.children[0].align), "center")
             self.assertEqual(self._value(card.children[0].justify), "start")
+
+    def test_recent_donations_use_a_single_line_horizontal_carousel(self) -> None:
+        recent_view = recent_donations_view()
+        carousel = next(
+            node
+            for node in _all_component_nodes(recent_view)
+            if getattr(node, "class_name", None)
+            == "recent-donations-carousel"
+        )
+        self.assertEqual(self._value(carousel.wrap), "nowrap")
+        self.assertEqual(self._value(carousel.overflow_x), "auto")
+        self.assertEqual(self._value(carousel.gap), "20px")
+        self.assertEqual(
+            self._value(carousel.style["scrollSnapType"]),
+            "x mandatory",
+        )
+
+        count_view = donation_count_view()
+        self.assertEqual(self._value(count_view.flex_shrink), "0")
+        self.assertEqual(
+            self._value(count_view.style["minWidth"]["62em"]),
+            "14rem",
+        )
+        self.assertEqual(
+            self._value(count_view.style["width"]["62em"]),
+            "14rem",
+        )
+        self.assertEqual(
+            _component_contents(count_view)[-1],
+            "Doações em circulação",
+        )
+        count_label = next(
+            node
+            for node in _all_component_nodes(count_view)
+            if type(node).__name__ == "Text"
+            and "Doações em circulação" in _component_contents(node)
+        )
+        self.assertEqual(self._value(count_label.white_space), "normal")
+        self.assertEqual(self._value(recent_view.min_width), "0")
 
     def test_first_viewport_contains_header_content_and_illustration(self) -> None:
         page = index()

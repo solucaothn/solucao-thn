@@ -65,7 +65,7 @@ def _parse_donations(
     donations: list[dict[str, str | int | bool]] = []
     for item in payload:
         if not isinstance(item, dict):
-            raise ValueError("A resposta contém uma doação inválida.")
+            continue
 
         donation_id = item.get("id")
         created_at = item.get("created_at")
@@ -81,19 +81,19 @@ def _parse_donations(
             or not isinstance(title, str)
             or not title.strip()
         ):
-            raise ValueError("A resposta contém campos obrigatórios inválidos.")
+            continue
         if photo is not None and not isinstance(photo, str):
-            raise ValueError("A foto da doação precisa ser uma URL ou nula.")
+            continue
         if condition is not None and (
             not isinstance(condition, str)
             or condition not in AVAILABLE_CONDITIONS
         ):
-            raise ValueError("A condição da doação não é reconhecida.")
+            continue
 
         try:
             is_new = _is_new_donation(created_at, now)
-        except ValueError as error:
-            raise ValueError("A data de criação da doação é inválida.") from error
+        except ValueError:
+            continue
 
         donations.append(
             {
@@ -108,6 +108,9 @@ def _parse_donations(
                 "is_new": is_new,
             }
         )
+
+    if payload and not donations:
+        raise ValueError("A resposta não contém nenhuma doação válida.")
 
     return donations
 
@@ -198,7 +201,7 @@ class HomeState(rx.State):
                 "Não foi possível carregar as doações recentes."
             )
         else:
-            self.donations = donations_result
+            self.donations = donations_result[:4]
         self.donations_loading = False
 
 
@@ -286,10 +289,12 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
         position="relative",
         overflow="hidden",
         border_radius="16px",
-        min_width="0",
-        width="260px",
-        max_width="100%",
+        min_width="280px",
+        width="280px",
+        max_width="280px",
         aspect_ratio="1 / 1",
+        flex_shrink="0",
+        scroll_snap_align="start",
         background=rx.cond(
             donation["photo"] == GENERIC_DONATION_IMAGE,
             "#DDF3E5",
@@ -310,8 +315,10 @@ def donation_count_view() -> rx.Component:
                     HomeState.count_error,
                     color="#9B2C2C",
                     width="100%",
+                    max_width="100%",
                     white_space="normal",
                     overflow_wrap="anywhere",
+                    font_size="0.85rem",
                 ),
                 rx.text(
                     HomeState.donation_count,
@@ -326,32 +333,17 @@ def donation_count_view() -> rx.Component:
             font_size="1rem",
             font_weight="600",
             color="#333333",
-            white_space="nowrap",
+            white_space="normal",
         ),
         align="start",
         spacing="1",
-        style={"width": rx.breakpoints(initial="100%", lg="150px")},
-        min_width="0",
+        style={"width": rx.breakpoints(initial="100%", md="14rem")},
+        min_width=rx.breakpoints(initial="100%", md="14rem"),
         flex_shrink="0",
     )
 
 
 def recent_donations_view() -> rx.Component:
-    donation_count = HomeState.donations.length()
-    group_width = rx.cond(
-        donation_count == 0,
-        "100%",
-        rx.cond(
-            donation_count == 1,
-            "260px",
-            rx.cond(
-                donation_count == 2,
-                "536px",
-                rx.cond(donation_count == 3, "812px", "1104px"),
-            ),
-        ),
-    )
-
     return rx.vstack(
         rx.heading(
             "Doações mais recentes",
@@ -378,21 +370,29 @@ def recent_donations_view() -> rx.Component:
                     ),
                     rx.flex(
                         rx.foreach(HomeState.donations, donation_card),
-                        wrap="wrap",
-                        justify="center",
+                        wrap="nowrap",
+                        justify="start",
                         align="start",
-                        gap="16px",
+                        gap="20px",
                         width="100%",
+                        overflow_x="auto",
+                        padding_bottom="8px",
+                        class_name="recent-donations-carousel",
+                        style={
+                            "scrollSnapType": "x mandatory",
+                            "scrollbarWidth": "thin",
+                            "scrollbarColor": "#B8C8BC transparent",
+                        },
                     ),
                 ),
             ),
         ),
         align="stretch",
         spacing="5",
-        width=group_width,
+        width="100%",
+        flex="1",
         max_width="100%",
         min_width="0",
-        margin_x="auto",
     )
 
 
@@ -981,7 +981,7 @@ def index() -> rx.Component:
                     padding_x="24px",
                     style={
                         "flexDirection": rx.breakpoints(
-                            initial="column", lg="row"
+                            initial="column", md="row"
                         )
                     },
                 ),
@@ -1026,7 +1026,17 @@ app = rx.App(
         "#public-home-search::placeholder": {
             "color": "#6b6b6b",
             "opacity": "1",
-        }
+        },
+        ".recent-donations-carousel::-webkit-scrollbar": {
+            "height": "6px",
+        },
+        ".recent-donations-carousel::-webkit-scrollbar-thumb": {
+            "background_color": "#B8C8BC",
+            "border_radius": "999px",
+        },
+        ".recent-donations-carousel::-webkit-scrollbar-track": {
+            "background_color": "transparent",
+        },
     },
     stylesheets=[
         "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
