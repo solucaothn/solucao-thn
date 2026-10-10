@@ -4,8 +4,9 @@
 
 - [x] 1.1 Executar `xano workspace pull -d ./xano`, revisar diferenças compartilhadas e reconciliar os arquivos do escopo sem descartar alterações locais preexistentes; verificar o estado final com `git diff`.
 - [x] 1.2 Consultar a documentação Xano e definir com o Developer MCP a representação opcional da foto e sua URL pública; adicionar à doação foto opcional e condição opcional restrita a Ótimo, Bom ou Regular; validar que registros existentes sem esses campos continuam íntegros.
-- [ ] 1.3 Criar endpoint público de doações recentes com até quatro registros disponíveis, ordenados por data de criação decrescente e somente com campos dos cartões; verificar chamada sem autenticação, filtro de status, ordenação, limite, campos retornados e valores ausentes.
+- [x] 1.3 Criar endpoint público de doações recentes com até quatro registros disponíveis, ordenados por data de criação decrescente e somente com campos dos cartões; verificar chamada sem autenticação, filtro de status, ordenação, limite, campos retornados e valores ausentes.
 - [ ] 1.4 Criar endpoint público de contagem de doações disponíveis; verificar chamada sem autenticação, contagem de todos os registros disponíveis e resposta zero sem registros disponíveis.
+  Verificado manualmente: endpoint Public e sem autenticação; com 6 registros (5 disponíveis e 1 reservada), o count retornou 5; pendente: caso de zero doações disponíveis.
 - [x] 1.5 Validar com o Xano Developer MCP todos os arquivos XanoScript alterados e executar `xano workspace push -d ./xano --dry-run`; revisar que o plano contém apenas o escopo desta change e não executar push como parte dessas tasks.
 
 ## 2. Home pública no Reflex
@@ -18,7 +19,7 @@
 
 ## 3. Verificação integrada
 
-- [ ] 3.1 Executar as verificações automatizadas relevantes do Reflex e percorrer manualmente a home com respostas reais ou controladas dos endpoints; confirmar visualmente o layout contra as referências aprovadas e registrar os comandos/resultados usados para validar a change.
+- [x] 3.1 Executar as verificações automatizadas relevantes do Reflex e percorrer manualmente a home com respostas reais ou controladas dos endpoints; confirmar visualmente o layout contra as referências aprovadas e registrar os comandos/resultados usados para validar a change.
 - [x] 3.2 Atualizar spec e design para registrar o carrossel horizontal de uma linha, o descarte isolado de itens inválidos e o layout sem sobreposição no estado de erro; implementar e cobrir esses comportamentos com testes, sem alterar Xano, endpoints ou a primeira tela fora da seção de doações recentes.
 - [x] 3.3 Executar `python -m unittest discover -s tests -v` e verificar no navegador, inclusive em viewport de 390px, que o carrossel permanece em uma linha com rolagem horizontal e que a contagem/erro não se sobrepõem.
 - [x] 3.4 Reservar 14rem para a contagem em telas largas, permitir quebra do rótulo, manter o carrossel no espaço restante e confirmar a ausência de sobreposição ou rolagem horizontal da página em 1440px, 1024px e 390px.
