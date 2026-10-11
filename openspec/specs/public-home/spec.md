@@ -1,0 +1,88 @@
+# public-home Specification
+
+## Purpose
+
+Define a apresentação da página inicial pública do DoaFácil e como seus elementos exibem a contagem e as doações disponíveis obtidas do backend.
+
+## Requirements
+
+### Requirement: Apresentação da home pública
+A home SHALL apresentar o cabeçalho, a frase de destaque, a estatística “Doações em circulação”, a seção “Doações mais recentes” e a ilustração aprovada no rodapé conforme as referências do design.
+
+#### Scenario: Abrir a home sem autenticação
+- **WHEN** uma pessoa acessa a página inicial sem sessão
+- **THEN** a página apresenta o logotipo, os links Explorar Doações, Como funciona e Categorias, os botões Entrar e Quero Doar, a frase de destaque, a estatística e a seção de doações recentes
+- **AND** não exibe a estatística “Pessoas alcançadas”
+- **AND** apresenta a ilustração aprovada ocupando toda a largura no rodapé da página, mantendo sua proporção
+
+### Requirement: Exibição da contagem em circulação
+A home SHALL apresentar na estatística “Doações em circulação” a quantidade retornada pelo serviço público de contagem de doações disponíveis.
+
+#### Scenario: Contagem retornada pelo backend
+- **WHEN** o serviço retorna uma quantidade de doações disponíveis
+- **THEN** a home exibe esse valor junto ao rótulo “Doações em circulação”
+
+#### Scenario: Falha ao carregar a contagem
+- **WHEN** o serviço de contagem falha
+- **THEN** a home informa que a contagem não pôde ser carregada e não apresenta um valor fictício como se fosse a contagem real
+
+#### Scenario: URL base do Xano não configurada
+- **WHEN** `XANO_API_URL` está ausente ou não contém uma URL HTTP(S) válida
+- **THEN** a home informa que não foi possível conectar ao Xano para cada seção afetada
+- **AND** não apresenta uma contagem ou uma lista de doações fictícias
+
+### Requirement: Cartões de doações recentes
+A home SHALL exibir os dados retornados para cada doação recente com título, condição, botão “Acessar” e uma imagem.
+
+#### Scenario: Doação com foto e condição
+- **WHEN** uma doação recente possui foto e condição
+- **THEN** o cartão exibe a foto, o título e a condição com o rótulo “Condição”
+- **AND** exibe o botão “Acessar” sem navegar para outra página quando acionado
+
+#### Scenario: Doação sem foto
+- **WHEN** uma doação recente não possui foto
+- **THEN** o cartão exibe uma imagem genérica no lugar da foto
+
+#### Scenario: Doação sem condição
+- **WHEN** uma doação recente não possui condição
+- **THEN** o cartão exibe “Condição não informada”
+
+#### Scenario: Marcação de doação nova
+- **WHEN** a data de criação da doação está dentro dos últimos sete dias
+- **THEN** o cartão exibe a etiqueta “NOVO”
+
+#### Scenario: Doação fora do período de novidade
+- **WHEN** a data de criação da doação tem mais de sete dias
+- **THEN** o cartão não exibe a etiqueta “NOVO”
+
+#### Scenario: Nenhuma doação recente
+- **WHEN** o serviço retorna uma lista vazia
+- **THEN** a home mantém os demais elementos e informa que ainda não há doações disponíveis para exibição
+
+#### Scenario: Falha ao carregar as doações recentes
+- **WHEN** o serviço de listagem falha
+- **THEN** a home informa que as doações recentes não puderam ser carregadas e não apresenta cartões fictícios
+
+#### Scenario: Item inválido em uma lista de doações recentes
+- **WHEN** a resposta contém um ou mais itens inválidos e ao menos um item válido
+- **THEN** a home ignora somente os itens inválidos e exibe os cartões válidos
+
+#### Scenario: Nenhum item válido na resposta
+- **WHEN** a resposta contém itens, mas nenhum deles é válido
+- **THEN** a home informa que as doações recentes não puderam ser carregadas
+
+#### Scenario: Cartões recentes em carrossel
+- **WHEN** existem uma ou mais doações recentes válidas
+- **THEN** os cartões são exibidos em uma única linha horizontal, sem quebra
+- **AND** cada cartão tem largura fixa aproximada de 280px
+- **AND** há espaçamento aproximado de 1.25rem entre cartões
+- **AND** o carrossel permite rolagem horizontal com scroll-snap no eixo X e alinhamento inicial
+- **AND** são exibidos no máximo quatro cartões
+- **AND** em telas estreitas o carrossel ocupa a largura disponível e continua rolável horizontalmente
+- **AND** em telas largas a contagem reserva 14rem sem encolher, o rótulo pode quebrar em linhas e o carrossel ocupa apenas o espaço restante sem sobreposição
+- **AND** em telas estreitas a contagem ocupa toda a largura acima do título e do carrossel
+- **AND** a rolagem horizontal fica restrita ao carrossel, sem rolagem horizontal da página
+
+#### Scenario: Contagem e mensagem de erro sem sobreposição
+- **WHEN** a contagem falha
+- **THEN** a mensagem de erro e o rótulo “Doações em circulação” permanecem visíveis em áreas distintas, sem sobreposição
