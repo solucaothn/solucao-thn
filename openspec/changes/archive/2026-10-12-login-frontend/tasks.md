@@ -14,4 +14,4 @@
 
 ## 3. Verificação integrada
 
-- [ ] 3.1 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; testar manualmente a rota `/login` em largura estreita e larga, conferindo o design, carregamento, mensagens de erro e retorno à home após sucesso com endpoint disponível no ambiente, sem persistência de token após recarregar.
+- [x] 3.1 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; testar manualmente a rota `/login` em largura estreita e larga, conferindo o design, carregamento, mensagens de erro e retorno à home após sucesso com endpoint disponível no ambiente, sem persistência de token após recarregar.
