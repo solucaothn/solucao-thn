@@ -665,9 +665,17 @@ class PublicHomeTests(unittest.TestCase):
             _component_contents(content[3]),
         )
 
+        enter_button = next(
+            node
+            for node in _component_nodes(page)
+            if _component_contents(node) == ["Entrar"]
+        )
+        self.assertIn("on_click", enter_button.event_triggers)
+
         for node in _component_nodes(page):
             self.assertFalse(getattr(node, "href", None))
-            self.assertFalse(getattr(node, "event_triggers", {}))
+            if node is not enter_button:
+                self.assertFalse(getattr(node, "event_triggers", {}))
 
 
 if __name__ == "__main__":
