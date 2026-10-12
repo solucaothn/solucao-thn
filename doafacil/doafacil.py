@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.cadastro import signup_page
 from doafacil.login import LoginState, login_page
 
 
@@ -1038,6 +1039,26 @@ app = rx.App(
             "color": "#6b6b6b",
             "opacity": "1",
         },
+        "#signup-name::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#signup-email::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#signup-city::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#signup-password::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#signup-confirm-password::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
         ".recent-donations-carousel::-webkit-scrollbar": {
             "height": "6px",
         },
@@ -1055,3 +1076,4 @@ app = rx.App(
 )
 app.add_page(index, on_load=HomeState.load_home_data)
 app.add_page(login_page, route="/login")
+app.add_page(signup_page, route="/cadastro")

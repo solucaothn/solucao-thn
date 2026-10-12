@@ -194,6 +194,8 @@ class LoginClientTests(unittest.TestCase):
                 "error_message": (str, ""),
                 "auth_token": (str, ""),
                 "password_visible": (bool, False),
+                "signup_password_visible": (bool, False),
+                "signup_confirmation_visible": (bool, False),
             },
         )
 
@@ -381,11 +383,23 @@ class LoginPageTests(unittest.TestCase):
         )
         self.assertEqual(getattr(logo.src, "_var_value", logo.src), "/logo.svg")
 
-        no_action_labels = {"Esqueci minha senha", "Criar conta"}
+        no_action_labels = {"Esqueci minha senha"}
         for node in nodes:
             if _component_text(node) in no_action_labels:
                 self.assertFalse(getattr(node, "href", None))
                 self.assertFalse(getattr(node, "event_triggers", {}))
+
+        create_account = next(
+            node for node in nodes if _component_text(node) == "Criar conta"
+        )
+        self.assertIn("on_click", create_account.event_triggers)
+        self.assertIn("/cadastro", str(create_account.event_triggers["on_click"]))
+
+        back_link = next(
+            node for node in nodes if _component_text(node) == "← Voltar"
+        )
+        route_link = back_link.children[0]
+        self.assertEqual(getattr(route_link.to, "_var_value", route_link.to), "/")
 
     def test_login_form_has_loading_and_error_state_bindings(self) -> None:
         page_nodes = _component_nodes(login_page())
