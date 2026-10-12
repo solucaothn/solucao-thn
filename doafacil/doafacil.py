@@ -1059,6 +1059,33 @@ app = rx.App(
             "color": "#6b6b6b",
             "opacity": "1",
         },
+        (
+            "#login-email:-webkit-autofill, "
+            "#login-email:-webkit-autofill:hover, "
+            "#login-email:-webkit-autofill:focus, "
+            "#login-password:-webkit-autofill, "
+            "#login-password:-webkit-autofill:hover, "
+            "#login-password:-webkit-autofill:focus, "
+            "#signup-name:-webkit-autofill, "
+            "#signup-name:-webkit-autofill:hover, "
+            "#signup-name:-webkit-autofill:focus, "
+            "#signup-email:-webkit-autofill, "
+            "#signup-email:-webkit-autofill:hover, "
+            "#signup-email:-webkit-autofill:focus, "
+            "#signup-city:-webkit-autofill, "
+            "#signup-city:-webkit-autofill:hover, "
+            "#signup-city:-webkit-autofill:focus, "
+            "#signup-password:-webkit-autofill, "
+            "#signup-password:-webkit-autofill:hover, "
+            "#signup-password:-webkit-autofill:focus, "
+            "#signup-confirm-password:-webkit-autofill, "
+            "#signup-confirm-password:-webkit-autofill:hover, "
+            "#signup-confirm-password:-webkit-autofill:focus"
+        ): {
+            "background_color": "white",
+            "WebkitTextFillColor": "#2b2b2b",
+            "box_shadow": "0 0 0 1000px white inset",
+        },
         ".recent-donations-carousel::-webkit-scrollbar": {
             "height": "6px",
         },

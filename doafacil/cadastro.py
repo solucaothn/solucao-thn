@@ -244,6 +244,7 @@ def signup_page() -> rx.Component:
                             width="100%",
                         ),
                         on_submit=LoginState.signup,
+                        no_validate=True,
                         width="100%",
                     ),
                     background="white",

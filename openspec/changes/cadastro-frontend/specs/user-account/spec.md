@@ -15,6 +15,7 @@ A aplicação SHALL oferecer uma tela responsiva para criação de conta, alinha
 #### Scenario: Validar dados antes do envio
 - **WHEN** a pessoa envia campos obrigatórios vazios, e-mail inválido, senha com menos de oito caracteres ou sem letra ou dígito, ou confirmação diferente da senha
 - **THEN** o envio é impedido e a tela apresenta mensagem de validação em português que identifica o problema
+- **AND** quando um campo obrigatório está vazio, a mensagem própria do site aparece no cartão em vez da validação nativa do navegador
 
 #### Scenario: Enviar cadastro válido
 - **WHEN** a pessoa envia Nome, E-mail, Cidade, Estado e uma senha válida com confirmação correspondente
@@ -42,6 +43,10 @@ A aplicação SHALL oferecer uma tela responsiva para criação de conta, alinha
 - **AND** cada botão alterna ícone e rótulo acessível entre “Mostrar senha” e “Ocultar senha”
 - **AND** os controles são do tipo botão e não enviam o formulário
 - **AND** os valores de senha não são persistidos no estado da aplicação nem registrados em logs
+
+#### Scenario: Preservar legibilidade no preenchimento automático
+- **WHEN** o navegador preenche automaticamente um campo de login ou cadastro
+- **THEN** o campo mantém fundo branco e texto escuro nos estados normal, hover e foco
 
 ### Requirement: Navegação entre login e cadastro
 A aplicação SHALL permitir que a pessoa navegue entre as telas públicas de login e cadastro e retorne à origem definida para cada tela.

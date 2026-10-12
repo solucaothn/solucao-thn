@@ -359,6 +359,24 @@ class SignupStateTests(unittest.TestCase):
             self.assertEqual(asyncio.run(run_loading()), [])
         request.assert_not_called()
 
+    def test_empty_required_signup_fields_show_site_validation_message(self) -> None:
+        class State:
+            is_loading = False
+            error_message = ""
+            auth_token = ""
+
+        state = State()
+        with patch("doafacil.login.request_signup") as request:
+            async def run() -> None:
+                async for _ in LoginState.signup.fn(state, {}):
+                    pass
+
+            asyncio.run(run())
+
+        self.assertEqual(state.error_message, "Informe seu nome.")
+        self.assertFalse(state.is_loading)
+        request.assert_not_called()
+
     def test_signup_visibility_flags_toggle_independently(self) -> None:
         class State:
             signup_password_visible = False
@@ -429,6 +447,21 @@ class SignupPageTests(unittest.TestCase):
         ]
         self.assertEqual(option_values, list(BRAZILIAN_STATES))
 
+    def test_signup_form_uses_site_validation_instead_of_native_validation(self) -> None:
+        nodes = _component_nodes(signup_page())
+        form = next(node for node in nodes if type(node).__name__ == "Form")
+        self.assertTrue(
+            getattr(form.no_validate, "_var_value", form.no_validate)
+        )
+        fields = [
+            node
+            for node in nodes
+            if type(node).__name__ == "TextFieldRoot"
+        ]
+        self.assertTrue(
+            all(getattr(field.required, "_var_value", field.required) for field in fields)
+        )
+
     def test_signup_password_buttons_are_accessible_and_independent(self) -> None:
         nodes = _component_nodes(signup_page())
         password_inputs = [
@@ -488,6 +521,31 @@ class SignupPageTests(unittest.TestCase):
         self.assertEqual(
             getattr(route_link.to, "_var_value", route_link.to), "/login"
         )
+
+    def test_login_and_signup_fields_have_scoped_autofill_styles(self) -> None:
+        autofill_rules = [
+            (selector, styles)
+            for selector, styles in app.style.items()
+            if ":-webkit-autofill" in selector
+        ]
+        self.assertEqual(len(autofill_rules), 1)
+        selector, styles = autofill_rules[0]
+        for field_id in (
+            "login-email",
+            "login-password",
+            "signup-name",
+            "signup-email",
+            "signup-city",
+            "signup-password",
+            "signup-confirm-password",
+        ):
+            self.assertIn(f"#{field_id}:-webkit-autofill", selector)
+            self.assertIn(f"#{field_id}:-webkit-autofill:hover", selector)
+            self.assertIn(f"#{field_id}:-webkit-autofill:focus", selector)
+        self.assertEqual(styles["background_color"], "white")
+        self.assertEqual(styles["WebkitTextFillColor"], "#2b2b2b")
+        self.assertIn("white inset", styles["box_shadow"])
+        self.assertNotIn("public-home-search", selector)
 
 
 if __name__ == "__main__":

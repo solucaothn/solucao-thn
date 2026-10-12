@@ -33,6 +33,8 @@ Ver `proposal.md` e `specs/user-account/spec.md` para motivação e comportament
 
 6. **Atualizar apenas as seções 04 e 05 do README de design.** A seção 04 registra Voltar para `/` e Criar conta para `/cadastro`; a seção 05 substitui o cadastro desatualizado pelas decisões aprovadas de campos, fundo, logo, telefone e controles adicionais. Nenhuma outra parte do README será alterada.
 
+7. **Priorizar mensagens do site para campos vazios e autofill legível.** Desativar a validação HTML nativa somente no formulário de cadastro para que o handler apresente a mensagem localizada no cartão; manter a validação pura existente. Estilizar `:-webkit-autofill` nos campos de login e cadastro para preservar texto escuro e fundo branco, incluindo hover e foco; não incluir seletores da home.
+
 ## Risks / Trade-offs
 
 - [A resposta HTTP de `accessdenied` não conter o texto de duplicidade em um campo estruturado reconhecido] → apresentar mensagem genérica, sem fazer inferências pelo status isolado nem expor o corpo bruto.

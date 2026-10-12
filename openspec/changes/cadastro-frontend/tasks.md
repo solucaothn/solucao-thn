@@ -9,6 +9,8 @@
 
 - [x] 2.1 Acrescentar o fluxo de signup ao mesmo estado Reflex que guarda o token do login, com carregamento, bloqueio de envio duplo, mensagens localizadas, tratamento de duplicidade e redirecionamento no sucesso; testar transições de estado, token compartilhado e ausência de senha nos campos persistentes do estado/logs.
 - [x] 2.2 Criar a rota `/cadastro` com campos na ordem especificada, seletor com as 27 UFs, cartão e cabeçalho responsivos, validação e dois controles independentes de mostrar/ocultar senha; acrescentar testes estruturais de textos, ordem dos campos, opções de UF, tipos de botão, ícones e rótulos acessíveis.
+- [x] 2.3 No formulário de cadastro, fazer as mensagens próprias de validação aparecerem para campos obrigatórios vazios, sem bloquear a validação do site; testar que o formulário não usa validação nativa e que o erro do primeiro campo vazio é apresentado.
+- [x] 2.4 Aplicar regras CSS `:-webkit-autofill` e estados de foco/hover aos campos de login e cadastro para preservar texto escuro e fundo branco; testar a presença das regras sem alterar os campos da home.
 
 ## 3. Navegação e documentação de design
 
