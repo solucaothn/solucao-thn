@@ -193,8 +193,19 @@ class LoginClientTests(unittest.TestCase):
                 "is_loading": (bool, False),
                 "error_message": (str, ""),
                 "auth_token": (str, ""),
+                "password_visible": (bool, False),
             },
         )
+
+    def test_password_visibility_state_toggles_on_each_activation(self) -> None:
+        class State:
+            password_visible = False
+
+        state = State()
+        LoginState.toggle_password_visibility.fn(state)
+        self.assertTrue(state.password_visible)
+        LoginState.toggle_password_visibility.fn(state)
+        self.assertFalse(state.password_visible)
 
     def test_login_error_messages_are_generic_and_distinct(self) -> None:
         invalid_credentials = login_error_message(InvalidCredentialsError())
@@ -334,20 +345,31 @@ class LoginPageTests(unittest.TestCase):
         def literal(value: object) -> object:
             return getattr(value, "_var_value", value)
 
+        fields = {
+            literal(node.name): node
+            for node in inputs
+        }
         self.assertEqual(
-            {
-                (
-                    literal(node.name),
-                    literal(node.type),
-                    literal(node.placeholder),
-                )
-                for node in inputs
-            },
-            {
-                ("email", "email", "Insira seu e-mail"),
-                ("password", "password", "Insira sua senha"),
-            },
+            {name: literal(node.placeholder) for name, node in fields.items()},
+            {"email": "Insira seu e-mail", "password": "Insira sua senha"},
         )
+        self.assertEqual(literal(fields["email"].type), "email")
+        self.assertIn("password_visible", str(fields["password"].type))
+        for name, field_id in (
+            ("email", "login-email"),
+            ("password", "login-password"),
+        ):
+            with self.subTest(field=name):
+                field = fields[name]
+                self.assertEqual(
+                    getattr(field.id, "_var_value", field.id),
+                    field_id,
+                )
+                self.assertEqual(field.color, "#333333")
+                self.assertEqual(
+                    app.style[f"#{field_id}::placeholder"],
+                    {"color": "#6b6b6b", "opacity": "1"},
+                )
         self.assertNotIn("CPF", contents)
         self.assertIn("login", app._unevaluated_pages)
         self.assertEqual(app._unevaluated_pages["login"].route, "login")
@@ -387,6 +409,37 @@ class LoginPageTests(unittest.TestCase):
         self.assertIn("is_loading", str(submit.disabled))
         self.assertIn("is_loading", str(submit.children))
         self.assertIn("error_message", str(page_nodes))
+
+    def test_password_visibility_button_is_accessible_and_not_submit(self) -> None:
+        page_nodes = _component_nodes(login_page())
+        visibility_button = next(
+            node
+            for node in page_nodes
+            if getattr(getattr(node, "type", None), "_var_value", None)
+            == "button"
+            and "aria-label" in getattr(node, "custom_attrs", {})
+        )
+        password_input = next(
+            node
+            for node in page_nodes
+            if type(node).__name__ == "TextFieldRoot"
+            and getattr(getattr(node, "name", None), "_var_value", None)
+            == "password"
+        )
+        self.assertIn("password_visible", str(password_input.type))
+        accessible_label = str(visibility_button.custom_attrs["aria-label"])
+        self.assertIn("Mostrar senha", accessible_label)
+        self.assertIn("Ocultar senha", accessible_label)
+        icon_branches = str(visibility_button.children)
+        self.assertIn("LucideEyeOff", icon_branches)
+        self.assertIn("LucideEye", icon_branches)
+        self.assertTrue(
+            getattr(visibility_button, "event_triggers", {}).get("on_click")
+        )
+        self.assertEqual(
+            getattr(visibility_button.style["color"], "_var_value", None),
+            "#168447",
+        )
 
     def test_home_header_enters_login_and_keeps_other_home_controls(self) -> None:
         page = index()

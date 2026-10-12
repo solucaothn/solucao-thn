@@ -111,6 +111,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 - Cabeçalho branco com o logotipo colorido centralizado; fundo creme na página.
 - Cartão branco centralizado com o título "Bem-vindo" e o subtítulo "Entre com seu e-mail e senha".
 - Campo "E-mail" com o texto interno "Insira seu e-mail" e campo "Senha" com o texto interno "Insira sua senha".
+- O campo Senha tem um botão de olho para mostrar ou ocultar a senha, acréscimo que não está no PNG do Figma.
 - Link pequeno "Esqueci minha senha", alinhado à direita abaixo do campo de senha, sem destino por enquanto.
 - Botão verde largo "Entrar".
 - Abaixo do cartão, botão pequeno em forma de pílula "Criar conta", sem destino por enquanto.

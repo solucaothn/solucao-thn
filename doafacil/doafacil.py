@@ -1030,6 +1030,14 @@ app = rx.App(
             "color": "#6b6b6b",
             "opacity": "1",
         },
+        "#login-email::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#login-password::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
         ".recent-donations-carousel::-webkit-scrollbar": {
             "height": "6px",
         },

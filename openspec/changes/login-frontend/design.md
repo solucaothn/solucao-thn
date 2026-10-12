@@ -33,6 +33,8 @@ Ver `proposal.md` e `specs/user-account/spec.md` para objetivo e comportamento c
 
 6. **Tratar a configuração como responsabilidade do ambiente de execução.** O processo Reflex deve receber `XANO_AUTH_API_URL` definido fora do repositório. Não alterar `.env`, `rxconfig.py`, manifests, arquivos de deploy nem exemplos versionados para incluir um valor local.
 
+7. **Alternar a visibilidade da senha na interface.** Um único booleano transitório do estado Reflex controla o tipo do campo, o ícone Lucide e o rótulo acessível; o valor da senha permanece exclusivamente no input e não é copiado ao estado.
+
 ## Risks / Trade-offs
 
 - [A URL base do grupo Authentication não estar configurada no ambiente] → validar a configuração antes da chamada e apresentar orientação de conexão sem incluir valores ou credenciais na interface.
