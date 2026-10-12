@@ -13,6 +13,12 @@ A aplicação SHALL oferecer uma página pública de login responsiva, coerente 
 - **AND** não solicita CPF
 - **AND** “Esqueci minha senha” e “Criar conta” não navegam nem iniciam outros fluxos
 
+#### Scenario: Alternar a visibilidade da senha
+- **WHEN** a pessoa aciona o botão de olho no campo “Senha”
+- **THEN** a senha alterna entre oculta e visível, iniciando oculta
+- **AND** o ícone e o rótulo acessível alternam entre olho / “Mostrar senha” e olho riscado / “Ocultar senha”
+- **AND** o controle é do tipo botão e não envia o formulário
+
 ### Requirement: Autenticação da pessoa usuária pela interface
 A interface de login SHALL autenticar por e-mail e senha usando o endpoint `auth/login` do grupo Authentication configurado no ambiente do processo da aplicação.
 

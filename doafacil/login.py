@@ -110,6 +110,11 @@ class LoginState(rx.State):
     is_loading: bool = False
     error_message: str = ""
     auth_token: str = ""
+    password_visible: bool = False
+
+    @rx.event
+    def toggle_password_visibility(self) -> None:
+        self.password_visible = not self.password_visible
 
     @rx.event
     async def login(
@@ -191,6 +196,7 @@ def login_page() -> rx.Component:
                                 ),
                                 rx.input(
                                     name="email",
+                                    id="login-email",
                                     type="email",
                                     placeholder="Insira seu e-mail",
                                     required=True,
@@ -214,7 +220,12 @@ def login_page() -> rx.Component:
                                 ),
                                 rx.input(
                                     name="password",
-                                    type="password",
+                                    id="login-password",
+                                    type=rx.cond(
+                                        LoginState.password_visible,
+                                        "text",
+                                        "password",
+                                    ),
                                     placeholder="Insira sua senha",
                                     required=True,
                                     width="100%",
@@ -223,6 +234,32 @@ def login_page() -> rx.Component:
                                     color="#333333",
                                     border="1px solid #C8C8C8",
                                     border_radius="8px",
+                                    padding_right="44px",
+                                ),
+                                rx.button(
+                                    rx.cond(
+                                        LoginState.password_visible,
+                                        rx.icon("eye-off", size=18),
+                                        rx.icon("eye", size=18),
+                                    ),
+                                    type="button",
+                                    aria_label=rx.cond(
+                                        LoginState.password_visible,
+                                        "Ocultar senha",
+                                        "Mostrar senha",
+                                    ),
+                                    on_click=LoginState.toggle_password_visibility,
+                                    position="absolute",
+                                    right="8px",
+                                    top="36px",
+                                    width="36px",
+                                    height="36px",
+                                    padding="0",
+                                    color="#168447",
+                                    background="transparent",
+                                    border="none",
+                                    box_shadow="none",
+                                    cursor="pointer",
                                 ),
                                 rx.text(
                                     "Esqueci minha senha",
@@ -235,6 +272,7 @@ def login_page() -> rx.Component:
                                 align="start",
                                 spacing="2",
                                 width="100%",
+                                position="relative",
                             ),
                             rx.cond(
                                 LoginState.error_message != "",
