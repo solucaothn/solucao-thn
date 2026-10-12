@@ -14,7 +14,7 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 
 ### 01-home.png — Tela inicial
 
-- Cabeçalho: logotipo, links **Explorar Doações**, **Como funciona** e **Categorias**, botão **Entrar** e botão **Quero Doar**.
+- Cabeçalho: logotipo, links **Explorar Doações**, **Como funciona** e **Categorias**, botão **Entrar** e botão **Quero Doar**. Com sessão autenticada, exibe “Olá, <primeiro nome>” e o botão **Sair** no lugar de **Entrar**; esse comportamento é um acréscimo que não está no Figma.
 - Frase de destaque: "Doar é fácil. No DoaFácil, o que sobra em você vira recomeço para alguém."
 - Estatística: "Doações em circulação".
 - Seção **Doações mais recentes**: cartões com foto, etiqueta **NOVO**, título, **Condição** do item (Ótimo, Bom) e botão **Acessar**.

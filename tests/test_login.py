@@ -8,17 +8,23 @@ import reflex as rx
 
 from doafacil.doafacil import app, index
 from doafacil.login import (
+    ACCOUNT_FALLBACK_NAME,
     AUTH_API_ENV,
     AUTH_LOGIN_PATH,
+    AUTH_ME_PATH,
+    AuthAccountUnavailableError,
+    AuthTokenRejectedError,
     InvalidCredentialsError,
     LoginConfigurationError,
     LoginResult,
     LoginState,
     LoginUnavailableError,
+    auth_me_endpoint,
     auth_login_endpoint,
     login_page,
     login_error_message,
     request_login,
+    request_authenticated_name,
 )
 
 
@@ -83,6 +89,96 @@ class LoginClientTests(unittest.TestCase):
             os.environ.pop(AUTH_API_ENV, None)
             with self.assertRaises(LoginConfigurationError):
                 auth_login_endpoint()
+
+    def test_auth_me_endpoint_uses_the_authentication_base_url(self) -> None:
+        with patch.dict(os.environ, {AUTH_API_ENV: "https://auth.example/api/"}):
+            self.assertEqual(
+                auth_me_endpoint(),
+                f"https://auth.example/api{AUTH_ME_PATH}",
+            )
+
+    def test_authenticated_name_request_uses_bearer_and_keeps_only_first_name(
+        self,
+    ) -> None:
+        async def respond(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.method, "GET")
+            self.assertEqual(request.url.path, AUTH_ME_PATH)
+            self.assertEqual(
+                request.headers["Authorization"], "Bearer private-token"
+            )
+            return httpx.Response(
+                200,
+                json={
+                    "name": "Maria da Silva",
+                    "email": "private@example.test",
+                    "role": "user",
+                },
+                request=request,
+            )
+
+        async def run() -> str:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(respond)
+            ) as client:
+                return await request_authenticated_name(
+                    client,
+                    f"https://auth.example{AUTH_ME_PATH}",
+                    "private-token",
+                )
+
+        self.assertEqual(asyncio.run(run()), "Maria")
+
+    def test_authenticated_name_request_classifies_rejected_tokens(self) -> None:
+        async def respond(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                401, json={"message": "private detail"}, request=request
+            )
+
+        async def run() -> None:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(respond)
+            ) as client:
+                await request_authenticated_name(
+                    client,
+                    f"https://auth.example{AUTH_ME_PATH}",
+                    "private-token",
+                )
+
+        with self.assertRaises(AuthTokenRejectedError) as raised:
+            asyncio.run(run())
+        self.assertNotIn("private-token", str(raised.exception))
+        self.assertNotIn("private detail", str(raised.exception))
+
+    def test_authenticated_name_request_uses_fallback_or_hides_failures(
+        self,
+    ) -> None:
+        async def empty_name(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"name": "  "}, request=request)
+
+        async def malformed(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=["invalid"], request=request)
+
+        async def unavailable(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503, json={"detail": "private"}, request=request)
+
+        async def request_name(handler: object) -> str:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(handler)
+            ) as client:
+                return await request_authenticated_name(
+                    client,
+                    f"https://auth.example{AUTH_ME_PATH}",
+                    "private-token",
+                )
+
+        self.assertEqual(
+            asyncio.run(request_name(empty_name)), ACCOUNT_FALLBACK_NAME
+        )
+        with self.assertRaises(AuthAccountUnavailableError):
+            asyncio.run(request_name(malformed))
+        with self.assertRaises(AuthAccountUnavailableError) as raised:
+            asyncio.run(request_name(unavailable))
+        self.assertNotIn("private", str(raised.exception))
 
     def test_login_request_sends_only_email_and_password(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:
@@ -193,11 +289,76 @@ class LoginClientTests(unittest.TestCase):
                 "is_loading": (bool, False),
                 "error_message": (str, ""),
                 "auth_token": (str, ""),
+                "account_name": (str, ""),
                 "password_visible": (bool, False),
                 "signup_password_visible": (bool, False),
                 "signup_confirmation_visible": (bool, False),
             },
         )
+
+    def test_account_state_clears_rejected_token_and_falls_back_on_errors(
+        self,
+    ) -> None:
+        class State:
+            auth_token = "private-token"
+            account_name = "Old name"
+
+        rejected_state = State()
+        with (
+            patch.dict(
+                os.environ, {AUTH_API_ENV: "https://auth.example/api"}
+            ),
+            patch(
+                "doafacil.login.request_authenticated_name",
+                new_callable=AsyncMock,
+                side_effect=AuthTokenRejectedError(),
+            ),
+        ):
+            asyncio.run(LoginState.load_account.fn(rejected_state))
+        self.assertEqual(rejected_state.auth_token, "")
+        self.assertEqual(rejected_state.account_name, "")
+
+        transient_state = State()
+        with (
+            patch.dict(
+                os.environ, {AUTH_API_ENV: "https://auth.example/api"}
+            ),
+            patch(
+                "doafacil.login.request_authenticated_name",
+                new_callable=AsyncMock,
+                side_effect=AuthAccountUnavailableError(),
+            ),
+        ):
+            asyncio.run(LoginState.load_account.fn(transient_state))
+        self.assertEqual(transient_state.auth_token, "private-token")
+        self.assertEqual(transient_state.account_name, ACCOUNT_FALLBACK_NAME)
+
+    def test_account_state_without_token_skips_request_and_logout_clears_values(
+        self,
+    ) -> None:
+        class State:
+            auth_token = ""
+            account_name = "Old name"
+
+        state = State()
+        with (
+            patch.dict(
+                os.environ, {AUTH_API_ENV: "https://auth.example/api"}
+            ),
+            patch(
+                "doafacil.login.request_authenticated_name",
+                new_callable=AsyncMock,
+            ) as request,
+        ):
+            asyncio.run(LoginState.load_account.fn(state))
+        request.assert_not_awaited()
+        self.assertEqual(state.account_name, "")
+
+        state.auth_token = "private-token"
+        state.account_name = "Maria"
+        LoginState.logout.fn(state)
+        self.assertEqual(state.auth_token, "")
+        self.assertEqual(state.account_name, "")
 
     def test_password_visibility_state_toggles_on_each_activation(self) -> None:
         class State:
@@ -461,13 +622,27 @@ class LoginPageTests(unittest.TestCase):
         enter = next(
             node
             for node in nodes
-            if _component_text(node) == "Entrar"
+            if type(node).__name__ == "Button"
+            and _component_text(node) == "Entrar"
         )
         self.assertIn("on_click", getattr(enter, "event_triggers", {}))
         self.assertIn("/login", str(enter.event_triggers["on_click"]))
 
+        logout = next(
+            node
+            for node in nodes
+            if type(node).__name__ == "Button"
+            and _component_text(node) == "Sair"
+        )
+        self.assertIn("on_click", getattr(logout, "event_triggers", {}))
+        self.assertIn("LoginState.logout", str(logout.event_triggers["on_click"]))
+        self.assertTrue(
+            any("Olá," in _component_text(node) for node in nodes)
+        )
+        self.assertIn("account_name", str(page))
+
         for node in nodes:
-            if node is not enter:
+            if node not in (enter, logout):
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
 

@@ -925,13 +925,38 @@ def index() -> rx.Component:
                     ),
                     rx.spacer(),
                     rx.hstack(
-                        rx.button(
-                            "Entrar",
-                            variant="outline",
-                            color="#168447",
-                            border_color="#168447",
-                            size="2",
-                            on_click=rx.redirect("/login"),
+                        rx.cond(
+                            LoginState.auth_token,
+                            rx.hstack(
+                                rx.text(
+                                    "Olá, ",
+                                    LoginState.account_name,
+                                    color="#168447",
+                                    font_weight="700",
+                                    max_width=rx.breakpoints(
+                                        initial="110px", md="180px"
+                                    ),
+                                    overflow_wrap="anywhere",
+                                ),
+                                rx.button(
+                                    "Sair",
+                                    variant="outline",
+                                    color="#168447",
+                                    border_color="#168447",
+                                    size="2",
+                                    on_click=LoginState.logout,
+                                ),
+                                align="center",
+                                spacing="3",
+                            ),
+                            rx.button(
+                                "Entrar",
+                                variant="outline",
+                                color="#168447",
+                                border_color="#168447",
+                                size="2",
+                                on_click=rx.redirect("/login"),
+                            ),
                         ),
                         rx.button(
                             "Quero Doar",
@@ -1101,6 +1126,9 @@ app = rx.App(
         "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
     ]
 )
-app.add_page(index, on_load=HomeState.load_home_data)
+app.add_page(
+    index,
+    on_load=[HomeState.load_home_data, LoginState.load_account],
+)
 app.add_page(login_page, route="/login")
 app.add_page(signup_page, route="/cadastro")

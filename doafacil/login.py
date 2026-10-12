@@ -12,6 +12,8 @@ import reflex as rx
 AUTH_API_ENV = "XANO_AUTH_API_URL"
 AUTH_LOGIN_PATH = "/auth/login"
 AUTH_SIGNUP_PATH = "/auth/signup"
+AUTH_ME_PATH = "/auth/me"
+ACCOUNT_FALLBACK_NAME = "Minha conta"
 DUPLICATE_SIGNUP_MESSAGE = "An account with this email already exists."
 
 
@@ -44,6 +46,14 @@ class SignupRejectedError(SignupError):
 
 
 class SignupUnavailableError(SignupError):
+    pass
+
+
+class AuthTokenRejectedError(LoginError):
+    pass
+
+
+class AuthAccountUnavailableError(LoginError):
     pass
 
 
@@ -108,6 +118,41 @@ def auth_login_endpoint() -> str:
 
 def auth_signup_endpoint() -> str:
     return _auth_api_endpoint(AUTH_SIGNUP_PATH)
+
+
+def auth_me_endpoint() -> str:
+    return _auth_api_endpoint(AUTH_ME_PATH)
+
+
+async def request_authenticated_name(
+    client: httpx.AsyncClient, endpoint: str, auth_token: str
+) -> str:
+    try:
+        response = await client.get(
+            endpoint,
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+    except httpx.RequestError:
+        raise AuthAccountUnavailableError from None
+
+    if response.status_code in {401, 403}:
+        raise AuthTokenRejectedError from None
+    if response.is_error:
+        raise AuthAccountUnavailableError from None
+
+    try:
+        payload = response.json()
+    except ValueError:
+        raise AuthAccountUnavailableError from None
+
+    if not isinstance(payload, dict):
+        raise AuthAccountUnavailableError from None
+
+    name = payload.get("name")
+    if not isinstance(name, str):
+        raise AuthAccountUnavailableError from None
+    first_name = name.strip().split(maxsplit=1)
+    return first_name[0] if first_name else ACCOUNT_FALLBACK_NAME
 
 
 async def request_login(
@@ -251,9 +296,34 @@ class LoginState(rx.State):
     is_loading: bool = False
     error_message: str = ""
     auth_token: str = ""
+    account_name: str = ""
     password_visible: bool = False
     signup_password_visible: bool = False
     signup_confirmation_visible: bool = False
+
+    @rx.event
+    async def load_account(self) -> None:
+        if not self.auth_token:
+            self.account_name = ""
+            return
+
+        self.account_name = ACCOUNT_FALLBACK_NAME
+        try:
+            endpoint = auth_me_endpoint()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                self.account_name = await request_authenticated_name(
+                    client, endpoint, self.auth_token
+                )
+        except AuthTokenRejectedError:
+            self.auth_token = ""
+            self.account_name = ""
+        except LoginError:
+            self.account_name = ACCOUNT_FALLBACK_NAME
+
+    @rx.event
+    def logout(self) -> None:
+        self.auth_token = ""
+        self.account_name = ""
 
     @rx.event
     def toggle_password_visibility(self) -> None:
@@ -277,6 +347,7 @@ class LoginState(rx.State):
         self.is_loading = True
         self.error_message = ""
         self.auth_token = ""
+        self.account_name = ""
 
         email = form_data.get("email", "").strip()
         password = form_data.get("password", "")
@@ -313,6 +384,7 @@ class LoginState(rx.State):
         self.is_loading = True
         self.error_message = ""
         self.auth_token = ""
+        self.account_name = ""
 
         validation_message = validate_signup_data(form_data)
         if validation_message:
