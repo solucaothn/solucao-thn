@@ -1,0 +1,273 @@
+from typing import Any
+
+import reflex as rx
+
+from doafacil.login import LoginState
+
+
+BRAZILIAN_STATES = (
+    "AC",
+    "AL",
+    "AP",
+    "AM",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MT",
+    "MS",
+    "MG",
+    "PA",
+    "PB",
+    "PR",
+    "PE",
+    "PI",
+    "RJ",
+    "RN",
+    "RS",
+    "RO",
+    "RR",
+    "SC",
+    "SP",
+    "SE",
+    "TO",
+)
+
+
+def _text_field(
+    label: str,
+    name: str,
+    field_id: str,
+    input_type: str,
+    placeholder: str,
+) -> rx.Component:
+    return rx.vstack(
+        rx.text(label, color="#333333", font_weight="700", width="100%"),
+        rx.input(
+            name=name,
+            id=field_id,
+            type=input_type,
+            placeholder=placeholder,
+            required=True,
+            width="100%",
+            height="48px",
+            background="white",
+            color="#333333",
+            border="1px solid #C8C8C8",
+            border_radius="8px",
+        ),
+        align="start",
+        spacing="2",
+        width="100%",
+    )
+
+
+def _password_field(
+    label: str,
+    name: str,
+    field_id: str,
+    placeholder: str,
+    visible: rx.Var[bool],
+    toggle: Any,
+) -> rx.Component:
+    return rx.vstack(
+        rx.text(label, color="#333333", font_weight="700", width="100%"),
+        rx.box(
+            rx.input(
+                name=name,
+                id=field_id,
+                type=rx.cond(visible, "text", "password"),
+                placeholder=placeholder,
+                required=True,
+                width="100%",
+                height="48px",
+                background="white",
+                color="#333333",
+                border="1px solid #C8C8C8",
+                border_radius="8px",
+                padding_right="44px",
+            ),
+            rx.button(
+                rx.cond(
+                    visible,
+                    rx.icon("eye-off", size=18),
+                    rx.icon("eye", size=18),
+                ),
+                type="button",
+                aria_label=rx.cond(visible, "Ocultar senha", "Mostrar senha"),
+                on_click=toggle,
+                position="absolute",
+                right="8px",
+                top="6px",
+                width="36px",
+                height="36px",
+                padding="0",
+                color="#168447",
+                background="transparent",
+                border="none",
+                box_shadow="none",
+                cursor="pointer",
+            ),
+            position="relative",
+            width="100%",
+        ),
+        align="start",
+        spacing="2",
+        width="100%",
+    )
+
+
+def signup_page() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.box(
+                rx.image(
+                    src="/logo.svg",
+                    alt="DoaFácil",
+                    width="190px",
+                    height="72px",
+                    object_fit="contain",
+                    margin="0 auto",
+                ),
+                width="100%",
+                background="white",
+                padding="12px 24px",
+            ),
+            rx.vstack(
+                rx.link(
+                    "← Voltar",
+                    href="/login",
+                    color="#168447",
+                    align_self="start",
+                    cursor="pointer",
+                ),
+                rx.box(
+                    rx.form(
+                        rx.vstack(
+                            rx.heading(
+                                "Criar sua conta",
+                                color="#333333",
+                                font_size="2rem",
+                                font_weight="700",
+                                text_align="center",
+                                width="100%",
+                            ),
+                            _text_field(
+                                "Nome",
+                                "name",
+                                "signup-name",
+                                "text",
+                                "Insira seu nome",
+                            ),
+                            _text_field(
+                                "E-mail",
+                                "email",
+                                "signup-email",
+                                "email",
+                                "Insira seu e-mail",
+                            ),
+                            _text_field(
+                                "Cidade",
+                                "city",
+                                "signup-city",
+                                "text",
+                                "Insira sua cidade",
+                            ),
+                            rx.vstack(
+                                rx.text(
+                                    "Estado",
+                                    color="#333333",
+                                    font_weight="700",
+                                    width="100%",
+                                ),
+                                rx.select(
+                                    list(BRAZILIAN_STATES),
+                                    name="state",
+                                    placeholder="Selecione seu estado",
+                                    required=True,
+                                    width="100%",
+                                    height="48px",
+                                    background="white",
+                                    color="#333333",
+                                    border="1px solid #C8C8C8",
+                                    border_radius="8px",
+                                ),
+                                align="start",
+                                spacing="2",
+                                width="100%",
+                            ),
+                            _password_field(
+                                "Senha",
+                                "password",
+                                "signup-password",
+                                "Insira sua senha",
+                                LoginState.signup_password_visible,
+                                LoginState.toggle_signup_password_visibility,
+                            ),
+                            _password_field(
+                                "Confirmar senha",
+                                "confirm_password",
+                                "signup-confirm-password",
+                                "Confirme sua senha",
+                                LoginState.signup_confirmation_visible,
+                                LoginState.toggle_signup_confirmation_visibility,
+                            ),
+                            rx.cond(
+                                LoginState.error_message != "",
+                                rx.text(
+                                    LoginState.error_message,
+                                    color="#B42318",
+                                    role="alert",
+                                    width="100%",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.button(
+                                rx.cond(
+                                    LoginState.is_loading,
+                                    "Criando...",
+                                    "Criar",
+                                ),
+                                type="submit",
+                                disabled=LoginState.is_loading,
+                                background="#168447",
+                                color="white",
+                                width="100%",
+                                height="50px",
+                                border_radius="8px",
+                                cursor="pointer",
+                            ),
+                            align="start",
+                            spacing="5",
+                            width="100%",
+                        ),
+                        on_submit=LoginState.signup,
+                        no_validate=True,
+                        width="100%",
+                    ),
+                    background="white",
+                    border_radius="16px",
+                    box_shadow="0 8px 24px rgba(0, 0, 0, 0.08)",
+                    padding=rx.breakpoints(
+                        initial="24px",
+                        md="40px",
+                    ),
+                    width="100%",
+                ),
+                align="center",
+                spacing="4",
+                width="100%",
+                max_width="440px",
+                padding="32px 24px",
+            ),
+            align="center",
+            width="100%",
+            spacing="0",
+        ),
+        min_height="100vh",
+        width="100%",
+        background="#FFF6E8",
+        font_family="'LINE Seed JP', Arial, sans-serif",
+    )

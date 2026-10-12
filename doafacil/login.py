@@ -1,5 +1,6 @@
 import os
-from collections.abc import AsyncGenerator
+import re
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -10,6 +11,8 @@ import reflex as rx
 
 AUTH_API_ENV = "XANO_AUTH_API_URL"
 AUTH_LOGIN_PATH = "/auth/login"
+AUTH_SIGNUP_PATH = "/auth/signup"
+DUPLICATE_SIGNUP_MESSAGE = "An account with this email already exists."
 
 
 class LoginError(Exception):
@@ -28,8 +31,30 @@ class LoginUnavailableError(LoginError):
     pass
 
 
+class SignupError(LoginError):
+    pass
+
+
+class EmailAlreadyRegisteredError(SignupError):
+    pass
+
+
+class SignupRejectedError(SignupError):
+    pass
+
+
+class SignupUnavailableError(SignupError):
+    pass
+
+
 @dataclass(frozen=True, repr=False)
 class LoginResult:
+    auth_token: str
+    user_id: int
+
+
+@dataclass(frozen=True, repr=False)
+class SignupResult:
     auth_token: str
     user_id: int
 
@@ -43,7 +68,18 @@ def login_error_message(error: LoginError) -> str:
     )
 
 
-def auth_login_endpoint() -> str:
+def signup_error_message(error: LoginError) -> str:
+    if isinstance(error, EmailAlreadyRegisteredError):
+        return "Este e-mail já está cadastrado."
+    if isinstance(error, (SignupUnavailableError, LoginConfigurationError)):
+        return (
+            "Não foi possível conectar ao serviço de autenticação. "
+            "Tente novamente."
+        )
+    return "Não foi possível criar sua conta. Confira os dados e tente novamente."
+
+
+def _auth_api_endpoint(path: str) -> str:
     base_url = os.getenv(AUTH_API_ENV, "").strip()
     try:
         parsed_url = urlsplit(base_url)
@@ -63,7 +99,15 @@ def auth_login_endpoint() -> str:
     ):
         raise LoginConfigurationError from None
 
-    return f"{base_url.rstrip('/')}{AUTH_LOGIN_PATH}"
+    return f"{base_url.rstrip('/')}{path}"
+
+
+def auth_login_endpoint() -> str:
+    return _auth_api_endpoint(AUTH_LOGIN_PATH)
+
+
+def auth_signup_endpoint() -> str:
+    return _auth_api_endpoint(AUTH_SIGNUP_PATH)
 
 
 async def request_login(
@@ -106,15 +150,122 @@ async def request_login(
     return LoginResult(auth_token=auth_token, user_id=user_id)
 
 
+def _contains_duplicate_signup_message(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip() == DUPLICATE_SIGNUP_MESSAGE
+    if isinstance(value, Mapping):
+        return any(
+            _contains_duplicate_signup_message(item)
+            for item in value.values()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_contains_duplicate_signup_message(item) for item in value)
+    return False
+
+
+async def request_signup(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    name: str,
+    email: str,
+    password: str,
+    city: str,
+    state: str,
+) -> SignupResult:
+    try:
+        response = await client.post(
+            endpoint,
+            json={
+                "name": name.strip(),
+                "email": email.strip(),
+                "password": password,
+                "city": city.strip(),
+                "state": state.strip(),
+            },
+        )
+    except httpx.RequestError:
+        raise SignupUnavailableError from None
+
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    if response.is_error:
+        if _contains_duplicate_signup_message(payload):
+            raise EmailAlreadyRegisteredError from None
+        raise SignupRejectedError from None
+
+    if not isinstance(payload, dict):
+        raise SignupUnavailableError from None
+
+    auth_token = payload.get("authToken")
+    user_id = payload.get("user_id")
+    if (
+        not isinstance(auth_token, str)
+        or not auth_token
+        or isinstance(user_id, bool)
+        or not isinstance(user_id, int)
+    ):
+        raise SignupUnavailableError from None
+
+    return SignupResult(auth_token=auth_token, user_id=user_id)
+
+
+def validate_signup_data(form_data: Mapping[str, object]) -> str:
+    required_fields = (
+        ("name", "Informe seu nome."),
+        ("email", "Informe seu e-mail."),
+        ("city", "Informe sua cidade."),
+        ("state", "Selecione seu estado."),
+        ("password", "Informe sua senha."),
+        ("confirm_password", "Confirme sua senha."),
+    )
+    values: dict[str, str] = {}
+    for name, _ in required_fields:
+        value = form_data.get(name)
+        if isinstance(value, str):
+            values[name] = value.strip()
+
+    for name, message in required_fields:
+        if not values.get(name):
+            return message
+
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", values["email"]):
+        return "Informe um e-mail válido."
+
+    password = form_data.get("password")
+    confirm_password = form_data.get("confirm_password")
+    if not isinstance(password, str) or len(password) < 8:
+        return "A senha deve ter pelo menos 8 caracteres."
+    if not any(character.isalpha() for character in password):
+        return "A senha deve conter pelo menos uma letra."
+    if not any(character.isdigit() for character in password):
+        return "A senha deve conter pelo menos um número."
+    if password != confirm_password:
+        return "As senhas não coincidem."
+    return ""
+
+
 class LoginState(rx.State):
     is_loading: bool = False
     error_message: str = ""
     auth_token: str = ""
     password_visible: bool = False
+    signup_password_visible: bool = False
+    signup_confirmation_visible: bool = False
 
     @rx.event
     def toggle_password_visibility(self) -> None:
         self.password_visible = not self.password_visible
+
+    @rx.event
+    def toggle_signup_password_visibility(self) -> None:
+        self.signup_password_visible = not self.signup_password_visible
+
+    @rx.event
+    def toggle_signup_confirmation_visibility(self) -> None:
+        self.signup_confirmation_visible = not self.signup_confirmation_visible
 
     @rx.event
     async def login(
@@ -152,6 +303,45 @@ class LoginState(rx.State):
 
         self.is_loading = False
 
+    @rx.event
+    async def signup(
+        self, form_data: dict[str, Any]
+    ) -> AsyncGenerator[rx.event.EventSpec, None]:
+        if self.is_loading:
+            return
+
+        self.is_loading = True
+        self.error_message = ""
+        self.auth_token = ""
+
+        validation_message = validate_signup_data(form_data)
+        if validation_message:
+            self.error_message = validation_message
+            self.is_loading = False
+            return
+
+        try:
+            endpoint = auth_signup_endpoint()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                result = await request_signup(
+                    client,
+                    endpoint,
+                    str(form_data["name"]),
+                    str(form_data["email"]),
+                    str(form_data["password"]),
+                    str(form_data["city"]),
+                    str(form_data["state"]),
+                )
+        except LoginError as error:
+            self.error_message = signup_error_message(error)
+        else:
+            self.auth_token = result.auth_token
+            self.is_loading = False
+            yield rx.redirect("/")
+            return
+
+        self.is_loading = False
+
 
 def login_page() -> rx.Component:
     return rx.box(
@@ -170,6 +360,13 @@ def login_page() -> rx.Component:
                 padding="12px 24px",
             ),
             rx.vstack(
+                rx.link(
+                    "← Voltar",
+                    href="/",
+                    color="#168447",
+                    align_self="start",
+                    cursor="pointer",
+                ),
                 rx.box(
                     rx.form(
                         rx.vstack(
@@ -318,11 +515,12 @@ def login_page() -> rx.Component:
                 rx.button(
                     "Criar conta",
                     type="button",
+                    on_click=rx.redirect("/cadastro"),
                     variant="outline",
                     color="#168447",
                     border="1px solid #168447",
                     border_radius="999px",
-                    cursor="default",
+                    cursor="pointer",
                 ),
                 align="center",
                 spacing="5",

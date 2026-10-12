@@ -106,26 +106,26 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 
 ## Novas telas
 
-### 04-login.png — Login (implementar agora)
+### 04-login.png — Login
 
 - Cabeçalho branco com o logotipo colorido centralizado; fundo creme na página.
 - Cartão branco centralizado com o título "Bem-vindo" e o subtítulo "Entre com seu e-mail e senha".
 - Campo "E-mail" com o texto interno "Insira seu e-mail" e campo "Senha" com o texto interno "Insira sua senha".
 - O campo Senha tem um botão de olho para mostrar ou ocultar a senha, acréscimo que não está no PNG do Figma.
+- Link "← Voltar" acima do cartão, alinhado à esquerda, que retorna para a home em `/`.
 - Link pequeno "Esqueci minha senha", alinhado à direita abaixo do campo de senha, sem destino por enquanto.
 - Botão verde largo "Entrar".
-- Abaixo do cartão, botão pequeno em forma de pílula "Criar conta", sem destino por enquanto.
+- Abaixo do cartão, botão pequeno em forma de pílula "Criar conta", que leva para `/cadastro`.
 - O login é somente por e-mail. O design original indicava "e-mail ou CPF", mas o CPF foi removido porque o Xano autentica apenas por e-mail e o grupo não decidiu armazenar CPF.
 
 ![Login](04-login.png)
 
-### 05-cadastro-de-conta.png — Cadastro de conta (registrar; não implementar agora)
+### 05-cadastro-de-conta.png — Cadastro de conta
 
-- Título "Criar sua conta", campos E-mail, Telefone, Senha e Confirmar senha e botão verde "Criar".
+- Cabeçalho branco com o logotipo colorido centralizado e fundo creme, iguais aos do login; o PNG está sem o logo e com fundo branco, mas esta descrição prevalece sobre a imagem.
+- Cartão branco com o título "Criar sua conta" e os campos, nesta ordem: Nome, E-mail, Cidade, Estado, Senha e Confirmar senha. Estado oferece as 27 siglas de UF. Botão verde "Criar".
+- Telefone ficou de fora: não existe campo correspondente no Xano e nenhuma funcionalidade deste escopo o utiliza.
+- Nome, Cidade, Estado, os botões de olho para mostrar/ocultar as senhas e o link "← Voltar" acima do cartão, alinhado à esquerda e com destino `/login`, são acréscimos que não estão no PNG do Figma.
 - O PNG pode conter textos internos desatualizados, como menção a CPF no campo de e-mail e texto incorreto no campo Telefone. Esta descrição prevalece sobre a imagem.
-- O fundo do cadastro é creme, igual ao do login. O PNG está com fundo branco, e esta descrição prevalece sobre a imagem.
-- O cadastro tem o mesmo cabeçalho branco do login, com o logotipo colorido centralizado. O PNG está sem o logo, e esta descrição prevalece sobre a imagem.
-- O cadastro tem o mesmo cabeçalho branco do login, com o logotipo colorido centralizado. O PNG está sem o logo, e esta descrição prevalece sobre a imagem.
-- **Decisão em aberto — alinhamento com o Xano:** a tabela `user` exige nome, cidade e estado, que não aparecem no desenho, e não possui campo de telefone. Definir como tratar esses campos antes de implementar o cadastro; não há decisão tomada nesta descrição.
 
 ![Cadastro de conta](05-cadastro-de-conta.png)
