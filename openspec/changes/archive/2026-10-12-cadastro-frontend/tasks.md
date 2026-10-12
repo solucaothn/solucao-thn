@@ -19,4 +19,4 @@
 
 ## 4. Verificação integrada
 
-- [ ] 4.1 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; conferir no navegador a responsividade e o fluxo de cadastro, erros de validação, duplicidade, rede e sucesso, sem persistência de sessão após recarregar.
+- [x] 4.1 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; conferir no navegador a responsividade e o fluxo de cadastro, erros de validação, duplicidade, rede e sucesso, sem persistência de sessão após recarregar. Verificado manualmente pelo usuário, além dos 55 testes e da compilação Reflex aprovados.
