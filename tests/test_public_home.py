@@ -2,11 +2,12 @@ import asyncio
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
 from doafacil.doafacil import (
+    HomeState,
     _fetch_donation_count,
     _fetch_recent_donations,
     _is_new_donation,
@@ -21,6 +22,11 @@ from doafacil.doafacil import (
     recent_donations_view,
     start_here_section,
     _xano_endpoints,
+)
+from doafacil.login import (
+    ACCOUNT_FALLBACK_NAME,
+    AuthAccountUnavailableError,
+    LoginState,
 )
 
 
@@ -286,6 +292,36 @@ class PublicHomeTests(unittest.TestCase):
 
         self.assertIsInstance(count_result, httpx.HTTPStatusError)
         self.assertEqual(donations_result, [])
+
+    def test_home_loads_account_independently_from_public_data(self) -> None:
+        on_load = app._unevaluated_pages["index"].on_load
+        self.assertEqual(
+            [handler.fn for handler in on_load],
+            [HomeState.load_home_data.fn, LoginState.load_account.fn],
+        )
+
+        class AccountState:
+            auth_token = "temporary-token"
+            account_name = ""
+
+        account_state = AccountState()
+        with (
+            patch(
+                "doafacil.login.auth_me_endpoint",
+                return_value="https://auth.example/auth/me",
+            ),
+            patch(
+                "doafacil.login.request_authenticated_name",
+                new_callable=AsyncMock,
+                side_effect=AuthAccountUnavailableError(),
+            ),
+        ):
+            asyncio.run(LoginState.load_account.fn(account_state))
+
+        self.assertEqual(account_state.account_name, ACCOUNT_FALLBACK_NAME)
+        page_text = _component_contents(index())
+        self.assertIn("Doações em circulação", page_text)
+        self.assertIn("Doações mais recentes", page_text)
 
     def test_start_here_section_content_and_controls(self) -> None:
         section = start_here_section()
@@ -668,13 +704,21 @@ class PublicHomeTests(unittest.TestCase):
         enter_button = next(
             node
             for node in _component_nodes(page)
-            if _component_contents(node) == ["Entrar"]
+            if type(node).__name__ == "Button"
+            and _component_contents(node) == ["Entrar"]
         )
         self.assertIn("on_click", enter_button.event_triggers)
+        logout_button = next(
+            node
+            for node in _component_nodes(page)
+            if type(node).__name__ == "Button"
+            and _component_contents(node) == ["Sair"]
+        )
+        self.assertIn("on_click", logout_button.event_triggers)
 
         for node in _component_nodes(page):
             self.assertFalse(getattr(node, "href", None))
-            if node is not enter_button:
+            if node not in (enter_button, logout_button):
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
 
