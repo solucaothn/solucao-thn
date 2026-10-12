@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.login import LoginState, login_page
+
 
 RECENT_DONATIONS_PATH = "/catalog/donations/recent"
 DONATION_COUNT_PATH = "/catalog/donations/count"
@@ -928,6 +930,7 @@ def index() -> rx.Component:
                             color="#168447",
                             border_color="#168447",
                             size="2",
+                            on_click=rx.redirect("/login"),
                         ),
                         rx.button(
                             "Quero Doar",
@@ -1043,3 +1046,4 @@ app = rx.App(
     ]
 )
 app.add_page(index, on_load=HomeState.load_home_data)
+app.add_page(login_page, route="/login")
