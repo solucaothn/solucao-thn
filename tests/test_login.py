@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -482,6 +483,17 @@ class LoginClientTests(unittest.TestCase):
 
 
 class LoginPageTests(unittest.TestCase):
+    def test_auth_card_stylesheet_registers_animation_and_reduced_motion(self) -> None:
+        stylesheet = Path(__file__).parents[1] / "assets" / "auth-card.css"
+        css = stylesheet.read_text(encoding="utf-8")
+
+        self.assertIn("/auth-card.css", app.stylesheets)
+        self.assertIn("@keyframes auth-card-enter", css)
+        self.assertIn("translateY(12px)", css)
+        self.assertIn("0.3s ease-out 1 both", css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+        self.assertIn("animation: none;", css)
+
     def test_login_page_has_email_only_form_and_non_navigating_controls(self) -> None:
         page = login_page()
         self.assertEqual(page.min_height, "100vh")
@@ -584,6 +596,24 @@ class LoginPageTests(unittest.TestCase):
         self.assertIn("is_loading", str(submit.disabled))
         self.assertIn("is_loading", str(submit.children))
         self.assertIn("error_message", str(page_nodes))
+
+    def test_login_animation_class_is_applied_only_to_the_card(self) -> None:
+        nodes = _component_nodes(login_page())
+        animated_nodes = [
+            node
+            for node in nodes
+            if getattr(node, "class_name", None) == "auth-card-enter"
+        ]
+        self.assertEqual(len(animated_nodes), 1)
+        card = animated_nodes[0]
+        self.assertEqual(card.background, "white")
+        self.assertTrue(
+            all(
+                getattr(node, "class_name", None) != "auth-card-enter"
+                for node in nodes
+                if node is not card
+            )
+        )
 
     def test_password_visibility_button_is_accessible_and_not_submit(self) -> None:
         page_nodes = _component_nodes(login_page())

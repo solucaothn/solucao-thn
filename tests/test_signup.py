@@ -447,6 +447,23 @@ class SignupPageTests(unittest.TestCase):
         ]
         self.assertEqual(option_values, list(BRAZILIAN_STATES))
 
+    def test_signup_animation_class_is_applied_only_to_the_card(self) -> None:
+        nodes = _component_nodes(signup_page())
+        animated_nodes = [
+            node
+            for node in nodes
+            if getattr(node, "class_name", None) == "auth-card-enter"
+        ]
+        self.assertEqual(len(animated_nodes), 1)
+        self.assertEqual(animated_nodes[0].background, "white")
+        self.assertTrue(
+            all(
+                getattr(node, "class_name", None) != "auth-card-enter"
+                for node in nodes
+                if node is not animated_nodes[0]
+            )
+        )
+
     def test_signup_form_uses_site_validation_instead_of_native_validation(self) -> None:
         nodes = _component_nodes(signup_page())
         form = next(node for node in nodes if type(node).__name__ == "Form")

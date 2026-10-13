@@ -255,6 +255,7 @@ def signup_page() -> rx.Component:
                         md="40px",
                     ),
                     width="100%",
+                    class_name="auth-card-enter",
                 ),
                 align="center",
                 spacing="4",

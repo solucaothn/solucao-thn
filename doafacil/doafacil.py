@@ -1123,6 +1123,7 @@ app = rx.App(
         },
     },
     stylesheets=[
+        "/auth-card.css",
         "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
     ]
 )
