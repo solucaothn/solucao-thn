@@ -9,6 +9,7 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 - Cor principal: verde. Fundo das páginas: creme claro. Textos em cinza escuro.
 - Logotipo "doafácil" (coração com mãos) e ilustração de pessoas no rodapé da home.
 - As cores exatas e as fontes devem ser extraídas do Figma ao implementar.
+- Páginas novas usam `auth-card-enter` no cartão central de formulários ou `page-fade-enter` no conteúdo principal das demais; ambas respeitam `prefers-reduced-motion`, sem animar cabeçalho, rodapé ou dados carregados do Xano.
 
 ## Telas prontas
 
@@ -112,6 +113,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 - Cartão branco centralizado com o título "Bem-vindo" e o subtítulo "Entre com seu e-mail e senha".
 - Campo "E-mail" com o texto interno "Insira seu e-mail" e campo "Senha" com o texto interno "Insira sua senha".
 - O campo Senha tem um botão de olho para mostrar ou ocultar a senha, acréscimo que não está no PNG do Figma.
+- O cartão tem uma animação suave de entrada, acréscimo que não está no PNG do Figma.
 - Link "← Voltar" acima do cartão, alinhado à esquerda, que retorna para a home em `/`.
 - Link pequeno "Esqueci minha senha", alinhado à direita abaixo do campo de senha, sem destino por enquanto.
 - Botão verde largo "Entrar".
@@ -126,6 +128,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 - Cartão branco com o título "Criar sua conta" e os campos, nesta ordem: Nome, E-mail, Cidade, Estado, Senha e Confirmar senha. Estado oferece as 27 siglas de UF. Botão verde "Criar".
 - Telefone ficou de fora: não existe campo correspondente no Xano e nenhuma funcionalidade deste escopo o utiliza.
 - Nome, Cidade, Estado, os botões de olho para mostrar/ocultar as senhas e o link "← Voltar" acima do cartão, alinhado à esquerda e com destino `/login`, são acréscimos que não estão no PNG do Figma.
+- O cartão tem uma animação suave de entrada, acréscimo que não está no PNG do Figma.
 - O PNG pode conter textos internos desatualizados, como menção a CPF no campo de e-mail e texto incorreto no campo Telefone. Esta descrição prevalece sobre a imagem.
 
 ![Cadastro de conta](05-cadastro-de-conta.png)

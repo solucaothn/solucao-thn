@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -482,6 +483,22 @@ class LoginClientTests(unittest.TestCase):
 
 
 class LoginPageTests(unittest.TestCase):
+    def test_auth_card_stylesheet_registers_animation_and_reduced_motion(self) -> None:
+        stylesheet = Path(__file__).parents[1] / "assets" / "auth-card.css"
+        css = stylesheet.read_text(encoding="utf-8")
+
+        self.assertIn("/auth-card.css", app.stylesheets)
+        self.assertIn("@keyframes auth-card-enter", css)
+        self.assertIn("translateY(12px)", css)
+        self.assertIn("0.3s ease-out 1 both", css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+        reduced_motion_rules = css.split(
+            "@media (prefers-reduced-motion: reduce)", maxsplit=1
+        )[1]
+        self.assertIn(".auth-card-enter", reduced_motion_rules)
+        self.assertIn(".page-fade-enter", reduced_motion_rules)
+        self.assertIn("animation: none;", reduced_motion_rules)
+
     def test_login_page_has_email_only_form_and_non_navigating_controls(self) -> None:
         page = login_page()
         self.assertEqual(page.min_height, "100vh")
@@ -585,6 +602,24 @@ class LoginPageTests(unittest.TestCase):
         self.assertIn("is_loading", str(submit.children))
         self.assertIn("error_message", str(page_nodes))
 
+    def test_login_animation_class_is_applied_only_to_the_card(self) -> None:
+        nodes = _component_nodes(login_page())
+        animated_nodes = [
+            node
+            for node in nodes
+            if getattr(node, "class_name", None) == "auth-card-enter"
+        ]
+        self.assertEqual(len(animated_nodes), 1)
+        card = animated_nodes[0]
+        self.assertEqual(card.background, "white")
+        self.assertTrue(
+            all(
+                getattr(node, "class_name", None) != "auth-card-enter"
+                for node in nodes
+                if node is not card
+            )
+        )
+
     def test_password_visibility_button_is_accessible_and_not_submit(self) -> None:
         page_nodes = _component_nodes(login_page())
         visibility_button = next(
@@ -644,6 +679,52 @@ class LoginPageTests(unittest.TestCase):
         for node in nodes:
             if node not in (enter, logout):
                 self.assertFalse(getattr(node, "event_triggers", {}))
+
+    def test_home_fades_static_content_without_animating_header_or_xano_data(self) -> None:
+        nodes = _component_nodes(index())
+        animated_nodes = [
+            node
+            for node in nodes
+            if "page-fade-enter"
+            in str(getattr(node, "class_name", "")).split()
+        ]
+
+        self.assertEqual(len(animated_nodes), 4)
+        self.assertTrue(
+            any("Doar é fácil." in _component_text(node) for node in animated_nodes)
+        )
+        self.assertTrue(
+            any(
+                "Pessoas reunidas na comunidade DoaFácil"
+                == getattr(getattr(node, "alt", None), "_var_value", None)
+                for node in animated_nodes
+            )
+        )
+        self.assertTrue(
+            all(
+                "HomeState" not in str(_component_nodes(node))
+                for node in animated_nodes
+            )
+        )
+
+        header = next(
+            node
+            for node in nodes
+            if getattr(node, "background", None) == "white"
+            and any(
+                _component_text(child) == "Entrar"
+                for child in _component_nodes(node)
+            )
+        )
+        self.assertNotIn("page-fade-enter", str(header.class_name).split())
+
+        footer = next(
+            node
+            for node in nodes
+            if "Projeto acadêmico DoaFácil" in _component_text(node)
+            and "Fale conosco" in _component_text(node)
+        )
+        self.assertNotIn("page-fade-enter", str(footer.class_name).split())
 
 
 if __name__ == "__main__":

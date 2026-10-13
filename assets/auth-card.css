@@ -1,0 +1,36 @@
+@keyframes auth-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card-enter {
+  animation: auth-card-enter 0.3s ease-out 1 both;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.page-fade-enter {
+  animation: page-fade 0.3s ease-out 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-card-enter,
+  .page-fade-enter {
+    animation: none;
+  }
+}
