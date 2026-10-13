@@ -13,4 +13,4 @@
 
 - [x] 3.1 Registrar o carregamento da conta como handler independente do carregamento público da home; verificar com testes que a página mantém os handlers e o conteúdo público mesmo quando a consulta autenticada falha.
 - [x] 3.2 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; corrigir falhas relacionadas à change.
-- [ ] 3.3 Conferir manualmente em janela estreita e larga, com Xano: cabeçalho após login/cadastro, fallback “Minha conta”, rejeição de token, logout na home; depois de recarregar, a sessão da aba continua, enquanto uma aba nova ou o servidor reiniciado abrem sem sessão.
+- [x] 3.3 Conferir manualmente em janela estreita e larga, com Xano: cabeçalho após login/cadastro, fallback “Minha conta”, rejeição de token, logout na home; depois de recarregar, a sessão da aba continua, enquanto uma aba nova ou o servidor reiniciado abrem sem sessão.
