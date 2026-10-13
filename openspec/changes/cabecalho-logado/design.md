@@ -4,6 +4,8 @@
 
 O estado `LoginState` mantém `auth_token` transitório e é reutilizado pelo login e cadastro. A home registra `HomeState.load_home_data` no carregamento e usa `HomeState` para contagem e doações públicas. O endpoint existente `GET auth/me` exige autenticação e retorna um objeto de usuário com `name`, além de outros dados que não devem ser mantidos no estado de exibição. Ver `proposal.md` para a motivação e `specs/user-account/spec.md` para o contrato.
 
+O teste manual observou que o estado do Reflex continua disponível ao recarregar a mesma aba, mas não em uma aba nova nem após reiniciar o servidor. Isso não é persistência própria do site em armazenamento do navegador; a change não deve tentar limpar o estado por causa de um recarregamento.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -14,7 +16,7 @@ O estado `LoginState` mantém `auth_token` transitório e é reutilizado pelo lo
 
 **Non-Goals:**
 
-- Criar outro estado de autenticação, persistir sessão ou alterar o backend.
+- Criar outro estado de autenticação, adicionar persistência própria em armazenamento do navegador ou alterar o backend.
 - Reter e-mail, papel, identificador ou a resposta completa de `auth/me` no estado da interface.
 
 ## Decisions
@@ -31,7 +33,7 @@ O estado `LoginState` mantém `auth_token` transitório e é reutilizado pelo lo
 - [A resposta de `auth/me` contém mais dados pessoais do que o cabeçalho precisa] → Validar e extrair somente o primeiro nome, sem armazenar a resposta completa nem registrar conteúdo da requisição.
 - [Uma falha transitória pode deixar uma sessão sem nome reconhecível] → Exibir “Minha conta” e preservar o acesso à home pública; somente rejeição explícita limpa o token.
 - [Handlers simultâneos podem terminar em tempos diferentes] → Manter estados e tratamento de falha independentes; os pedidos públicos não aguardam o resultado do perfil.
-- [A sessão continua dependente do estado Reflex em memória] → Não adicionar persistência; após recarga, o comportamento permanece o já confirmado para login e cadastro.
+- [O estado da sessão pode continuar disponível após recarga na mesma aba] → Preservar o comportamento observado, sem adicionar armazenamento próprio do site no navegador; uma aba nova ou reinício do servidor começa sem sessão.
 
 ## Migration Plan
 
