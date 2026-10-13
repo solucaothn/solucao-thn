@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Identidade da sessão no cabeçalho da home
-A home SHALL representar a sessão autenticada com o primeiro nome da pessoa e permitir que ela encerre a sessão sem persistir credenciais.
+A home SHALL representar a sessão autenticada com o primeiro nome da pessoa e permitir que ela encerre a sessão sem adicionar persistência própria em armazenamento do navegador.
 
 #### Scenario: Exibir pessoa autenticada
 - **WHEN** a consulta autenticada da conta retorna um nome válido
@@ -25,9 +25,15 @@ A home SHALL representar a sessão autenticada com o primeiro nome da pessoa e p
 - **THEN** a aplicação limpa o token e o nome do estado transitório
 - **AND** permanece na home com o cabeçalho de visitante
 
-#### Scenario: Recarregar a home
-- **WHEN** a pessoa recarrega a página
-- **THEN** a sessão não é restaurada por persistência no navegador e o cabeçalho apresenta “Entrar”
+#### Scenario: Manter sessão ao recarregar a mesma aba
+- **WHEN** uma pessoa recarrega a home na mesma aba
+- **THEN** o estado da sessão permanece disponível nessa aba e o cabeçalho continua autenticado
+- **AND** o site não grava o token em armazenamento do navegador
+
+#### Scenario: Não compartilhar sessão com outra aba ou reinício do servidor
+- **WHEN** a pessoa abre uma aba nova ou o servidor Reflex é reiniciado
+- **THEN** a sessão não está disponível nessa nova aba ou após o reinício e o cabeçalho apresenta “Entrar”
+- **AND** o site não restaura a sessão por persistência própria em armazenamento do navegador
 
 #### Scenario: Minimizar dados mantidos para exibição
 - **WHEN** a consulta autenticada retorna os dados da conta
