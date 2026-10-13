@@ -10,3 +10,9 @@
 
 - [x] 2.1 Acrescentar uma linha nas seções 04 e 05 de `docs/design/README.md` registrando que a animação de entrada não está no Figma e conferir pelo diff que nenhuma outra seção mudou.
 - [x] 2.2 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; confirmar que todos os testes passam e que a compilação Reflex termina com sucesso.
+
+## 3. Fade do conteúdo da home e regra para novas páginas
+
+- [x] 3.1 Criar a classe `page-fade-enter` no stylesheet com fade de opacidade de 0,3s, ease-out e suporte a movimento reduzido; aplicá-la somente ao conteúdo estático interno da home, preservando o layout e excluindo cabeçalho, rodapé, contagem e carrossel do Xano; verificar com teste estrutural.
+- [x] 3.2 Acrescentar ou atualizar teste estrutural confirmando que o cartão do login mantém `auth-card-enter` e a regra de movimento reduzido cobre a classe de fade; executar os testes de home existentes para confirmar que seguem passando.
+- [x] 3.3 Acrescentar somente uma regra curta sobre animação de entrada para futuras páginas em `AGENTS.md` e uma linha na parte geral de `docs/design/README.md`; verificar o diff dos dois arquivos para confirmar que só esses trechos foram alterados.

@@ -492,7 +492,12 @@ class LoginPageTests(unittest.TestCase):
         self.assertIn("translateY(12px)", css)
         self.assertIn("0.3s ease-out 1 both", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
-        self.assertIn("animation: none;", css)
+        reduced_motion_rules = css.split(
+            "@media (prefers-reduced-motion: reduce)", maxsplit=1
+        )[1]
+        self.assertIn(".auth-card-enter", reduced_motion_rules)
+        self.assertIn(".page-fade-enter", reduced_motion_rules)
+        self.assertIn("animation: none;", reduced_motion_rules)
 
     def test_login_page_has_email_only_form_and_non_navigating_controls(self) -> None:
         page = login_page()
@@ -674,6 +679,52 @@ class LoginPageTests(unittest.TestCase):
         for node in nodes:
             if node not in (enter, logout):
                 self.assertFalse(getattr(node, "event_triggers", {}))
+
+    def test_home_fades_static_content_without_animating_header_or_xano_data(self) -> None:
+        nodes = _component_nodes(index())
+        animated_nodes = [
+            node
+            for node in nodes
+            if "page-fade-enter"
+            in str(getattr(node, "class_name", "")).split()
+        ]
+
+        self.assertEqual(len(animated_nodes), 4)
+        self.assertTrue(
+            any("Doar é fácil." in _component_text(node) for node in animated_nodes)
+        )
+        self.assertTrue(
+            any(
+                "Pessoas reunidas na comunidade DoaFácil"
+                == getattr(getattr(node, "alt", None), "_var_value", None)
+                for node in animated_nodes
+            )
+        )
+        self.assertTrue(
+            all(
+                "HomeState" not in str(_component_nodes(node))
+                for node in animated_nodes
+            )
+        )
+
+        header = next(
+            node
+            for node in nodes
+            if getattr(node, "background", None) == "white"
+            and any(
+                _component_text(child) == "Entrar"
+                for child in _component_nodes(node)
+            )
+        )
+        self.assertNotIn("page-fade-enter", str(header.class_name).split())
+
+        footer = next(
+            node
+            for node in nodes
+            if "Projeto acadêmico DoaFácil" in _component_text(node)
+            and "Fale conosco" in _component_text(node)
+        )
+        self.assertNotIn("page-fade-enter", str(footer.class_name).split())
 
 
 if __name__ == "__main__":

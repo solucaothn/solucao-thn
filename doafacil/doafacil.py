@@ -660,6 +660,7 @@ def start_here_section() -> rx.Component:
         ),
         width="100%",
         background="#FFF6E8",
+        class_name="page-fade-enter",
     )
 
 
@@ -777,6 +778,7 @@ def institutional_section() -> rx.Component:
         ),
         width="100%",
         background="#EEEDEA",
+        class_name="page-fade-enter",
     )
 
 
@@ -999,6 +1001,7 @@ def index() -> rx.Component:
                     width="100%",
                     padding_top="3rem",
                     padding_bottom="2.5rem",
+                    class_name="page-fade-enter",
                 ),
                 rx.hstack(
                     donation_count_view(),
@@ -1031,6 +1034,7 @@ def index() -> rx.Component:
                 margin_bottom="0",
                 object_fit="contain",
                 flex_shrink="0",
+                class_name="page-fade-enter",
             ),
             align="stretch",
             spacing="0",

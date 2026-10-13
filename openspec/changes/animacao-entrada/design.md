@@ -21,6 +21,8 @@ O app Reflex centraliza estilos globais em `doafacil/doafacil.py`. As telas `log
 - Definir keyframes e o `@media (prefers-reduced-motion: reduce)` em um stylesheet CSS local referenciado pela configuração `stylesheets` da aplicação em `doafacil/doafacil.py`. A configuração atual usa `app.style` para seletores e `stylesheets` para arquivos CSS externos; um stylesheet local permite expressar diretamente regras CSS de keyframes e media query sem JavaScript ou biblioteca de animação.
 - Usar animação de opacidade e `translateY` de aproximadamente 12px, por cerca de 0,3s com `ease-out`, sem atraso e com uma única execução. O media query desativa a animação; assim, o cartão não se move nem faz fade nessa preferência.
 - Adicionar uma linha às descrições das telas 04 e 05 em `docs/design/README.md`, sem alterar o restante do documento.
+- Para o fade da home, aplicar uma classe distinta diretamente aos elementos estáticos existentes (destaque, ilustração e seções informativas), sem criar um invólucro que altere o layout. Manter fora da animação o cabeçalho, a contagem e o carrossel carregados do Xano e o rodapé. A classe também respeita a preferência por movimento reduzido.
+- Registrar a regra geral para páginas futuras em `AGENTS.md` e uma linha de referência na parte geral do `docs/design/README.md`.
 
 ## Risks / Trade-offs
 

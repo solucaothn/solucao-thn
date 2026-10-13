@@ -9,6 +9,7 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 - Cor principal: verde. Fundo das páginas: creme claro. Textos em cinza escuro.
 - Logotipo "doafácil" (coração com mãos) e ilustração de pessoas no rodapé da home.
 - As cores exatas e as fontes devem ser extraídas do Figma ao implementar.
+- Páginas novas usam `auth-card-enter` no cartão central de formulários ou `page-fade-enter` no conteúdo principal das demais; ambas respeitam `prefers-reduced-motion`, sem animar cabeçalho, rodapé ou dados carregados do Xano.
 
 ## Telas prontas
 

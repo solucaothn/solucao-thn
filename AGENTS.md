@@ -51,4 +51,6 @@ Utilize os mecanismos próprios do Reflex para componentes, estado, eventos, pá
 
 Não introduza outra tecnologia de frontend para substituir ou complementar o Reflex, salvo quando houver uma alteração arquitetural explicitamente aprovada.
 
+Toda página nova deve ter animação de entrada: use `auth-card-enter` no cartão central de telas de formulário ou `page-fade-enter` no conteúdo principal das demais páginas; ambas desligam com `prefers-reduced-motion`. Cabeçalho, rodapé e dados carregados do Xano não animam.
+
 Use o ambiente virtual `.venv` com `pip`; não misture `uv` e `pip`. Ao instalar uma nova biblioteca, atualize o `requirements.txt` junto com a mudança correspondente.

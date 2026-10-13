@@ -13,3 +13,15 @@ A aplicação SHALL animar somente o cartão das telas públicas de login e cada
 #### Scenario: Respeitar preferência por movimento reduzido
 - **WHEN** o sistema operacional ou navegador indica `prefers-reduced-motion: reduce`
 - **THEN** os cartões de login e cadastro aparecem sem animação
+
+### Requirement: Entrada suave do conteúdo estático da home
+A aplicação SHALL aplicar um fade de entrada ao conteúdo estático da home sem animar o cabeçalho, o rodapé ou dados carregados do Xano.
+
+#### Scenario: Retornar do login para a home
+- **WHEN** uma pessoa aciona “← Voltar” no login e a home é exibida
+- **THEN** as seções estáticas da home aparecem com fade de opacidade por cerca de 0,3 segundo com aceleração ease-out
+- **AND** a animação não altera o layout nem a contagem e o carrossel de doações
+
+#### Scenario: Respeitar movimento reduzido na home
+- **WHEN** o sistema operacional ou navegador indica `prefers-reduced-motion: reduce`
+- **THEN** as seções estáticas da home aparecem sem animação
