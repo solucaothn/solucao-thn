@@ -9,18 +9,23 @@ query "catalog/donations/recent" verb=GET {
       where = $db.donation.status == "disponível"
       sort = {created_at: "desc"}
       return = {
-        type: "list"
+        type  : "list"
         paging: {page: 1, per_page: 4, metadata: false}
       }
+    
       output = ["id", "created_at", "title", "photo", "condition"]
     } as $donations
-
-    var $cards { value = [] }
-
+  
+    var $cards {
+      value = []
+    }
+  
     foreach ($donations) {
       each as $donation {
-        var $photo_url { value = null }
-
+        var $photo_url {
+          value = null
+        }
+      
         conditional {
           if ($donation.photo != null) {
             conditional {
@@ -31,21 +36,24 @@ query "catalog/donations/recent" verb=GET {
                 }
               }
             }
-
+          
             var.update $photo_url {
               value = $env.PUBLIC_BASE_URL ~ $donation.photo.path
             }
           }
         }
-
+      
         var.update $cards {
-          value = $cards|push:{
-            id: $donation.id,
-            created_at: $donation.created_at,
-            title: $donation.title,
-            photo: $photo_url,
-            condition: $donation.condition
-          }
+          value = $cards
+            |push:```
+              {
+                id: $donation.id,
+                created_at: $donation.created_at,
+                title: $donation.title,
+                photo: $photo_url,
+                condition: $donation.condition
+              }
+              ```
         }
       }
     }

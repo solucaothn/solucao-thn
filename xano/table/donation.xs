@@ -14,6 +14,7 @@ table donation {
     enum? condition {
       values = ["Ótimo", "Bom", "Regular"]
     }
+  
     enum status? {
       values = ["disponível", "reservada", "concluída"]
     }
