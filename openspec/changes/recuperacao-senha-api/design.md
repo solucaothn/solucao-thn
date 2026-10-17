@@ -31,18 +31,25 @@ Alternativa considerada: manter um único endpoint ou retornar erros específico
 
 - Adicionar tabela própria, por exemplo `password_reset_code`, com relação a `user`, hash do código, expiração, tentativas, estado de uso, hash do token de redefinição, expiração/uso do token e timestamps de emissão necessários para os limites. Não gravar endereço de e-mail nessa tabela quando a relação com `user` for suficiente.
 - Usar registros por emissão (ou mecanismo equivalente que preserve histórico de uma hora) para aplicar a janela móvel de cinco envios; um único `last_sent_at` não basta para esse limite. Nova emissão invalida códigos pendentes anteriores da conta.
-- Usar campos/tipos de senha com verificação do Xano (`security.check_password`) ou mecanismo adaptativo equivalente para os hashes. Não usar SHA-256 simples para o código de seis dígitos: seu espaço de busca é pequeno. A implementação deve persistir apenas hashes não reversíveis dos códigos e tokens.
-- A documentação XanoScript consultada descreve `security.random_number` e `security.random_bytes`, mas não declara explicitamente suas garantias criptográficas nem todos os detalhes de limites/serialização. Antes de implementar, confirmar no Xano MCP e validar no workspace que a fonte é criptograficamente segura, a faixa gera exatamente seis dígitos (incluindo zeros à esquerda) e o token tem entropia suficiente. Se isso não puder ser confirmado, interromper e levar a decisão ao grupo; não substituir por PRNG comum, timestamp ou UUID não verificado.
-- Incrementos de tentativa, invalidação ao quinto erro, emissão sob limite e consumo do token devem ser resistentes a solicitações concorrentes. Validar no Xano a estratégia transacional/atômica antes de codificar; não confiar apenas em checagem seguida de escrita não atômica.
+- Usar campos do tipo `password` com `security.check_password` para comparar códigos de baixa entropia, de modo que o Xano armazene hashes adaptativos. Para o token aleatório de 32 bytes, armazenar SHA-256 hexadecimal: sua entropia alta permite busca indexada determinística sem guardar o token em claro. O SHA-256 não é adequado para o código numérico.
+- A documentação XanoScript consultada descreve `security.random_number`, `security.random_bytes` e `db.transaction`, mas não declara explicitamente garantias criptográficas do gerador nem o nível de isolamento/serialização concorrente. Por instrução do grupo, a implementação usa `security.random_number` para código entre 100000 e 999999 e `security.random_bytes` com 32 bytes para token; isso é a melhor fonte disponível documentada, mas sua qualidade criptográfica não pôde ser confirmada independentemente. Esse é um risco residual: antes da publicação, confirmar com o Xano/provedor a implementação criptográfica e testar limites/uso concorrente.
+- Atualizações de estado e consumo do token são agrupados em `db.transaction`, cuja documentação declara execução atômica. Ainda não foi possível comprovar isolamento contra duas transações concorrentes lendo o mesmo estado; tentativa, limite de envio e token de uso único continuam com risco residual até teste concorrente no Xano. Não tratar transação como prova de serialização.
 
 Alternativa considerada: guardar o código em texto ou usar hash rápido sem chave. Rejeitada por expor códigos/tokens em repouso ou permitir enumeração offline barata do espaço de seis dígitos.
+
+### Nomes e contratos Xano
+
+- Tabela nova: `password_reset_code`, com uma linha por usuário, hash de senha do código, validade, tentativas, estado de uso, hash SHA-256 do reset token, validade/uso do token e cinco timestamps de envio para aplicar a janela horária.
+- Função interna: `Password Recovery/send_recovery_code`, recebendo somente e-mail da conta, código e validade; chama SendGrid e devolve apenas um indicador interno de sucesso, sem propagar corpo do provedor.
+- APIs públicas: `POST reset/request_code` recebe `email` e responde sempre `{success: true}`; `POST reset/verify_code` recebe `email` e `code`, devolve `reset_token` apenas no sucesso e uma resposta genérica idêntica nas falhas; `POST reset/confirm_password` recebe `reset_token`, `password` e `password_confirmation`, não cria sessão e não devolve credencial.
+- O endpoint de solicitação captura falha da função de e-mail e mantém a resposta neutra. Registros pelo `log_event` recebem somente `user_id` e ação.
 
 ### Limites e envio de e-mail
 
 - Aplicar no servidor o intervalo mínimo de 30 segundos e o máximo de cinco envios por hora por conta. Um limite adicional por IP é desejável se puder ser implementado com recursos já disponíveis, sem depender do cronômetro da interface; não substituir os limites por conta.
 - Enviar por função interna, com `api.request` para `POST https://api.sendgrid.com/v3/mail/send`, usando exclusivamente `$env.SENDGRID_API_KEY` e `$env.SENDGRID_FROM_EMAIL`. Não colocar valores dessas variáveis em arquivos, respostas, logs ou exemplos.
 - Montar assunto e texto fixos em português; enviar ao e-mail recuperado da conta e incluir apenas código e validade, sem links.
-- Tratar erro HTTP e falha de rede sem alterar a resposta neutra de `request_code`. Registrar, quando necessário, apenas ação segura e `user_id` por `log_event`; nunca registrar corpo da chamada/resposta, e-mail, código, token, hash ou chave.
+- Tratar erro HTTP e falha de rede sem alterar a resposta neutra de `request_code`. Registrar a falha, quando possível, somente como ação segura e `user_id` por `log_event`; nunca registrar corpo da chamada/resposta, e-mail, código, token, hash ou chave.
 
 Alternativa considerada: endpoint público para disparo de e-mail ou função utilitária com configuração/remetente em texto no código. Rejeitada por ampliar a superfície pública e expor configuração.
 
@@ -57,6 +64,7 @@ O cadastro atual revela e-mail já cadastrado; essa decisão de UX permanece for
 - [Hash rápido de código de baixa entropia permite busca offline] → Usar hash adaptativo/seguro no Xano e validar seu comportamento antes da implementação.
 - [Concorrência pode ultrapassar limites ou consumir token mais de uma vez] → Exigir mecanismo atômico/transacional e testar solicitações concorrentes.
 - [SendGrid indisponível impede entrega, mas a resposta deve continuar neutra] → Registrar apenas evento seguro e verificar recebimento real em teste manual.
+- [Falha também na invalidação do código após erro de entrega] → Tentar marcar o código como usado sem alterar a resposta pública; se a gravação de invalidação falhar, o código permanece limitado a cinco tentativas e expira em 10 minutos. Essa condição ainda precisa de teste no Xano.
 - [Endpoints legados podem continuar permitindo fluxos menos seguros] → Não alterá-los sem decisão do grupo; decidir seu estado antes de disponibilizar o fluxo novo.
 - [Múltiplos registros de emissão preservam dados de controle] → Reter apenas o necessário para limites e remover registros expirados conforme mecanismo de limpeza validado no Xano.
 
