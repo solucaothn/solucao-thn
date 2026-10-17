@@ -26,4 +26,5 @@ table password_reset_code {
     {type: "btree|unique", field: [{name: "user_id"}]}
     {type: "btree", field: [{name: "reset_token_hash"}]}
   ]
+  guid = "2tppd2-jpCokdc1mzic8qu-Bhqo"
 }

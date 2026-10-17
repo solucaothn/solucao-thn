@@ -232,4 +232,5 @@ query "reset/request_code" verb=POST {
   }
 
   response = $response_data
+  guid = "t72EaNWoAnk-mCdyf5kUcuDURsA"
 }

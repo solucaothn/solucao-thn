@@ -45,4 +45,5 @@ function "Password Recovery/send_recovery_code" {
   }
 
   response = {success: true}
+  guid = "yyyXPsUGiXUnhEfE9tE8vHQ490Y"
 }

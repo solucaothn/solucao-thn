@@ -70,4 +70,5 @@ query "reset/confirm_password" verb=POST {
   }
 
   response = $response_data
+  guid = "e49ij53KjX2bw1Lap6uubkFGfYM"
 }

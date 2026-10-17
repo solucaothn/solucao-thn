@@ -90,4 +90,5 @@ query "reset/verify_code" verb=POST {
   }
 
   response = $response_data
+  guid = "9V0qiz1UR06UiZyL1DCtVXirdjc"
 }
