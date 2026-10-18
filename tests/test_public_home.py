@@ -715,9 +715,17 @@ class PublicHomeTests(unittest.TestCase):
             and _component_contents(node) == ["Sair"]
         )
         self.assertIn("on_click", logout_button.event_triggers)
+        donate_link = next(
+            node
+            for node in _component_nodes(page)
+            if type(node).__name__ == "Link"
+            and _component_contents(node) == ["Quero Doar"]
+        )
+        self.assertIn('/cadastro-doacao', str(donate_link))
 
         for node in _component_nodes(page):
-            self.assertFalse(getattr(node, "href", None))
+            if node is not donate_link:
+                self.assertFalse(getattr(node, "href", None))
             if node not in (enter_button, logout_button):
                 self.assertFalse(getattr(node, "event_triggers", {}))
 

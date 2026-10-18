@@ -2,7 +2,7 @@
 
 Link do Figma: https://www.figma.com/design/l4MoQJUROh7b7gY3vCFTC0/doafacil?node-id=73-105&t=wvbRRiL16TnYnhQA-0
 
-As imagens desta pasta são a referência visual do frontend (Reflex). O texto abaixo descreve cada tela e registra as decisões tomadas. Em caso de dúvida entre a imagem e este texto, vale o texto.
+As imagens desta pasta são a referência visual do frontend (Reflex). O texto abaixo descreve cada tela e registra as decisões tomadas. Em caso de dúvida entre uma imagem e uma decisão de produto documentada, vale a decisão documentada.
 
 ## Identidade visual
 
@@ -89,13 +89,12 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 15. A seção “Comece por aqui” usa espaçamentos e cartões arejados conforme definidos acima; a busca visual tem controles brancos, borda cinza clara e texto legível, sem executar busca.
 16. O rodapé preserva o logotipo colorido original, sem filtro; títulos em 15px, links e contato em 13px com 6px entre linhas, texto acadêmico em 12px e texto de contato sem sublinhado.
 
-## O que o design exige do backend (Xano) e ainda não existe
+## Cadastro de doação: integração com o backend (Xano)
 
-- **Foto da doação:** campo de imagem na doação.
-- **Condição do item:** campo com os valores Ótimo, Bom e Regular.
-- **Localização da doação:** cidade e estado guardados na doação.
-- **Contagem de doações em circulação:** endpoint público que retorne a quantidade de doações disponíveis.
-- **Listagem pública:** a home e o catálogo devem poder ser vistos sem login. Verificar se o endpoint de listagem atual já permite isso.
+- O wizard usa `/catalog/categories` para carregar categorias e `/auth/profile` para exibir a cidade e a UF do perfil autenticado.
+- A publicação completa usa `POST /catalog/donations/publish`; o Xano deriva o doador e a localização da sessão autenticada, valida os campos e persiste até cinco fotos, mantendo a primeira como foto de capa.
+- Os arquivos locais em `xano/` incluem os campos aditivos de modalidade de entrega, preferência de contato e localização, além da tabela de fotos e do endpoint de publicação. O `dry-run` do workspace 168184 foi revisado; nenhuma alteração foi enviada ao workspace compartilhado.
+- A contagem de doações em circulação e a listagem pública são funcionalidades separadas deste fluxo.
 
 ## Telas (imagens)
 
@@ -132,3 +131,21 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 - O PNG pode conter textos internos desatualizados, como menção a CPF no campo de e-mail e texto incorreto no campo Telefone. Esta descrição prevalece sobre a imagem.
 
 ![Cadastro de conta](05-cadastro-de-conta.png)
+
+## Cadastro de doação em cinco etapas
+
+As telas de referência adicionadas são:
+
+- [06-cadastro-de-doacao.png](./06-cadastro-de-doacao.png) — item.
+- [07-detalhamento-doacao.png](./07-detalhamento-doacao.png) — descrição e categoria.
+- [08-fotos-doacao.png](./08-fotos-doacao.png) — seleção de fotos.
+- [09-entrega-doacao.png](./09-entrega-doacao.png) — localização e entrega.
+- [10-formas -de-contato.png](./10-formas%20-de-contato.png) — contato e publicação.
+
+1. **Item:** nome da doação.
+2. **Detalhes:** descrição, categoria existente e condição (Ótimo, Bom ou Regular).
+3. **Fotos:** até cinco imagens JPEG, PNG, GIF ou WEBP; a publicação também pode ser feita sem fotos.
+4. **Entrega:** modalidade (Retirada, Entrega ou A combinar) e cidade/UF do perfil, sem endereço específico.
+5. **Contato e publicação:** preferência (WhatsApp, E-mail ou Chat do DoaFácil), sem solicitar telefone ou outro identificador de contato.
+
+As imagens originais indicam oito etapas e mostram a condição no último passo; o fluxo aprovado nesta change reduz a navegação a cinco etapas e coleta a condição no passo 2. A página usa cabeçalho branco com logotipo centralizado, fundo creme `#FFF6E8`, conteúdo estreito centralizado e animação `auth-card-enter`, que respeita `prefers-reduced-motion`. Os botões primários usam um tom mais escuro de verde com texto branco para manter contraste legível; a barra de progresso conserva `#00A859`. O indicador mostra “Passo X de 5”; a navegação preserva os campos, e erros de serviço não apagam o formulário nem mostram confirmação de publicação.

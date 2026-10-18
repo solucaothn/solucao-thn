@@ -8,6 +8,10 @@ import httpx
 import reflex as rx
 
 from doafacil.cadastro import signup_page
+from doafacil.cadastro_doacao import (
+    DonationCreateState,
+    donation_creation_page,
+)
 from doafacil.login import LoginState, login_page
 
 
@@ -960,11 +964,17 @@ def index() -> rx.Component:
                                 on_click=rx.redirect("/login"),
                             ),
                         ),
-                        rx.button(
+                        rx.link(
                             "Quero Doar",
+                            href="/cadastro-doacao",
                             background="#168447",
                             color="white",
-                            size="2",
+                            padding="8px 16px",
+                            border_radius="6px",
+                            font_size="14px",
+                            font_weight="500",
+                            white_space="nowrap",
+                            _hover={"background": "#126f3b"},
                         ),
                         spacing="3",
                     ),
@@ -1137,3 +1147,8 @@ app.add_page(
 )
 app.add_page(login_page, route="/login")
 app.add_page(signup_page, route="/cadastro")
+app.add_page(
+    donation_creation_page,
+    route="/cadastro-doacao",
+    on_load=DonationCreateState.load_initial_data,
+)
