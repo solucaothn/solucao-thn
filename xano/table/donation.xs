@@ -11,10 +11,20 @@ table donation {
     text title filters=trim|min:1
     text description? filters=trim
     image? photo
+    text? city?
+    text? state?
     enum? condition {
       values = ["Ótimo", "Bom", "Regular"]
     }
-  
+
+    enum? delivery_method {
+      values = ["Retirada", "Entrega", "A combinar"]
+    }
+
+    enum? contact_preference {
+      values = ["WhatsApp", "E-mail", "Chat do DoaFácil"]
+    }
+
     enum status? {
       values = ["disponível", "reservada", "concluída"]
     }
