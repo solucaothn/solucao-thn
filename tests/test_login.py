@@ -285,6 +285,15 @@ class LoginClientTests(unittest.TestCase):
             {
                 name: (field.annotated_type, field.default)
                 for name, field in LoginState.__own_fields__.items()
+                if name in {
+                    "is_loading",
+                    "error_message",
+                    "auth_token",
+                    "account_name",
+                    "password_visible",
+                    "signup_password_visible",
+                    "signup_confirmation_visible",
+                }
             },
             {
                 "is_loading": (bool, False),
@@ -303,6 +312,8 @@ class LoginClientTests(unittest.TestCase):
         class State:
             auth_token = "private-token"
             account_name = "Old name"
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
 
         rejected_state = State()
         with (
@@ -340,6 +351,8 @@ class LoginClientTests(unittest.TestCase):
         class State:
             auth_token = ""
             account_name = "Old name"
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
 
         state = State()
         with (
@@ -357,9 +370,13 @@ class LoginClientTests(unittest.TestCase):
 
         state.auth_token = "private-token"
         state.account_name = "Maria"
+        state.password_reset_notice_pending = True
+        state.password_reset_notice_visible = True
         LoginState.logout.fn(state)
         self.assertEqual(state.auth_token, "")
         self.assertEqual(state.account_name, "")
+        self.assertFalse(state.password_reset_notice_pending)
+        self.assertFalse(state.password_reset_notice_visible)
 
     def test_password_visibility_state_toggles_on_each_activation(self) -> None:
         class State:
@@ -383,6 +400,8 @@ class LoginClientTests(unittest.TestCase):
             is_loading = False
             error_message = ""
             auth_token = ""
+            password_reset_notice_pending = True
+            password_reset_notice_visible = True
 
         state = State()
         with (
@@ -407,6 +426,8 @@ class LoginClientTests(unittest.TestCase):
         self.assertEqual(state.auth_token, "transient-token")
         self.assertFalse(state.is_loading)
         self.assertEqual(state.error_message, "")
+        self.assertFalse(state.password_reset_notice_pending)
+        self.assertFalse(state.password_reset_notice_visible)
         self.assertEqual(len(events), 1)
         self.assertIn("/", str(events[0]))
 
@@ -427,6 +448,8 @@ class LoginClientTests(unittest.TestCase):
                     is_loading = False
                     error_message = ""
                     auth_token = "old-token"
+                    password_reset_notice_pending = False
+                    password_reset_notice_visible = False
 
                 state = State()
                 with (
@@ -461,6 +484,8 @@ class LoginClientTests(unittest.TestCase):
             is_loading = True
             error_message = ""
             auth_token = ""
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
 
         state = State()
         with patch(
@@ -561,17 +586,22 @@ class LoginPageTests(unittest.TestCase):
         )
         self.assertEqual(getattr(logo.src, "_var_value", logo.src), "/logo.svg")
 
-        no_action_labels = {"Esqueci minha senha"}
-        for node in nodes:
-            if _component_text(node) in no_action_labels:
-                self.assertFalse(getattr(node, "href", None))
-                self.assertFalse(getattr(node, "event_triggers", {}))
+        forgot_password = next(
+            node
+            for node in nodes
+            if _component_text(node) == "Esqueci minha senha"
+        )
+        self.assertIn("/recuperar-senha", str(forgot_password))
+        self.assertIn("on_click", forgot_password.event_triggers)
 
         create_account = next(
             node for node in nodes if _component_text(node) == "Criar conta"
         )
         self.assertIn("on_click", create_account.event_triggers)
-        self.assertIn("/cadastro", str(create_account.event_triggers["on_click"]))
+        self.assertIn(
+            "navigate_to_signup_from_login",
+            str(create_account.event_triggers["on_click"]),
+        )
 
         back_link = next(
             node for node in nodes if _component_text(node) == "← Voltar"
