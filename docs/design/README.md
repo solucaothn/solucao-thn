@@ -140,7 +140,7 @@ As telas de referência adicionadas são:
 - [07-detalhamento-doacao.png](./07-detalhamento-doacao.png) — descrição e categoria.
 - [08-fotos-doacao.png](./08-fotos-doacao.png) — seleção de fotos.
 - [09-entrega-doacao.png](./09-entrega-doacao.png) — localização e entrega.
-- [10-formas -de-contato.png](./10-formas%20-de-contato.png) — contato e publicação.
+- [10-formas-de-contato.png](./10-formas-de-contato.png) — contato e publicação.
 
 1. **Item:** nome da doação.
 2. **Detalhes:** descrição, categoria existente e condição (Ótimo, Bom ou Regular).
