@@ -19,4 +19,4 @@
 
 ## 4. Conferência manual
 
-- [ ] 4.1 Conferir no navegador o fluxo de ponta a ponta: login para solicitação; texto neutro e e-mail mascarado; código correto/incorreto; contagem e reenvio; “Usar outro e-mail”; validação das senhas e confirmação; retorno com aviso verde; limpeza ao digitar, recarregar ou voltar; responsividade, autofill e movimento reduzido.
+- [x] 4.1 Conferir no navegador o fluxo de ponta a ponta: verificados link “Esqueci minha senha”, recebimento do código por e-mail, contador de 0:30 até zero, aceitação do código, tela de nova senha, troca de senha, aviso verde no login e login com a nova senha. Não verificados: código incorreto, “Usar outro e-mail”, responsividade, autofill, movimento reduzido e aviso verde ao recarregar ou voltar pelo histórico.
