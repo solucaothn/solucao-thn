@@ -149,3 +149,23 @@ As telas de referência adicionadas são:
 5. **Contato e publicação:** preferência (WhatsApp, E-mail ou Chat do DoaFácil), sem solicitar telefone ou outro identificador de contato.
 
 As imagens originais indicam oito etapas e mostram a condição no último passo; o fluxo aprovado nesta change reduz a navegação a cinco etapas e coleta a condição no passo 2. A página usa cabeçalho branco com logotipo centralizado, fundo creme `#FFF6E8`, conteúdo estreito centralizado e animação `auth-card-enter`, que respeita `prefers-reduced-motion`. Os botões primários usam um tom mais escuro de verde com texto branco para manter contraste legível; a barra de progresso conserva `#00A859`. O indicador mostra “Passo X de 5”; a navegação preserva os campos, e erros de serviço não apagam o formulário nem mostram confirmação de publicação.
+
+## Recuperação de senha
+
+### 11-esqueci-senha.png — Solicitar código
+
+- Cartão central com o título “Esqueceu a senha?”, campo E-mail e botão “Continuar”; o link “← Voltar” retorna ao login.
+- Cabeçalho branco com logotipo, fundo creme e animação `auth-card-enter` somente no cartão.
+- A animação e o retorno ao login são acréscimos que não estão no Figma.
+
+### 12-verifique-email.png — Verificar código
+
+- Cartão com o título “Verifique seu e-mail”, campo Código de seis dígitos, dica para verificar o spam, contagem “Reenviar código em 0:30” e botão “Continuar”.
+- A tela mostra o e-mail parcialmente mascarado em uma mensagem neutra, oferece “Usar outro e-mail” e “← Voltar” para a solicitação.
+- A máscara, a mensagem neutra, a dica, a contagem, os links, o cabeçalho e a animação `auth-card-enter` são acréscimos que não estão no Figma.
+
+### 13-nova-senha.png — Definir nova senha
+
+- Cartão com o título “Altere sua senha”, campos “Nova senha” e “Confirmar senha” e botão “Salvar nova senha”.
+- Cada campo tem controle de olho independente; “← Voltar” retorna ao login. Após salvar, o login mostra uma faixa verde de sucesso.
+- Os controles de olho, o retorno, a faixa verde e a animação `auth-card-enter` são acréscimos que não estão no Figma.

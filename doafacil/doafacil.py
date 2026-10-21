@@ -13,6 +13,11 @@ from doafacil.cadastro_doacao import (
     donation_creation_page,
 )
 from doafacil.login import LoginState, login_page
+from doafacil.recuperacao_senha import (
+    new_password_page,
+    request_recovery_page,
+    verify_recovery_page,
+)
 
 
 RECENT_DONATIONS_PATH = "/catalog/donations/recent"
@@ -1098,6 +1103,22 @@ app = rx.App(
             "color": "#6b6b6b",
             "opacity": "1",
         },
+        "#recovery-email::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#recovery-code::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#recovery-password::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
+        "#recovery-password-confirmation::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
         (
             "#login-email:-webkit-autofill, "
             "#login-email:-webkit-autofill:hover, "
@@ -1119,7 +1140,19 @@ app = rx.App(
             "#signup-password:-webkit-autofill:focus, "
             "#signup-confirm-password:-webkit-autofill, "
             "#signup-confirm-password:-webkit-autofill:hover, "
-            "#signup-confirm-password:-webkit-autofill:focus"
+            "#signup-confirm-password:-webkit-autofill:focus, "
+            "#recovery-email:-webkit-autofill, "
+            "#recovery-email:-webkit-autofill:hover, "
+            "#recovery-email:-webkit-autofill:focus, "
+            "#recovery-code:-webkit-autofill, "
+            "#recovery-code:-webkit-autofill:hover, "
+            "#recovery-code:-webkit-autofill:focus, "
+            "#recovery-password:-webkit-autofill, "
+            "#recovery-password:-webkit-autofill:hover, "
+            "#recovery-password:-webkit-autofill:focus, "
+            "#recovery-password-confirmation:-webkit-autofill, "
+            "#recovery-password-confirmation:-webkit-autofill:hover, "
+            "#recovery-password-confirmation:-webkit-autofill:focus"
         ): {
             "background_color": "white",
             "WebkitTextFillColor": "#2b2b2b",
@@ -1145,8 +1178,23 @@ app.add_page(
     index,
     on_load=[HomeState.load_home_data, LoginState.load_account],
 )
-app.add_page(login_page, route="/login")
+app.add_page(
+    login_page,
+    route="/login",
+    on_load=LoginState.consume_password_reset_notice,
+)
 app.add_page(signup_page, route="/cadastro")
+app.add_page(request_recovery_page, route="/recuperar-senha")
+app.add_page(
+    verify_recovery_page,
+    route="/verificar-email",
+    on_load=LoginState.require_recovery_email,
+)
+app.add_page(
+    new_password_page,
+    route="/nova-senha",
+    on_load=LoginState.require_reset_token,
+)
 app.add_page(
     donation_creation_page,
     route="/cadastro-doacao",

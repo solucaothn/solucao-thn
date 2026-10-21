@@ -67,7 +67,7 @@ A aplicação SHALL oferecer uma página pública de login responsiva, coerente 
 - **AND** o cartão apresenta “Bem-vindo”, “Entre com seu e-mail e senha”, os campos “E-mail” e “Senha”, o link “Esqueci minha senha” alinhado à direita abaixo da senha e o botão verde “Entrar”
 - **AND** a página apresenta abaixo do cartão o botão em forma de pílula “Criar conta”
 - **AND** não solicita CPF
-- **AND** “Esqueci minha senha” não navega nem inicia outro fluxo, enquanto “Criar conta” leva para `/cadastro`
+- **AND** “Esqueci minha senha” leva para `/recuperar-senha`, enquanto “Criar conta” leva para `/cadastro`
 
 #### Scenario: Alternar a visibilidade da senha
 - **WHEN** a pessoa aciona o botão de olho no campo “Senha”
