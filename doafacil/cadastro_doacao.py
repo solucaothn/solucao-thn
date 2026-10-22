@@ -30,8 +30,9 @@ IMAGE_ACCEPT = {
     for mime_type in dict.fromkeys(IMAGE_TYPES.values())
 }
 CONDITIONS = ("Ótimo", "Bom", "Regular")
-DELIVERY_METHODS = ("Retirada", "Entrega", "A combinar")
-CONTACT_PREFERENCES = ("WhatsApp", "E-mail", "Chat do DoaFácil")
+DELIVERY_METHODS = ("A combinar",)
+CONTACT_PREFERENCES = ("E-mail", "Chat do DoaFácil")
+EXCLUDED_CATEGORY_NAMES = frozenset({"alimentos", "móveis"})
 
 
 class DonationServiceError(Exception):
@@ -70,6 +71,7 @@ def _parse_categories(payload: object) -> list[dict[str, Any]]:
         raise DonationServiceError
 
     categories: list[dict[str, Any]] = []
+    has_valid_category = False
     for item in payload:
         if not isinstance(item, dict):
             continue
@@ -82,9 +84,13 @@ def _parse_categories(payload: object) -> list[dict[str, Any]]:
             or not name.strip()
         ):
             continue
-        categories.append({"id": category_id, "name": name.strip()})
+        has_valid_category = True
+        normalized_name = name.strip()
+        if normalized_name.casefold() in EXCLUDED_CATEGORY_NAMES:
+            continue
+        categories.append({"id": category_id, "name": normalized_name})
 
-    if payload and not categories:
+    if payload and not has_valid_category:
         raise DonationServiceError
     return categories
 
@@ -356,8 +362,17 @@ class DonationCreateState(LoginState):
         self.contact_preference = value
 
     @rx.event
-    def advance(self) -> None:
+    def advance(self, files: list[rx.UploadFile]) -> None:
         if self.is_loading_data or self.is_publishing or self.published:
+            return
+        if self.current_step == 3:
+            if not files:
+                self.donation_error_message = (
+                    "Adicione pelo menos uma foto para continuar."
+                )
+                return
+            self.current_step = 4
+            self.donation_error_message = ""
             return
         category_ids = {
             category["id"] for category in self.categories
@@ -508,11 +523,13 @@ def _select_field(
     value: rx.Var[str],
     on_change: Any,
     placeholder: str,
+    field_id: str,
 ) -> rx.Component:
     return rx.vstack(
         _field_label(label),
         rx.select(
             options,
+            id=field_id,
             value=value,
             on_change=on_change,
             placeholder=placeholder,
@@ -520,6 +537,7 @@ def _select_field(
             height="40px",
             background="white",
             color="#333333",
+            high_contrast=True,
             border="1px solid #C8C8C8",
             border_radius="8px",
         ),
@@ -547,7 +565,8 @@ def _step_one() -> rx.Component:
         rx.input(
             value=DonationCreateState.title,
             on_change=DonationCreateState.set_title,
-            placeholder="Ex.: Mesa de madeira",
+            placeholder="Ex.: Carrinho de brinquedo",
+            id="donation-title",
             max_length=100,
             width="100%",
             height="40px",
@@ -581,6 +600,7 @@ def _step_two() -> rx.Component:
             value=DonationCreateState.description,
             on_change=DonationCreateState.set_description,
             placeholder="Conte detalhes importantes sobre o objeto.",
+            id="donation-description",
             max_length=2000,
             min_height="100px",
             width="100%",
@@ -595,6 +615,7 @@ def _step_two() -> rx.Component:
             DonationCreateState.category_name,
             DonationCreateState.set_category,
             "Selecione uma categoria",
+            "donation-category",
         ),
         _select_field(
             "Condição do item",
@@ -602,6 +623,7 @@ def _step_two() -> rx.Component:
             DonationCreateState.condition,
             DonationCreateState.set_condition,
             "Selecione a condição",
+            "donation-condition",
         ),
         align="start",
         spacing="3",
@@ -747,6 +769,7 @@ def _step_four() -> rx.Component:
             DonationCreateState.delivery_method,
             DonationCreateState.set_delivery_method,
             "Selecione uma forma de entrega",
+            "donation-delivery-method",
         ),
         align="start",
         spacing="3",
@@ -774,6 +797,7 @@ def _step_five() -> rx.Component:
             DonationCreateState.contact_preference,
             DonationCreateState.set_contact_preference,
             "Selecione uma forma de contato",
+            "donation-contact-preference",
         ),
         rx.cond(
             DonationCreateState.success_message != "",
@@ -935,7 +959,9 @@ def _wizard_content() -> rx.Component:
                 rx.button(
                     "Continuar",
                     type="button",
-                    on_click=DonationCreateState.advance,
+                    on_click=DonationCreateState.advance(
+                        rx.upload_files(PHOTO_UPLOAD_ID)
+                    ),
                     disabled=DonationCreateState.is_loading_data,
                     background="#007A42",
                     color="white",

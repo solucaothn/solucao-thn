@@ -14,7 +14,7 @@ O endpoint local `xano/api/catalog/catalog/donations/publish_POST.xs` declara `d
 
 **Non-Goals:**
 - Excluir ou alterar categorias, endpoints, tabelas ou validações no Xano.
-- Mudar as preferências de contato, as demais etapas ou o formato do payload da publicação.
+- Mudar o formato do payload da publicação ou outros passos além dos ajustes descritos; a lista de contatos será reduzida a “E-mail” e “Chat do DoaFácil”.
 - Criar novas páginas, rotas, dependências ou lógica fora do wizard existente.
 
 ## Decisions
@@ -36,6 +36,16 @@ Alternativa considerada: retirar a validação da modalidade por haver uma únic
 Aplicar uma cor de primeiro plano escura consistente aos placeholders, prompts/valores dos selects e opções de preferência de contato do quinto passo. Não redesenhar as mensagens explicativas, cabeçalho, cartões ou os demais elementos visuais dos passos. Os testes estruturais devem inspecionar os componentes e estilos referentes aos cinco passos, incluindo placeholder do campo, prompts de categoria/condição/entrega/contato e opções de contato.
 
 Alternativa considerada: mudar a paleta global de cores da aplicação ou todos os textos auxiliares. Rejeitada para manter o ajuste cirúrgico aos textos descritos.
+
+### Aplicar contraste no conteúdo interno do Select Radix
+
+O `rx.select` renderiza o placeholder dentro de `.rt-SelectTriggerInner`, dentro de um trigger marcado com `data-placeholder`. A regra de tema do Radix aplica a cor de placeholder nesse elemento interno, portanto uma regra apenas no `id` do trigger não basta. Aplicar cor `#333333` ao conteúdo interno dos quatro triggers do wizard quando estiverem no estado de placeholder; não alterar o fundo do controle nem os estilos do conteúdo/lista de opções.
+
+### Exigir uma foto para avançar e atualizar o exemplo do item
+
+O botão “Continuar” da etapa 3 deve enviar os arquivos selecionados ao evento Reflex. Se a lista estiver vazia, o estado mantém a pessoa na etapa e exibe o erro no componente de mensagens já existente; uma ou mais imagens válidas permitem avançar, sem alterar o limite de cinco. O endpoint continua aceitando ausência de fotos, mas o wizard não publica sem que a etapa obrigatória tenha sido concluída com ao menos uma foto. Atualizar o placeholder de “Nome do item” para “Ex.: Carrinho de brinquedo”.
+
+O endpoint existente declara `photos` opcional; essa permissividade não será alterada no Xano, pois a regra nova é aplicada no fluxo do frontend. As preferências permitidas permanecem somente “E-mail” e “Chat do DoaFácil”, já aceitas pelo enum do endpoint.
 
 ## Risks / Trade-offs
 
