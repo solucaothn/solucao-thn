@@ -1071,6 +1071,32 @@ def index() -> rx.Component:
 
 app = rx.App(
     style={
+        "#donation-title::placeholder": {
+            "color": "#333333",
+            "opacity": "1",
+        },
+        "#donation-description::placeholder": {
+            "color": "#333333",
+            "opacity": "1",
+        },
+        (
+            "#donation-category, "
+            "#donation-condition, "
+            "#donation-delivery-method, "
+            "#donation-contact-preference"
+        ): {
+            "color": "#333333",
+        },
+        (
+            "#donation-category[data-placeholder] .rt-SelectTriggerInner, "
+            "#donation-condition[data-placeholder] .rt-SelectTriggerInner, "
+            "#donation-delivery-method[data-placeholder] "
+            ".rt-SelectTriggerInner, "
+            "#donation-contact-preference[data-placeholder] "
+            ".rt-SelectTriggerInner"
+        ): {
+            "color": "#333333",
+        },
         "#public-home-search::placeholder": {
             "color": "#6b6b6b",
             "opacity": "1",

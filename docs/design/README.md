@@ -144,7 +144,7 @@ As telas de referência adicionadas são:
 
 1. **Item:** nome da doação.
 2. **Detalhes:** descrição, categoria existente e condição (Ótimo, Bom ou Regular).
-3. **Fotos:** até cinco imagens JPEG, PNG, GIF ou WEBP; a publicação também pode ser feita sem fotos.
+3. **Fotos:** pelo menos uma e até cinco imagens JPEG, PNG, GIF ou WEBP são necessárias para continuar no wizard e publicar a doação.
 4. **Entrega:** modalidade (Retirada, Entrega ou A combinar) e cidade/UF do perfil, sem endereço específico.
 5. **Contato e publicação:** preferência (WhatsApp, E-mail ou Chat do DoaFácil), sem solicitar telefone ou outro identificador de contato.
 

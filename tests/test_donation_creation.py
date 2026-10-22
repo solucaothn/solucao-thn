@@ -6,7 +6,10 @@ from unittest.mock import patch
 import httpx
 
 from doafacil.cadastro_doacao import (
+    CONTACT_PREFERENCES,
+    DELIVERY_METHODS,
     IMAGE_TYPES,
+    PHOTO_UPLOAD_ID,
     DonationCreateState,
     DonationServiceError,
     DonationSessionExpiredError,
@@ -14,27 +17,80 @@ from doafacil.cadastro_doacao import (
     _fetch_profile,
     _parse_categories,
     _publish_donation,
+    _step_five,
+    _step_four,
+    _step_one,
+    _step_two,
     _validate_step,
     _validated_photos,
     donation_creation_page,
+    _wizard_content,
 )
 from doafacil.doafacil import app
 
 
 class DonationCreationTests(unittest.TestCase):
     def test_category_payload_requires_valid_category_ids_and_names(self) -> None:
+        payload = [
+            {"id": 3, "name": "Móveis"},
+            {"id": 4, "name": "Livros"},
+            {"id": 5, "name": "Alimentos"},
+            {"id": 6, "name": "Brinquedos"},
+        ]
+        original_payload = [item.copy() for item in payload]
         self.assertEqual(
-            _parse_categories(
-                [{"id": 3, "name": "Móveis"}, {"id": 4, "name": "Livros"}]
-            ),
+            _parse_categories(payload),
             [
-                {"id": 3, "name": "Móveis"},
                 {"id": 4, "name": "Livros"},
+                {"id": 6, "name": "Brinquedos"},
             ],
         )
+        self.assertEqual(payload, original_payload)
         self.assertEqual(_parse_categories([]), [])
+        self.assertEqual(
+            _parse_categories(
+                [
+                    {"id": 7, "name": "Alimentos"},
+                    {"id": 8, "name": "Móveis"},
+                ]
+            ),
+            [],
+        )
         with self.assertRaises(DonationServiceError):
             _parse_categories([{"id": "3", "name": "Móveis"}])
+
+    def test_hidden_categories_are_not_valid_options(self) -> None:
+        categories = _parse_categories(
+            [
+                {"id": 3, "name": "Alimentos"},
+                {"id": 4, "name": "Móveis"},
+                {"id": 5, "name": "Livros"},
+            ]
+        )
+        state = SimpleNamespace(
+            categories=categories,
+            category_id="",
+            category_name="",
+        )
+
+        DonationCreateState.set_category.fn(state, "Móveis")
+        self.assertEqual(state.category_id, "")
+        self.assertEqual(state.category_name, "")
+        self.assertEqual(
+            _validate_step(
+                2,
+                "Mesa",
+                "Em bom estado",
+                "4",
+                "Bom",
+                "A combinar",
+                "E-mail",
+                {category["id"] for category in categories},
+                "Recife",
+                "PE",
+            ),
+            "Selecione uma categoria válida para continuar.",
+        )
 
     def test_step_validation_requires_fields_at_their_step(self) -> None:
         categories = {3}
@@ -43,7 +99,7 @@ class DonationCreationTests(unittest.TestCase):
             "Em bom estado",
             "3",
             "Bom",
-            "Retirada",
+            "A combinar",
             "E-mail",
             categories,
             "Recife",
@@ -111,6 +167,48 @@ class DonationCreationTests(unittest.TestCase):
             _validate_step(5, *args),
             "",
         )
+        self.assertEqual(
+            CONTACT_PREFERENCES,
+            ("E-mail", "Chat do DoaFácil"),
+        )
+        contact_options = [
+            _literal(node.value)
+            for node in _component_nodes(_step_five())
+            if type(node).__name__ == "SelectItem"
+        ]
+        self.assertEqual(contact_options, list(CONTACT_PREFERENCES))
+        for preference in CONTACT_PREFERENCES:
+            with self.subTest(contact_preference=preference):
+                self.assertEqual(
+                    _validate_step(
+                        5,
+                        *args[:5],
+                        preference,
+                        *args[6:],
+                    ),
+                    "",
+                )
+        self.assertIn(
+            "contato",
+            _validate_step(
+                5,
+                *args[:5],
+                "WhatsApp",
+                *args[6:],
+            ),
+        )
+        self.assertEqual(DELIVERY_METHODS, ("A combinar",))
+        for unavailable_method in ("Retirada", "Entrega"):
+            with self.subTest(delivery_method=unavailable_method):
+                self.assertIn(
+                    "entrega",
+                    _validate_step(
+                        4,
+                        *args[:4],
+                        unavailable_method,
+                        *args[5:],
+                    ),
+                )
 
     def test_navigation_preserves_fields_and_blocks_missing_title(self) -> None:
         state = SimpleNamespace(
@@ -129,18 +227,54 @@ class DonationCreationTests(unittest.TestCase):
             state="",
             donation_error_message="",
         )
-        DonationCreateState.advance.fn(state)
+        DonationCreateState.advance.fn(state, [])
         self.assertEqual(state.current_step, 1)
         self.assertIn("nome", state.donation_error_message)
 
         state.title = "Mesa"
         state.donation_error_message = ""
-        DonationCreateState.advance.fn(state)
+        DonationCreateState.advance.fn(state, [])
         self.assertEqual(state.current_step, 2)
         self.assertEqual(state.title, "Mesa")
         DonationCreateState.go_back.fn(state)
         self.assertEqual(state.current_step, 1)
         self.assertEqual(state.title, "Mesa")
+
+    def test_photo_step_requires_at_least_one_selected_file(self) -> None:
+        state = SimpleNamespace(
+            is_loading_data=False,
+            is_publishing=False,
+            published=False,
+            current_step=3,
+            donation_error_message="",
+        )
+
+        DonationCreateState.advance.fn(state, [])
+
+        self.assertEqual(state.current_step, 3)
+        self.assertEqual(
+            state.donation_error_message,
+            "Adicione pelo menos uma foto para continuar.",
+        )
+
+        selected_photo = SimpleNamespace(
+            name="brinquedo.jpg",
+            content_type="image/jpeg",
+        )
+        DonationCreateState.advance.fn(state, [selected_photo])
+
+        self.assertEqual(state.current_step, 4)
+        self.assertEqual(state.donation_error_message, "")
+
+        continue_button = next(
+            node
+            for node in _component_nodes(_wizard_content())
+            if type(node).__name__ == "Button"
+            and _component_text(node.children) == ["Continuar"]
+        )
+        continue_event = continue_button.event_triggers["on_click"].events[0]
+        self.assertEqual(continue_event.client_handler_name, "uploadFiles")
+        self.assertIn(PHOTO_UPLOAD_ID, str(continue_event.args))
 
     def test_upload_validation_accepts_images_and_rejects_invalid_files(self) -> None:
         image = SimpleNamespace(
@@ -167,12 +301,15 @@ class DonationCreationTests(unittest.TestCase):
             )
 
     def test_category_request_parses_returned_options(self) -> None:
+        payload = [
+            {"id": 1, "name": "Alimentos"},
+            {"id": 2, "name": "Móveis"},
+            {"id": 3, "name": "Livros"},
+        ]
+
         async def respond(request: httpx.Request) -> httpx.Response:
             self.assertTrue(request.url.path.endswith("/catalog/categories"))
-            return httpx.Response(
-                200,
-                json=[{"id": 9, "name": "Brinquedos"}],
-            )
+            return httpx.Response(200, json=payload)
 
         async def fetch() -> list[dict[str, object]]:
             async with httpx.AsyncClient(
@@ -185,7 +322,15 @@ class DonationCreationTests(unittest.TestCase):
 
         self.assertEqual(
             asyncio.run(fetch()),
-            [{"id": 9, "name": "Brinquedos"}],
+            [{"id": 3, "name": "Livros"}],
+        )
+        self.assertEqual(
+            payload,
+            [
+                {"id": 1, "name": "Alimentos"},
+                {"id": 2, "name": "Móveis"},
+                {"id": 3, "name": "Livros"},
+            ],
         )
 
     def test_category_request_reports_backend_failure(self) -> None:
@@ -323,6 +468,8 @@ class DonationCreationTests(unittest.TestCase):
             self.assertIn(b'filename="mesa.jpg"', body)
             self.assertIn(b'name="photos[]"', body)
             self.assertIn(b'name="category_id"', body)
+            self.assertIn(b'name="delivery_method"', body)
+            self.assertIn(b"A combinar", body)
             self.assertNotIn(b'name="owner_id"', body)
             self.assertNotIn(b'name="city"', body)
             self.assertNotIn(b'name="state"', body)
@@ -345,7 +492,7 @@ class DonationCreationTests(unittest.TestCase):
                         "title": "Mesa",
                         "description": "Em bom estado",
                         "condition": "Bom",
-                        "delivery_method": "Retirada",
+                        "delivery_method": "A combinar",
                         "contact_preference": "E-mail",
                     },
                     [("mesa.jpg", b"image-bytes", "image/jpeg")],
@@ -385,8 +532,8 @@ class DonationCreationTests(unittest.TestCase):
                         "title": "Mesa",
                         "description": "Em bom estado",
                         "condition": "Bom",
-                        "delivery_method": "Retirada",
-                        "contact_preference": "E-mail",
+                        "delivery_method": "A combinar",
+                        "contact_preference": "Chat do DoaFácil",
                     },
                     [],
                 )
@@ -439,9 +586,9 @@ class DonationCreationTests(unittest.TestCase):
             description="Em bom estado",
             category_id="3",
             condition="Bom",
-            delivery_method="Retirada",
+            delivery_method="A combinar",
             contact_preference="E-mail",
-            categories=[{"id": 3, "name": "Móveis"}],
+            categories=[{"id": 3, "name": "Livros"}],
             city="Recife",
             state="PE",
             donation_error_message="",
@@ -491,9 +638,9 @@ class DonationCreationTests(unittest.TestCase):
             description="Em bom estado",
             category_id="3",
             condition="Bom",
-            delivery_method="Retirada",
+            delivery_method="A combinar",
             contact_preference="E-mail",
-            categories=[{"id": 3, "name": "Móveis"}],
+            categories=[{"id": 3, "name": "Livros"}],
             city="Recife",
             state="PE",
             donation_error_message="",
@@ -561,6 +708,107 @@ class DonationCreationTests(unittest.TestCase):
         )
         self.assertIn("auth-card-enter", str(page))
 
+    def test_placeholders_and_select_texts_use_dark_colors(self) -> None:
+        step_components = (
+            _step_one(),
+            _step_two(),
+            _step_four(),
+            _step_five(),
+        )
+        nodes = [
+            node
+            for component in step_components
+            for node in _component_nodes(component)
+        ]
+        fields = {
+            _literal(node.id): node
+            for node in nodes
+            if type(node).__name__ == "DebounceInput"
+        }
+        self.assertEqual(
+            set(fields),
+            {"donation-title", "donation-description"},
+        )
+        expected_placeholders = {
+            "donation-title": "Ex.: Carrinho de brinquedo",
+            "donation-description": "Conte detalhes importantes sobre o objeto.",
+        }
+        for field_id, field in fields.items():
+            with self.subTest(field_id=field_id):
+                self.assertEqual(
+                    _literal(field.custom_attrs["placeholder"]),
+                    expected_placeholders[field_id],
+                )
+                self.assertEqual(
+                    _literal(field.style["color"]),
+                    "#333333",
+                )
+                self.assertEqual(
+                    app.style[f"#{field_id}::placeholder"],
+                    {"color": "#333333", "opacity": "1"},
+                )
+
+        select_triggers = {
+            _literal(node.id): node
+            for node in nodes
+            if type(node).__name__ == "SelectTrigger"
+        }
+        expected_prompts = {
+            "donation-category": "Selecione uma categoria",
+            "donation-condition": "Selecione a condição",
+            "donation-delivery-method": "Selecione uma forma de entrega",
+            "donation-contact-preference": "Selecione uma forma de contato",
+        }
+        self.assertEqual(set(select_triggers), set(expected_prompts))
+        for field_id, placeholder in expected_prompts.items():
+            with self.subTest(field_id=field_id):
+                self.assertEqual(
+                    _literal(select_triggers[field_id].placeholder),
+                    placeholder,
+                )
+                self.assertEqual(
+                    app.style[
+                        "#donation-category, "
+                        "#donation-condition, "
+                        "#donation-delivery-method, "
+                        "#donation-contact-preference"
+                    ]["color"],
+                    "#333333",
+                )
+
+        placeholder_selector = (
+            "#donation-category[data-placeholder] .rt-SelectTriggerInner, "
+            "#donation-condition[data-placeholder] .rt-SelectTriggerInner, "
+            "#donation-delivery-method[data-placeholder] "
+            ".rt-SelectTriggerInner, "
+            "#donation-contact-preference[data-placeholder] "
+            ".rt-SelectTriggerInner"
+        )
+        self.assertEqual(
+            app.style[placeholder_selector],
+            {"color": "#333333"},
+        )
+        self.assertNotIn("background", app.style[placeholder_selector])
+        self.assertNotIn("rt-SelectItem", placeholder_selector)
+
+        select_roots = [
+            node for node in nodes if type(node).__name__ == "SelectRoot"
+        ]
+        select_contents = [
+            node for node in nodes if type(node).__name__ == "SelectContent"
+        ]
+        self.assertEqual(len(select_roots), 4)
+        self.assertTrue(all(node.color == "#333333" for node in select_roots))
+        self.assertEqual(len(select_contents), 4)
+        self.assertTrue(
+            all(_literal(node.high_contrast) is True for node in select_contents)
+        )
+        self.assertEqual(DELIVERY_METHODS, ("A combinar",))
+        self.assertEqual(
+            CONTACT_PREFERENCES,
+            ("E-mail", "Chat do DoaFácil"),
+        )
+
 
 def _component_text(component: object) -> list[object]:
     contents: list[object] = []
@@ -580,6 +828,28 @@ def _component_text(component: object) -> list[object]:
 
     collect(component)
     return contents
+
+
+def _component_nodes(component: object) -> list[object]:
+    nodes: list[object] = []
+
+    def collect(value: object) -> None:
+        if hasattr(value, "children"):
+            nodes.append(value)
+            collect(value.children)
+        elif isinstance(value, dict):
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                collect(child)
+
+    collect(component)
+    return nodes
+
+
+def _literal(value: object) -> object:
+    return getattr(value, "_var_value", value)
 
 
 if __name__ == "__main__":
