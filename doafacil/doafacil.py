@@ -12,6 +12,10 @@ from doafacil.cadastro_doacao import (
     DonationCreateState,
     donation_creation_page,
 )
+from doafacil.detalhe_doacao import (
+    DonationDetailState,
+    donation_detail_page,
+)
 from doafacil.login import LoginState, login_page
 from doafacil.recuperacao_senha import (
     new_password_page,
@@ -274,12 +278,16 @@ def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
                 width="100%",
                 overflow_wrap="anywhere",
             ),
-            rx.button(
-                "Acessar",
-                color_scheme="green",
-                variant="solid",
-                size="1",
-                cursor="default",
+            rx.link(
+                rx.button(
+                    "Acessar",
+                    color_scheme="green",
+                    variant="solid",
+                    size="1",
+                    cursor="pointer",
+                    align_self="end",
+                ),
+                href=f"/doacao/{donation['id']}",
                 align_self="end",
             ),
             align="start",
@@ -1225,4 +1233,9 @@ app.add_page(
     donation_creation_page,
     route="/cadastro-doacao",
     on_load=DonationCreateState.load_initial_data,
+)
+app.add_page(
+    donation_detail_page,
+    route="/doacao/[id]",
+    on_load=DonationDetailState.load_donation,
 )

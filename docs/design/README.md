@@ -169,3 +169,18 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 - Cartão com o título “Altere sua senha”, campos “Nova senha” e “Confirmar senha” e botão “Salvar nova senha”.
 - Cada campo tem controle de olho independente; “← Voltar” retorna ao login. Após salvar, o login mostra uma faixa verde de sucesso.
 - Os controles de olho, o retorno, a faixa verde e a animação `auth-card-enter` são acréscimos que não estão no Figma.
+
+## Detalhe da doação
+
+### 14-detalhe-doacao.png e 15-detalhe-doacao-resumido.png — Uma página
+
+- As duas imagens representam uma única página de detalhe, não telas ou etapas diferentes.
+- A imagem 14 mostra a página inteira, incluindo a galeria, os detalhes e a localização após rolar. A imagem 15 mostra o topo da mesma página, antes de rolar.
+- A página usa cabeçalho branco com o logotipo, fundo creme, galeria de fotos e resumo da doação. Abaixo aparecem os detalhes, a localização e o cartão mínimo de quem doa.
+- O conteúdo aprovado inclui título, condição, descrição, categoria, cidade/UF, modalidade de entrega e preferência de contato escrita como texto. O cartão de quem doa mostra somente o primeiro nome e a cidade/UF da doação.
+- A página é pública e exibe somente doações disponíveis. Um identificador inválido, uma doação inexistente ou uma doação indisponível apresenta “Doação não encontrada”. Falhas de rede ou respostas inválidas apresentam uma mensagem de erro.
+- O conteúdo estático usa `page-fade-enter`, respeitando `prefers-reduced-motion`; cabeçalho e dados carregados do Xano não são animados.
+
+### Elementos fora do escopo desta versão
+
+Cor, Material e Tipo não fazem parte dos dados aprovados para exibição. Bairro, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade. Avaliações, histórico de doações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. Os botões Chat, Outros meios de comunicação e Acessar perfil do doador também ficam ocultos porque chat, perfil público e meios adicionais de contato não foram implementados. Esses itens não são apresentados como “Em breve”.
