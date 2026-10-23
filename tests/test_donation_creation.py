@@ -349,7 +349,7 @@ class DonationCreationTests(unittest.TestCase):
         with self.assertRaises(DonationServiceError):
             asyncio.run(fetch())
 
-    def test_category_load_failure_is_reported_without_clearing_form(self) -> None:
+    def test_category_load_failure_is_reported_after_form_reset(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/catalog/categories"):
                 return httpx.Response(503, request=request)
@@ -398,8 +398,105 @@ class DonationCreationTests(unittest.TestCase):
 
         self.assertTrue(state.data_load_failed)
         self.assertIn("categorias", state.donation_error_message)
-        self.assertEqual(state.title, "Mesa")
+        self.assertEqual(state.title, "")
+        self.assertEqual(state.current_step, 1)
         self.assertFalse(state.is_loading_data)
+
+    def test_reentering_after_publication_resets_form_and_reloads_account_data(
+        self,
+    ) -> None:
+        async def respond(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/catalog/categories"):
+                return httpx.Response(
+                    200,
+                    json=[{"id": 3, "name": "Livros"}],
+                    request=request,
+                )
+            self.assertTrue(request.url.path.endswith("/auth/profile"))
+            return httpx.Response(
+                200,
+                json={"city": "Recife", "state": "PE"},
+                request=request,
+            )
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(respond)
+        )
+        state = SimpleNamespace(
+            auth_token="test-token",
+            current_step=5,
+            title="Doação anterior",
+            description="Descrição anterior",
+            category_id="3",
+            category_name="Livros",
+            condition="Bom",
+            delivery_method="A combinar",
+            contact_preference="E-mail",
+            categories=[{"id": 3, "name": "Livros"}],
+            city="Cidade antiga",
+            state="UF",
+            is_loading_data=False,
+            data_load_failed=False,
+            is_publishing=False,
+            published=True,
+            donation_error_message="Erro anterior",
+            upload_progress="Upload anterior",
+            success_message="Doação publicada!",
+        )
+
+        async def load() -> list[object]:
+            events = []
+            async for event in DonationCreateState.load_initial_data.fn(state):
+                events.append(event)
+            return events
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "XANO_API_URL": "https://xano.example/api:catalog",
+                    "XANO_AUTH_API_URL": "https://xano.example/api:auth",
+                },
+            ),
+            patch(
+                "doafacil.cadastro_doacao.httpx.AsyncClient",
+                return_value=client,
+            ),
+        ):
+            events = asyncio.run(load())
+
+        self.assertEqual(state.current_step, 1)
+        self.assertEqual(state.title, "")
+        self.assertEqual(state.description, "")
+        self.assertEqual(state.category_id, "")
+        self.assertEqual(state.category_name, "")
+        self.assertEqual(state.condition, "")
+        self.assertEqual(state.delivery_method, "")
+        self.assertEqual(state.contact_preference, "")
+        self.assertEqual(state.donation_error_message, "")
+        self.assertEqual(state.success_message, "")
+        self.assertEqual(state.upload_progress, "")
+        self.assertFalse(state.published)
+        self.assertFalse(state.is_publishing)
+        self.assertFalse(state.is_loading_data)
+        self.assertFalse(state.data_load_failed)
+        self.assertEqual(state.categories, [{"id": 3, "name": "Livros"}])
+        self.assertEqual((state.city, state.state), ("Recife", "PE"))
+        self.assertEqual(len(events), 1)
+        self.assertIn(PHOTO_UPLOAD_ID, repr(events[0]))
+
+        DonationCreateState.advance.fn(state, [])
+        self.assertEqual(state.current_step, 1)
+        self.assertIn("nome", state.donation_error_message)
+
+        state.current_step = 3
+        state.donation_error_message = ""
+        DonationCreateState.advance.fn(state, [])
+        self.assertEqual(state.current_step, 3)
+        self.assertEqual(
+            state.donation_error_message,
+            "Adicione pelo menos uma foto para continuar.",
+        )
 
     def test_profile_request_sends_auth_and_returns_city_and_state(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:

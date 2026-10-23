@@ -276,10 +276,30 @@ class DonationCreateState(LoginState):
     async def load_initial_data(
         self,
     ) -> AsyncGenerator[rx.event.EventSpec, None]:
+        self.current_step = 1
+        self.title = ""
+        self.description = ""
+        self.category_id = ""
+        self.category_name = ""
+        self.condition = ""
+        self.delivery_method = ""
+        self.contact_preference = ""
+        self.categories = []
+        self.city = ""
+        self.state = ""
+        self.is_loading_data = False
+        self.data_load_failed = False
+        self.is_publishing = False
+        self.published = False
+        self.donation_error_message = ""
+        self.upload_progress = ""
+        self.success_message = ""
+
         if not self.auth_token:
             yield rx.redirect("/login")
             return
 
+        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
         self.is_loading_data = True
         self.data_load_failed = False
         self.donation_error_message = ""
