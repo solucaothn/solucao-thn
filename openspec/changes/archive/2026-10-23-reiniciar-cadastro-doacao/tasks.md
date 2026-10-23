@@ -8,4 +8,4 @@
 ## 2. Verificação integrada e manual
 
 - [x] 2.1 Executar `python -m unittest discover -s tests -v` e `.venv\Scripts\reflex.exe compile --dry`; corrigir falhas relacionadas ao reinício, confirmar que os testes existentes continuam passando sem alteração e que `test_navigation_preserves_fields` continua cobrindo a preservação dos campos ao avançar e voltar.
-- [ ] 2.2 (manual) No navegador, publicar uma doação de teste, abrir `/cadastro-doacao` novamente e conferir que o formulário está limpo no passo 1; preencher o passo 1, avançar até o passo 3, voltar e conferir que os dados continuam preenchidos; repetir a publicação e a conferência de formulário limpo após sair e entrar com outra conta na mesma aba. O Copilot não marca esta tarefa como concluída.
+- [x] 2.2 (manual) No navegador, publicar uma doação de teste, abrir `/cadastro-doacao` novamente e conferir que o formulário está limpo no passo 1; preencher o passo 1, avançar até o passo 3, voltar e conferir que os dados continuam preenchidos; repetir a publicação e a conferência de formulário limpo após sair e entrar com outra conta na mesma aba. O Copilot não marca esta tarefa como concluída.
