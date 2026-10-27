@@ -4,9 +4,9 @@
 
 - [x] 1.1 Conferir `git status` e registrar que os oito arquivos preexistentes em `xano/` diferem somente por LF/CRLF do último pull; eles não entram em commit e podem ser reescritos pelo pull. Antes de executar `xano workspace pull -d ./xano`, o Copilot MUST parar e pedir confirmação explícita ao usuário; só prosseguir após confirmação, registrando o resultado.
 - [x] 1.2 Consultar no Xano Developer MCP a sintaxe de consultas relacionadas, ordenação, composição de URLs de imagem e respostas/erros; implementar apenas o novo `GET /catalog/donations/detail` com `donation_id`, sem alterar tabelas ou endpoints existentes, e validar todos os `.xs` novos no MCP.
-- [ ] 1.3 (manual) Executar `xano workspace push -d ./xano --dry-run`, mostrar a saída inteira ao usuário, revisar e registrar o escopo; avisar o grupo e obter sua autorização para o push real. Não marcar esta tarefa concluída pelo Copilot.
-- [ ] 1.4 (manual) Após autorização do grupo, parar e pedir confirmação explícita ao usuário imediatamente antes do push real; somente após confirmação publicar exclusivamente o endpoint novo. Não marcar esta tarefa concluída pelo Copilot.
-- [ ] 1.5 (manual) Após a publicação, conferir no painel do Xano e na rota pública a resposta do endpoint: doação disponível retorna fotos sem repetição e dados aprovados; doação inexistente ou indisponível retorna o mesmo resultado genérico; nenhum dado privado é retornado. Se aparecer qualquer dado privado, remover o endpoint novo imediatamente como rollback. Não marcar esta tarefa concluída pelo Copilot.
+- [x] 1.3 (manual) Executar `xano workspace push -d ./xano --dry-run`, mostrar a saída inteira ao usuário, revisar e registrar o escopo; avisar o grupo e obter sua autorização para o push real. Não marcar esta tarefa concluída pelo Copilot.
+- [x] 1.4 (manual) Após autorização do grupo, parar e pedir confirmação explícita ao usuário imediatamente antes do push real; somente após confirmação publicar exclusivamente o endpoint novo. Não marcar esta tarefa concluída pelo Copilot.
+- [x] 1.5 (manual) Após a publicação, conferir no painel do Xano e na rota pública a resposta do endpoint: doação disponível retorna fotos sem repetição e dados aprovados; doação inexistente ou indisponível retorna o mesmo resultado genérico; nenhum dado privado é retornado. Se aparecer qualquer dado privado, remover o endpoint novo imediatamente como rollback. Não marcar esta tarefa concluída pelo Copilot.
 
 ## 2. Página Reflex e navegação da home
 
@@ -20,8 +20,8 @@
 
 - [x] 3.1 Executar `python -m unittest discover -s tests -v` e confirmar aprovação dos testes existentes e novos de detalhe e navegação.
 - [x] 3.2 Executar `.venv\Scripts\reflex.exe compile --dry` e corrigir qualquer erro de registro da rota dinâmica ou da página.
-- [ ] 3.3 Conferir `git status --short` e `git diff --stat`; confirmar que só os arquivos previstos da change foram alterados e que as alterações preexistentes de `xano/` foram preservadas.
+- [x] 3.3 Conferir `git status --short` e `git diff --stat`; confirmar que só os arquivos previstos da change foram alterados e que as alterações preexistentes de `xano/` foram preservadas.
 
 ## 4. Teste manual após publicação
 
-- [ ] 4.1 (manual) Depois da publicação do endpoint, abrir no navegador uma doação disponível real por `/doacao/<id>` e conferir o detalhe, galeria sem foto repetida, dados do doador limitados ao primeiro nome e cidade/UF, responsividade e estados de erro; também acessar `/doacao/abc` e `/doacao/999999` e conferir “Doação não encontrada”. O Copilot não marca esta tarefa como concluída.
+- [x] 4.1 (manual) Depois da publicação do endpoint, abrir no navegador uma doação disponível real por `/doacao/<id>` e conferir o detalhe, galeria sem foto repetida, dados do doador limitados ao primeiro nome e cidade/UF, responsividade e estados de erro; também acessar `/doacao/abc` e `/doacao/999999` e conferir “Doação não encontrada”. O Copilot não marca esta tarefa como concluída.

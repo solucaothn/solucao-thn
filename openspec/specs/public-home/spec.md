@@ -37,7 +37,7 @@ A home SHALL exibir os dados retornados para cada doação recente com título, 
 #### Scenario: Doação com foto e condição
 - **WHEN** uma doação recente possui foto e condição
 - **THEN** o cartão exibe a foto, o título e a condição com o rótulo “Condição”
-- **AND** exibe o botão “Acessar” sem navegar para outra página quando acionado
+- **AND** exibe o botão “Acessar” que navega para `/doacao/<id>` daquela doação
 
 #### Scenario: Doação sem foto
 - **WHEN** uma doação recente não possui foto
