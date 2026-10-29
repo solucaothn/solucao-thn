@@ -820,6 +820,20 @@ def _step_five() -> rx.Component:
             "donation-contact-preference",
         ),
         rx.cond(
+            DonationCreateState.contact_preference == "E-mail",
+            rx.text(
+                "Seu e-mail ficará disponível para pessoas logadas que "
+                "quiserem falar com você.",
+                role="note",
+                color="#166B3B",
+                background="#E8F5EC",
+                padding="0.85rem 1rem",
+                border_radius="8px",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
             DonationCreateState.success_message != "",
             rx.text(
                 DonationCreateState.success_message,

@@ -805,6 +805,22 @@ class DonationCreationTests(unittest.TestCase):
         )
         self.assertIn("auth-card-enter", str(page))
 
+    def test_email_visibility_notice_is_conditional_on_preference(self) -> None:
+        step = _step_five()
+        notice = (
+            "Seu e-mail ficará disponível para pessoas logadas que "
+            "quiserem falar com você."
+        )
+        content = _component_text(step)
+
+        self.assertIn(notice, content)
+        self.assertIn("contact_preference", str(step))
+        self.assertIn("E-mail", str(step))
+        rendered_step = str(step)
+        for personal_field in ("Telefone", "WhatsApp", "Endereço"):
+            with self.subTest(personal_field=personal_field):
+                self.assertNotIn(personal_field, rendered_step)
+
     def test_placeholders_and_select_texts_use_dark_colors(self) -> None:
         step_components = (
             _step_one(),

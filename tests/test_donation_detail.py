@@ -1,5 +1,6 @@
 import asyncio
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -7,13 +8,21 @@ from unittest.mock import patch
 import httpx
 
 from doafacil.detalhe_doacao import (
+    CHAT_UNAVAILABLE_MESSAGE,
     DONATION_DETAIL_ERROR_MESSAGE,
     DONATION_NOT_FOUND_MESSAGE,
+    DONOR_CHAT_PREFERENCE_MESSAGE,
+    DONOR_CONTACT_ERROR_MESSAGE,
+    DONOR_OWN_DONATION_MESSAGE,
     GENERIC_DETAIL_IMAGE,
+    DonorOwnDonationError,
     DonationNotFoundError,
     DonationDetailState,
+    _donor_contact_email_endpoint,
     _donation_detail_endpoint,
+    _fetch_donor_email,
     _fetch_donation_detail,
+    _mailto_url,
     _parse_donation_detail,
     donation_detail_page,
 )
@@ -55,6 +64,227 @@ class DonationDetailTests(unittest.TestCase):
             "https://xano.example/api:catalog/catalog/donations/detail"
             "?donation_id=42",
         )
+
+    def test_contact_endpoint_uses_xano_base_and_donation_id(self) -> None:
+        self.assertEqual(
+            _donor_contact_email_endpoint(
+                "https://xano.example/api:catalog/",
+                42,
+            ),
+            "https://xano.example/api:catalog"
+            "/catalog/donations/contact-email?donation_id=42",
+        )
+
+    def test_mailto_encodes_recipient_and_subject(self) -> None:
+        self.assertEqual(
+            _mailto_url(
+                "donor+tag@example.test",
+                "Carrinho & brinquedo",
+            ),
+            "mailto:donor%2Btag@example.test"
+            "?subject=Sobre%20a%20doa%C3%A7%C3%A3o%3A%20"
+            "Carrinho%20%26%20brinquedo",
+        )
+
+    def test_fetch_donor_email_sends_bearer_token_and_returns_only_email(
+        self,
+    ) -> None:
+        async def respond(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(
+                request.url.path,
+                "/api:catalog/catalog/donations/contact-email",
+            )
+            self.assertEqual(request.url.params.get("donation_id"), "42")
+            self.assertEqual(
+                request.headers.get("Authorization"),
+                "Bearer private-token",
+            )
+            return httpx.Response(
+                200,
+                json={"email": "donor@example.test"},
+            )
+
+        async def fetch() -> str:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(respond)
+            ) as client:
+                return await _fetch_donor_email(
+                    client,
+                    "https://xano.example/api:catalog",
+                    42,
+                    "private-token",
+                )
+
+        self.assertEqual(asyncio.run(fetch()), "donor@example.test")
+
+    def test_fetch_donor_email_maps_403_and_rejects_other_responses(self) -> None:
+        async def forbidden(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(403, json={"message": "Own donation"})
+
+        async def fetch_with(
+            handler: Callable[[httpx.Request], httpx.Response],
+        ) -> str:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(handler)
+            ) as client:
+                return await _fetch_donor_email(
+                    client,
+                    "https://xano.example",
+                    42,
+                    "private-token",
+                )
+
+        with self.assertRaises(DonorOwnDonationError):
+            asyncio.run(fetch_with(forbidden))
+
+        for status_code in (401, 404):
+            async def respond(
+                request: httpx.Request,
+                status_code: int = status_code,
+            ) -> httpx.Response:
+                return httpx.Response(status_code)
+
+            with self.subTest(status_code=status_code):
+                with self.assertRaises(httpx.HTTPStatusError):
+                    asyncio.run(fetch_with(respond))
+
+        async def extra_fields(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "email": "donor@example.test",
+                    "owner_id": 42,
+                },
+            )
+
+        with self.assertRaises(ValueError):
+            asyncio.run(fetch_with(extra_fields))
+
+    def test_contact_flow_redirects_unauthenticated_and_skips_chat_endpoint(
+        self,
+    ) -> None:
+        unauthenticated_state = _contact_state(auth_token="")
+        with (
+            patch(
+                "doafacil.detalhe_doacao.rx.redirect",
+                return_value="login-redirect",
+            ) as redirect,
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient") as async_client,
+        ):
+            result = asyncio.run(
+                DonationDetailState.request_donor_contact.fn(
+                    unauthenticated_state
+                )
+            )
+
+        redirect.assert_called_once_with("/login")
+        async_client.assert_not_called()
+        self.assertEqual(result, "login-redirect")
+
+        chat_state = _contact_state(
+            auth_token="private-token",
+            contact_preference="Chat do DoaFácil",
+        )
+        with patch(
+            "doafacil.detalhe_doacao.httpx.AsyncClient"
+        ) as async_client:
+            asyncio.run(
+                DonationDetailState.request_donor_contact.fn(chat_state)
+            )
+
+        async_client.assert_not_called()
+        self.assertEqual(
+            chat_state.contact_message,
+            DONOR_CHAT_PREFERENCE_MESSAGE,
+        )
+
+    def test_contact_flow_opens_mailto_and_handles_simulated_responses(
+        self,
+    ) -> None:
+        async def success(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(
+                request.headers.get("Authorization"),
+                "Bearer private-token",
+            )
+            return httpx.Response(
+                200,
+                json={"email": "donor+tag@example.test"},
+            )
+
+        async def run_contact(
+            handler: Callable[[httpx.Request], httpx.Response],
+        ) -> tuple[SimpleNamespace, object, object]:
+            state = _contact_state(auth_token="private-token")
+            client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler)
+            )
+            with (
+                patch.dict(
+                    "os.environ",
+                    {"XANO_API_URL": "https://xano.example/api:catalog"},
+                ),
+                patch(
+                    "doafacil.detalhe_doacao.httpx.AsyncClient",
+                    return_value=client,
+                ),
+                patch(
+                    "doafacil.detalhe_doacao.rx.call_script",
+                    return_value="mailto-navigation",
+                ) as call_script,
+            ):
+                result = await DonationDetailState.request_donor_contact.fn(
+                    state
+                )
+            return state, result, call_script
+
+        async def run(
+            handler: Callable[[httpx.Request], httpx.Response],
+        ) -> tuple[SimpleNamespace, object, object]:
+            return await run_contact(handler)
+
+        state, result, call_script = asyncio.run(run(success))
+        self.assertEqual(result, "mailto-navigation")
+        call_script.assert_called_once_with(
+            "window.location.href = "
+            '"mailto:donor%2Btag@example.test?subject=Sobre%20a%20doa'
+            '%C3%A7%C3%A3o%3A%20Carrinho%20de%20brinquedo";'
+        )
+        self.assertEqual(state.contact_message, "")
+        self.assertFalse(hasattr(state, "email"))
+        self.assertFalse(hasattr(state, "owner_id"))
+
+        async def forbidden(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(403, json={"message": "Own donation"})
+
+        async def not_found(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404)
+
+        async def unauthorized(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(401)
+
+        async def network_error(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("offline", request=request)
+
+        for handler, expected_message in (
+            (forbidden, DONOR_OWN_DONATION_MESSAGE),
+            (not_found, DONOR_CONTACT_ERROR_MESSAGE),
+            (unauthorized, DONOR_CONTACT_ERROR_MESSAGE),
+            (network_error, DONOR_CONTACT_ERROR_MESSAGE),
+        ):
+            with self.subTest(expected_message=expected_message):
+                state, result, call_script = asyncio.run(run(handler))
+                self.assertIsNone(result)
+                call_script.assert_not_called()
+                self.assertEqual(state.contact_message, expected_message)
+                self.assertFalse(hasattr(state, "email"))
+                self.assertFalse(hasattr(state, "owner_id"))
+
+    def test_chat_button_handler_sets_message_without_navigation(self) -> None:
+        state = _contact_state(auth_token="private-token")
+        result = DonationDetailState.show_chat_unavailable.fn(state)
+
+        self.assertIsNone(result)
+        self.assertEqual(state.contact_message, CHAT_UNAVAILABLE_MESSAGE)
 
     def test_parser_keeps_only_public_fields_and_deduplicates_photos(self) -> None:
         detail = _parse_donation_detail(DETAIL_PAYLOAD, expected_id=42)
@@ -286,8 +516,6 @@ class DonationDetailTests(unittest.TestCase):
                 self.assertIn(expected, contents)
 
         for excluded in (
-            "Chat",
-            "Outros meios de comunicação",
             "Acessar perfil do doador",
             "Em breve",
             "Online",
@@ -298,6 +526,10 @@ class DonationDetailTests(unittest.TestCase):
         ):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
+
+        self.assertIn("Outros meios de comunicação", contents)
+        self.assertIn("Chat", contents)
+        self.assertIn("LucideMessageCircle", str(page))
 
         nodes = _all_component_nodes(page)
         header = next(
@@ -396,6 +628,24 @@ def _state_for_route_id(route_id: str) -> SimpleNamespace:
         donor_first_name="",
         photos=[],
         view_state="loading",
+        auth_token="",
+        contact_message="",
+        contact_message_is_error=False,
+    )
+
+
+def _contact_state(
+    *,
+    auth_token: str,
+    contact_preference: str = "E-mail",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        donation_id=42,
+        title="Carrinho de brinquedo",
+        contact_preference=contact_preference,
+        auth_token=auth_token,
+        contact_message="",
+        contact_message_is_error=False,
     )
 
 
