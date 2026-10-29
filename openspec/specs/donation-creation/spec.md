@@ -84,6 +84,16 @@ O sistema MUST apresentar “A combinar” como única modalidade de entrega sel
 - **WHEN** o doador preenche o passo de contato
 - **THEN** a interface MUST apresentar apenas a escolha de preferência e MUST NOT solicitar número de telefone, endereço de contato ou identificador externo
 
+#### Scenario: Aviso de visibilidade do e-mail
+- **WHEN** o doador seleciona “E-mail” como preferência de contato na quinta etapa
+- **THEN** a interface MUST exibir o aviso curto: “Seu e-mail ficará disponível para pessoas logadas que quiserem falar com você.”
+- **AND** MUST manter a seleção da preferência e o restante do fluxo de publicação sem alterar as etapas anteriores
+
+#### Scenario: Escolha de chat sem aviso de e-mail
+- **WHEN** o doador seleciona “Chat do DoaFácil” como preferência de contato
+- **THEN** a interface MUST NOT exibir o aviso de disponibilidade de e-mail
+- **AND** MUST continuar seguindo o comportamento atual do wizard
+
 ### Requirement: Legibilidade dos textos de exemplo e seleção
 A interface MUST apresentar placeholders e textos de seleção do cadastro de doação em cor preta ou cinza bem escura, legível sobre os fundos existentes, em todas as cinco etapas.
 
