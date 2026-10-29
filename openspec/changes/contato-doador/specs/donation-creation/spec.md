@@ -30,5 +30,5 @@ O sistema MUST apresentar “A combinar” como única modalidade de entrega sel
 
 #### Scenario: Escolha de chat sem aviso de e-mail
 - **WHEN** o doador seleciona “Chat do DoaFácil” como preferência de contato
-- **THEN** a interface MUST NÃO exibir o aviso de disponibilidade de e-mail
+- **THEN** a interface MUST NOT exibir o aviso de disponibilidade de e-mail
 - **AND** MUST continuar seguindo o comportamento atual do wizard

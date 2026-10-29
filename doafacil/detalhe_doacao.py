@@ -1,21 +1,35 @@
+import json
 import os
 import re
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 import reflex as rx
 
+from doafacil.login import LoginState
+
 
 DONATION_DETAIL_PATH = "/catalog/donations/detail"
+DONOR_CONTACT_EMAIL_PATH = "/catalog/donations/contact-email"
 GENERIC_DETAIL_IMAGE = "/doacao-generica.svg"
 DONATION_NOT_FOUND_MESSAGE = "Doação não encontrada"
 DONATION_DETAIL_ERROR_MESSAGE = (
     "Não foi possível carregar os detalhes da doação. Tente novamente mais tarde."
 )
+DONOR_CONTACT_ERROR_MESSAGE = (
+    "Não foi possível iniciar o contato. Tente novamente mais tarde."
+)
+DONOR_OWN_DONATION_MESSAGE = "Esta é a sua doação."
+DONOR_CHAT_PREFERENCE_MESSAGE = "Quem doa prefere contato pelo chat."
+CHAT_UNAVAILABLE_MESSAGE = "O chat ainda não está disponível."
 
 
 class DonationNotFoundError(Exception):
+    pass
+
+
+class DonorOwnDonationError(Exception):
     pass
 
 
@@ -37,6 +51,22 @@ def _donation_detail_endpoint(base_url: str, donation_id: int) -> str:
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
         raise ValueError("XANO_API_URL precisa conter uma URL HTTP(S) válida.")
     return f"{base_url.strip().rstrip('/')}{DONATION_DETAIL_PATH}?donation_id={donation_id}"
+
+
+def _donor_contact_email_endpoint(base_url: str, donation_id: int) -> str:
+    parsed_url = urlsplit(base_url.strip())
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise ValueError("XANO_API_URL precisa conter uma URL HTTP(S) válida.")
+    return (
+        f"{base_url.strip().rstrip('/')}{DONOR_CONTACT_EMAIL_PATH}"
+        f"?donation_id={donation_id}"
+    )
+
+
+def _mailto_url(email: str, title: str) -> str:
+    recipient = quote(email, safe="@.-_")
+    subject = quote(f"Sobre a doação: {title}", safe="")
+    return f"mailto:{recipient}?subject={subject}"
 
 
 def _parse_donation_detail(
@@ -113,7 +143,36 @@ async def _fetch_donation_detail(
     return _parse_donation_detail(response.json(), donation_id)
 
 
-class DonationDetailState(rx.State):
+async def _fetch_donor_email(
+    client: httpx.AsyncClient,
+    base_url: str,
+    donation_id: int,
+    auth_token: str,
+) -> str:
+    endpoint = _donor_contact_email_endpoint(base_url, donation_id)
+    response = await client.get(
+        endpoint,
+        headers={"Authorization": f"Bearer {auth_token}"},
+    )
+    if response.status_code == 403:
+        raise DonorOwnDonationError
+    if response.status_code != 200:
+        response.raise_for_status()
+        raise ValueError("A resposta do endpoint de contato é inválida.")
+
+    payload = response.json()
+    if not isinstance(payload, dict) or set(payload) != {"email"}:
+        raise ValueError("A resposta do endpoint de contato é inválida.")
+    email = payload.get("email")
+    if (
+        not isinstance(email, str)
+        or re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is None
+    ):
+        raise ValueError("A resposta do endpoint de contato é inválida.")
+    return email
+
+
+class DonationDetailState(LoginState):
     donation_id: int = 0
     title: str = ""
     condition: str = ""
@@ -126,6 +185,8 @@ class DonationDetailState(rx.State):
     donor_first_name: str = ""
     photos: list[str] = []
     view_state: str = "loading"
+    contact_message: str = ""
+    contact_message_is_error: bool = False
 
     @rx.event
     async def load_donation(self) -> None:
@@ -141,6 +202,8 @@ class DonationDetailState(rx.State):
         self.donor_first_name = ""
         self.photos = []
         self.view_state = "loading"
+        self.contact_message = ""
+        self.contact_message_is_error = False
         donation_id = self.router.page.params.get("id", "")
 
         try:
@@ -169,6 +232,48 @@ class DonationDetailState(rx.State):
             self.donor_first_name = donation["donor_first_name"]
             self.photos = donation["photos"]
             self.view_state = "loaded"
+
+    @rx.event
+    async def request_donor_contact(self) -> rx.event.EventSpec | None:
+        self.contact_message = ""
+        self.contact_message_is_error = False
+        if not self.auth_token:
+            return rx.redirect("/login")
+        if self.contact_preference == "Chat do DoaFácil":
+            self.contact_message = DONOR_CHAT_PREFERENCE_MESSAGE
+            return None
+        if self.contact_preference != "E-mail":
+            self.contact_message = DONOR_CONTACT_ERROR_MESSAGE
+            self.contact_message_is_error = True
+            return None
+
+        try:
+            donation_id = _positive_donation_id(str(self.donation_id))
+            base_url = os.getenv("XANO_API_URL", "").strip()
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                email = await _fetch_donor_email(
+                    client,
+                    base_url,
+                    donation_id,
+                    self.auth_token,
+                )
+        except DonorOwnDonationError:
+            self.contact_message = DONOR_OWN_DONATION_MESSAGE
+            return None
+        except (httpx.HTTPError, ValueError):
+            self.contact_message = DONOR_CONTACT_ERROR_MESSAGE
+            self.contact_message_is_error = True
+            return None
+
+        mailto = _mailto_url(email, self.title)
+        return rx.call_script(
+            f"window.location.href = {json.dumps(mailto)};"
+        )
+
+    @rx.event
+    def show_chat_unavailable(self) -> None:
+        self.contact_message = CHAT_UNAVAILABLE_MESSAGE
+        self.contact_message_is_error = False
 
 
 def _gallery_thumbnail(photo: rx.Var[str]) -> rx.Component:
@@ -245,23 +350,51 @@ def _donation_content() -> rx.Component:
                         color="#333333",
                         font_size="1rem",
                     ),
-                    rx.divider(),
-                    rx.text("Forma de entrega", font_weight="700", color="#333333"),
-                    rx.text(
-                        DonationDetailState.delivery_method,
-                        color="#555555",
-                    ),
-                    rx.text(
-                        "Preferência de contato",
+                    rx.button(
+                        "Outros meios de comunicação",
+                        on_click=DonationDetailState.request_donor_contact,
+                        width="100%",
+                        height="48px",
+                        background="#00A859",
+                        color="white",
                         font_weight="700",
-                        color="#333333",
+                        border_radius="999px",
+                        _hover={"background": "#008F4C"},
                     ),
-                    rx.text(
-                        DonationDetailState.contact_preference,
-                        color="#555555",
+                    rx.button(
+                        rx.hstack(
+                            rx.icon("message-circle", size=20),
+                            rx.text("Chat"),
+                            spacing="2",
+                            align="center",
+                        ),
+                        on_click=DonationDetailState.show_chat_unavailable,
+                        width="100%",
+                        height="48px",
+                        background="white",
+                        color="#222222",
+                        font_weight="500",
+                        border="1px solid #7D8793",
+                        border_radius="999px",
+                        _hover={"background": "#F7F8F7"},
+                    ),
+                    rx.cond(
+                        DonationDetailState.contact_message != "",
+                        rx.text(
+                            DonationDetailState.contact_message,
+                            role="status",
+                            color=rx.cond(
+                                DonationDetailState.contact_message_is_error,
+                                "#9B2C2C",
+                                "#166B3B",
+                            ),
+                            font_size="0.9rem",
+                            width="100%",
+                        ),
+                        rx.fragment(),
                     ),
                     align="stretch",
-                    spacing="3",
+                    spacing="4",
                     width="100%",
                     padding="24px",
                     background="white",
@@ -304,6 +437,24 @@ def _donation_content() -> rx.Component:
                         ),
                         rx.text(
                             DonationDetailState.category,
+                            color="#555555",
+                        ),
+                        rx.text(
+                            "Forma de entrega",
+                            font_weight="700",
+                            color="#333333",
+                        ),
+                        rx.text(
+                            DonationDetailState.delivery_method,
+                            color="#555555",
+                        ),
+                        rx.text(
+                            "Preferência de contato",
+                            font_weight="700",
+                            color="#333333",
+                        ),
+                        rx.text(
+                            DonationDetailState.contact_preference,
                             color="#555555",
                         ),
                         align="stretch",
