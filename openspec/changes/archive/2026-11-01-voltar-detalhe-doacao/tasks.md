@@ -8,4 +8,4 @@
 
 ## 2. Verificação manual
 
-- [ ] 2.1 (manual) Conferir no navegador, em celular e computador, que o controle aparece durante carregamento, com a doação carregada, em “Doação não encontrada” (inclusive ID inválido) e em erro de rede; confirmar o rótulo acessível “Voltar”, a posição abaixo do cabeçalho e à esquerda, e que o clique navega para `/`. O Copilot não marca esta tarefa como concluída.
+- [x] 2.1 (manual) Conferir no navegador, em celular e computador, que o controle aparece durante carregamento, com a doação carregada, em “Doação não encontrada” (inclusive ID inválido) e em erro de rede; confirmar o rótulo acessível “Voltar”, a posição abaixo do cabeçalho e à esquerda, e que o clique navega para `/`. O Copilot não marca esta tarefa como concluída.
