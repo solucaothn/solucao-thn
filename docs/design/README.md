@@ -180,6 +180,7 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 - O conteúdo aprovado inclui título, condição, descrição, categoria, cidade/UF, modalidade de entrega e preferência de contato escrita como texto. O cartão de quem doa mostra somente o primeiro nome e a cidade/UF da doação.
 - A página é pública e exibe somente doações disponíveis. Um identificador inválido, uma doação inexistente ou uma doação indisponível apresenta “Doação não encontrada”. Falhas de rede ou respostas inválidas apresentam uma mensagem de erro.
 - O conteúdo estático usa `page-fade-enter`, respeitando `prefers-reduced-motion`; cabeçalho e dados carregados do Xano não são animados.
+- O link com seta verde “Voltar”, abaixo do cabeçalho e com destino à home (`/`), é um acréscimo que não está no Figma; sua seta tem o rótulo acessível “Voltar”.
 
 ### Elementos fora do escopo desta versão
 
