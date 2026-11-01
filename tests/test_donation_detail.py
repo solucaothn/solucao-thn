@@ -561,6 +561,37 @@ class DonationDetailTests(unittest.TestCase):
         self.assertIn("@media (prefers-reduced-motion: reduce)", animation_styles)
         self.assertIn(".page-fade-enter", animation_styles)
 
+    def test_back_link_is_shared_accessible_and_returns_home_in_all_states(
+        self,
+    ) -> None:
+        page = donation_detail_page()
+        header, back_container, state_content = page.children
+        back_link = back_container.children[0]
+        rendered = str(page)
+
+        self.assertEqual(type(header).__name__, "Box")
+        self.assertEqual(type(back_container).__name__, "Box")
+        self.assertEqual(type(state_content).__name__, "Fragment")
+        self.assertEqual(back_link.custom_attrs.get("aria-label"), "Voltar")
+        self.assertEqual(back_link.color, "#166B3B")
+        self.assertEqual(back_container.style["maxWidth"]._var_value, "1200px")
+        self.assertEqual(
+            back_container.style["padding"]._var_value,
+            "8px 24px 0",
+        )
+        self.assertIn('ReactRouterLink,{to:"/"}', rendered)
+        self.assertIn("LucideChevronLeft", rendered)
+
+        contents = _component_contents(state_content)
+        for state_message in (
+            "Carregando doação...",
+            "Detalhes",
+            DONATION_NOT_FOUND_MESSAGE,
+            DONATION_DETAIL_ERROR_MESSAGE,
+        ):
+            with self.subTest(state=state_message):
+                self.assertIn(state_message, contents)
+
     def test_recent_donation_cards_link_to_the_detail_route(self) -> None:
         page = recent_donations_view()
         component = str(page)

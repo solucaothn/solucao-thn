@@ -306,6 +306,22 @@ def _header() -> rx.Component:
     )
 
 
+def _back_link() -> rx.Component:
+    return rx.box(
+        rx.link(
+            rx.icon("chevron-left", size=24),
+            href="/",
+            color="#166B3B",
+            font_weight="600",
+            aria_label="Voltar",
+        ),
+        width="100%",
+        max_width="1200px",
+        margin="0 auto",
+        padding="8px 24px 0",
+    )
+
+
 def _donation_content() -> rx.Component:
     return rx.box(
         rx.vstack(
@@ -550,6 +566,7 @@ def _detail_state_message(message: str, color: str) -> rx.Component:
 def donation_detail_page() -> rx.Component:
     return rx.box(
         _header(),
+        _back_link(),
         rx.cond(
             DonationDetailState.view_state == "loading",
             _detail_state_message("Carregando doação...", "#555555"),
