@@ -1,56 +1,247 @@
-// Signup and retrieve an authentication token
 query "auth/signup" verb=POST {
   api_group = "Authentication"
 
   input {
-    text name filters=trim|min:1
-    email email filters=trim|lower
-    text password
-    text city filters=trim|min:1
-    text state filters=trim|min:1
+    text name filters=trim|min:1 {
+      sensitive = true
+    }
+    email email filters=trim|lower {
+      sensitive = true
+    }
+    text password {
+      sensitive = true
+    }
+    text city filters=trim|min:1 {
+      sensitive = true
+    }
+    text state filters=trim|min:1 {
+      sensitive = true
+    }
   }
 
   stack {
-    // Check if a user record with that email exists
-    db.get user {
-      field_name = "email"
-      field_value = $input.email
-    } as $user
-  
-    // Verify that the email being used to sign up is unique
-    precondition ($user == null) {
-      error_type = "accessdenied"
-      error = "An account with this email already exists."
+    var $response_data {
+      value = {success: true}
     }
-  
-    // Create a new user record
-    db.add user {
-      data = {
-        created_at: "now"
-        name      : $input.name
-        email     : $input.email
-        password  : $input.password
-        city      : $input.city
-        state     : $input.state
-        role      : "member"
+
+    var $password_valid {
+      value = true
+    }
+
+    conditional {
+      if (($input.password|strlen) < 8 || ("/[A-Za-z]/"|regex_matches:$input.password) == false || ("/[0-9]/"|regex_matches:$input.password) == false) {
+        var.update $password_valid {
+          value = false
+        }
+
+        var.update $response_data {
+          value = {success: false}
+        }
       }
-    } as $user
-  
-    // Create an authentiction token
-    security.create_auth_token {
-      table = "user"
-      extras = {}
-      expiration = 86400
-      id = $user.id
-    } as $authToken
-  
-    // Create an event log for signup
-    function.run "Quick Start/log_event" {
-      input = {user_id: $user.id, action: "signup"}
-    } as $event_log
+    }
+
+    conditional {
+      if ($password_valid) {
+        db.query user {
+          where = $db.user.email == $input.email
+          return = {type: "single"}
+          output = ["id"]
+        } as $existing_user
+
+        conditional {
+          if ($existing_user == null) {
+            security.random_number {
+              min = 100000
+              max = 999999
+            } as $code_number
+
+            var $code {
+              value = $code_number|to_text
+            }
+
+            var $hour_ago {
+              value = now|add_secs_to_timestamp:(-3600|to_int)
+            }
+
+            var $cooldown_border {
+              value = now|add_secs_to_timestamp:(-30|to_int)
+            }
+
+            var $send_allowed {
+              value = false
+            }
+
+            var $pending_id {
+              value = 0
+            }
+
+            try_catch {
+              try {
+                db.transaction {
+                  stack {
+                    db.query signup_pending {
+                      where = $db.signup_pending.email == $input.email
+                      return = {type: "single"}
+                    } as $pending
+
+                    conditional {
+                      if ($pending != null && $pending.pending_expires_at <= now) {
+                        db.del signup_pending {
+                          field_name = "id"
+                          field_value = $pending.id
+                        }
+
+                        var.update $pending {
+                          value = null
+                        }
+                      }
+                    }
+
+                    conditional {
+                      if ($pending == null) {
+                        db.add signup_pending {
+                          data = {
+                            name                : $input.name
+                            email               : $input.email
+                            city                : $input.city
+                            state               : $input.state
+                            code_hash           : $code
+                            code_expires_at     : now|add_secs_to_timestamp:(600|to_int)
+                            attempts            : 0
+                            code_used           : false
+                            pending_expires_at  : now|add_secs_to_timestamp:(86400|to_int)
+                            last_sent_at        : now
+                            sent_at_2           : null
+                            sent_at_3           : null
+                            sent_at_4           : null
+                            sent_at_5           : null
+                          }
+                        } as $created_pending
+
+                        var.update $pending_id {
+                          value = $created_pending.id
+                        }
+
+                        var.update $send_allowed {
+                          value = true
+                        }
+                      }
+
+                      else {
+                        var $recent_sends {
+                          value = 0
+                        }
+
+                        conditional {
+                          if ($pending.last_sent_at != null && $pending.last_sent_at > $hour_ago) {
+                            var.update $recent_sends {
+                              value = $recent_sends + 1
+                            }
+                          }
+                        }
+
+                        conditional {
+                          if ($pending.sent_at_2 != null && $pending.sent_at_2 > $hour_ago) {
+                            var.update $recent_sends {
+                              value = $recent_sends + 1
+                            }
+                          }
+                        }
+
+                        conditional {
+                          if ($pending.sent_at_3 != null && $pending.sent_at_3 > $hour_ago) {
+                            var.update $recent_sends {
+                              value = $recent_sends + 1
+                            }
+                          }
+                        }
+
+                        conditional {
+                          if ($pending.sent_at_4 != null && $pending.sent_at_4 > $hour_ago) {
+                            var.update $recent_sends {
+                              value = $recent_sends + 1
+                            }
+                          }
+                        }
+
+                        conditional {
+                          if ($pending.sent_at_5 != null && $pending.sent_at_5 > $hour_ago) {
+                            var.update $recent_sends {
+                              value = $recent_sends + 1
+                            }
+                          }
+                        }
+
+                        conditional {
+                          if (($pending.last_sent_at == null || $pending.last_sent_at <= $cooldown_border) && $recent_sends < 5) {
+                            db.edit signup_pending {
+                              field_name = "id"
+                              field_value = $pending.id
+                              data = {
+                                name               : $input.name
+                                email              : $input.email
+                                city               : $input.city
+                                state              : $input.state
+                                code_hash          : $code
+                                code_expires_at    : now|add_secs_to_timestamp:(600|to_int)
+                                attempts            : 0
+                                code_used           : false
+                                pending_expires_at : now|add_secs_to_timestamp:(86400|to_int)
+                                sent_at_5          : $pending.sent_at_4
+                                sent_at_4          : $pending.sent_at_3
+                                sent_at_3          : $pending.sent_at_2
+                                sent_at_2          : $pending.last_sent_at
+                                last_sent_at       : now
+                              }
+                            } as $updated_pending
+
+                            var.update $pending_id {
+                              value = $updated_pending.id
+                            }
+
+                            var.update $send_allowed {
+                              value = true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+
+              catch {
+                var.update $send_allowed {
+                  value = false
+                }
+              }
+            }
+
+            conditional {
+              if ($send_allowed) {
+                try_catch {
+                  try {
+                    function.run "Signup/send_confirmation_code" {
+                      input = {recipient: $input.email, code: $code}
+                    } as $delivery
+                  }
+
+                  catch {
+                    db.edit signup_pending {
+                      field_name = "id"
+                      field_value = $pending_id
+                      data = {code_used: true}
+                    } as $invalidated_code
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
-  response = {authToken: $authToken, user_id: $user.id}
-  tags = ["xano:quick-start"]
+  response = $response_data
   guid = "PEDp5DY1rznd-s2Y6KpJCmfNT70"
 }
