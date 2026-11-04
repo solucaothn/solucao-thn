@@ -147,7 +147,12 @@ def verify_recovery_page() -> rx.Component:
             rx.vstack(
                 rx.link(
                     "← Voltar",
-                    href="/recuperar-senha",
+                    href=rx.cond(
+                        LoginState.verification_flow == "signup",
+                        "/cadastro",
+                        "/recuperar-senha",
+                    ),
+                    on_click=LoginState.leave_verification_for_signup,
                     color="#168447",
                     align_self="start",
                     cursor="pointer",
@@ -162,14 +167,26 @@ def verify_recovery_page() -> rx.Component:
                             text_align="center",
                             width="100%",
                         ),
-                        rx.text(
-                            "Se existir uma conta com esse e-mail, enviamos "
-                            "um código de 6 dígitos para ",
-                            LoginState.masked_recovery_email,
-                            ".",
-                            color="#555555",
-                            width="100%",
-                            text_align="center",
+                        rx.cond(
+                            LoginState.verification_flow == "signup",
+                            rx.text(
+                                "Se for possível confirmar este e-mail, "
+                                "enviaremos um código de 6 dígitos para ",
+                                LoginState.masked_verification_email,
+                                ".",
+                                color="#555555",
+                                width="100%",
+                                text_align="center",
+                            ),
+                            rx.text(
+                                "Se existir uma conta com esse e-mail, "
+                                "enviamos um código de 6 dígitos para ",
+                                LoginState.masked_verification_email,
+                                ".",
+                                color="#555555",
+                                width="100%",
+                                text_align="center",
+                            ),
                         ),
                         rx.vstack(
                             rx.text(
@@ -227,7 +244,11 @@ def verify_recovery_page() -> rx.Component:
                         _submit_button("Continuar", "Verificando..."),
                         rx.link(
                             "Usar outro e-mail",
-                            href="/recuperar-senha",
+                            href=rx.cond(
+                                LoginState.verification_flow == "signup",
+                                "/cadastro",
+                                "/recuperar-senha",
+                            ),
                             on_click=LoginState.use_another_recovery_email,
                             color="#168447",
                             align_self="center",

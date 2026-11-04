@@ -1222,7 +1222,7 @@ app.add_page(request_recovery_page, route="/recuperar-senha")
 app.add_page(
     verify_recovery_page,
     route="/verificar-email",
-    on_load=LoginState.require_recovery_email,
+    on_load=LoginState.require_verification_email,
 )
 app.add_page(
     new_password_page,

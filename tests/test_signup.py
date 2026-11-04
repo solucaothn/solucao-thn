@@ -11,18 +11,23 @@ from doafacil.doafacil import app
 from doafacil.login import (
     AUTH_API_ENV,
     AUTH_SIGNUP_PATH,
-    DUPLICATE_SIGNUP_MESSAGE,
-    EmailAlreadyRegisteredError,
+    AUTH_SIGNUP_RESEND_PATH,
+    AUTH_SIGNUP_VERIFY_PATH,
     LoginConfigurationError,
     LoginState,
+    RECOVERY_CODE_ERROR,
     SignupRejectedError,
-    SignupResult,
     SignupUnavailableError,
     auth_signup_endpoint,
+    auth_signup_resend_endpoint,
+    auth_signup_verify_endpoint,
     request_signup,
+    request_signup_resend,
+    request_signup_verification,
     signup_error_message,
     validate_signup_data,
 )
+from doafacil.recuperacao_senha import verify_recovery_page
 
 
 VALID_FORM = {
@@ -36,18 +41,32 @@ VALID_FORM = {
 
 
 class SignupClientTests(unittest.TestCase):
-    def test_auth_signup_endpoint_reuses_validated_environment_url(self) -> None:
+    def test_signup_endpoints_reuse_validated_environment_url(self) -> None:
         with patch.dict(os.environ, {AUTH_API_ENV: "https://auth.example/api/"}):
             self.assertEqual(
                 auth_signup_endpoint(),
                 f"https://auth.example/api{AUTH_SIGNUP_PATH}",
             )
+            self.assertEqual(
+                auth_signup_resend_endpoint(),
+                f"https://auth.example/api{AUTH_SIGNUP_RESEND_PATH}",
+            )
+            self.assertEqual(
+                auth_signup_verify_endpoint(),
+                f"https://auth.example/api{AUTH_SIGNUP_VERIFY_PATH}",
+            )
 
         with patch.dict(os.environ, {AUTH_API_ENV: "invalid"}):
-            with self.assertRaises(LoginConfigurationError):
-                auth_signup_endpoint()
+            for endpoint in (
+                auth_signup_endpoint,
+                auth_signup_resend_endpoint,
+                auth_signup_verify_endpoint,
+            ):
+                with self.subTest(endpoint=endpoint.__name__):
+                    with self.assertRaises(LoginConfigurationError):
+                        endpoint()
 
-    def test_signup_request_sends_only_xano_fields(self) -> None:
+    def test_signup_request_sends_only_xano_fields_and_needs_no_token(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:
             self.assertEqual(request.url.path, AUTH_SIGNUP_PATH)
             self.assertEqual(
@@ -55,11 +74,9 @@ class SignupClientTests(unittest.TestCase):
                 b'{"name":"Pessoa Teste","email":"pessoa@example.test",'
                 b'"password":"senha123","city":"Cidade","state":"SP"}',
             )
-            return httpx.Response(
-                200, json={"authToken": "temporary-token", "user_id": 17}
-            )
+            return httpx.Response(200, json={"success": True})
 
-        async def run() -> SignupResult:
+        async def run() -> None:
             async with httpx.AsyncClient(
                 transport=httpx.MockTransport(respond)
             ) as client:
@@ -75,22 +92,15 @@ class SignupClientTests(unittest.TestCase):
                     },
                 )
 
-        result = asyncio.run(run())
-        self.assertEqual(result.auth_token, "temporary-token")
-        self.assertEqual(result.user_id, 17)
-        self.assertNotIn("confirm_password", repr(result))
+        self.assertIsNone(asyncio.run(run()))
 
-    def test_signup_duplicate_is_classified_only_by_exact_structured_message(self) -> None:
-        async def duplicate_response(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(
-                403,
-                json={"error": {"message": DUPLICATE_SIGNUP_MESSAGE}},
-                request=request,
-            )
+    def test_signup_rejection_does_not_disclose_duplicate_account(self) -> None:
+        async def run(status_code: int, payload: dict[str, object]) -> None:
+            async def respond(request: httpx.Request) -> httpx.Response:
+                return httpx.Response(status_code, json=payload, request=request)
 
-        async def run(handler: object) -> None:
             async with httpx.AsyncClient(
-                transport=httpx.MockTransport(handler)
+                transport=httpx.MockTransport(respond)
             ) as client:
                 await request_signup(
                     client,
@@ -102,23 +112,48 @@ class SignupClientTests(unittest.TestCase):
                     state="SP",
                 )
 
-        with self.assertRaises(EmailAlreadyRegisteredError) as raised:
-            asyncio.run(run(duplicate_response))
-        self.assertNotIn(DUPLICATE_SIGNUP_MESSAGE, str(raised.exception))
-        self.assertEqual(
-            signup_error_message(raised.exception),
-            "Este e-mail já está cadastrado.",
-        )
+        for status_code, payload in (
+            (200, {"success": False, "message": "email already exists"}),
+            (403, {"error": {"message": "email already exists"}}),
+        ):
+            with self.subTest(status_code=status_code):
+                with self.assertRaises(SignupRejectedError) as raised:
+                    asyncio.run(run(status_code, payload))
+                self.assertNotIn("email already exists", str(raised.exception))
+                self.assertNotIn(
+                    "já está cadastrado",
+                    signup_error_message(raised.exception),
+                )
 
-        async def similar_but_not_exact(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(
-                403,
-                json={"message": "An account with this email already exists"},
-                request=request,
-            )
+    def test_signup_uses_same_neutral_success_shape_without_a_token(self) -> None:
+        responses: list[dict[str, object]] = []
 
-        with self.assertRaises(SignupRejectedError):
-            asyncio.run(run(similar_but_not_exact))
+        async def respond(request: httpx.Request) -> httpx.Response:
+            response_body = {"success": True}
+            responses.append(response_body)
+            return httpx.Response(200, json=response_body, request=request)
+
+        async def run() -> list[None]:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(respond)
+            ) as client:
+                results = []
+                for email in ("new@example.test", "existing@example.test"):
+                    results.append(
+                        await request_signup(
+                            client,
+                            f"https://auth.example{AUTH_SIGNUP_PATH}",
+                            name="Pessoa",
+                            email=email,
+                            password="senha123",
+                            city="Cidade",
+                            state="SP",
+                        )
+                    )
+                return results
+
+        self.assertEqual(asyncio.run(run()), [None, None])
+        self.assertEqual(responses, [{"success": True}, {"success": True}])
 
     def test_signup_generic_rejection_and_network_error_hide_details(self) -> None:
         async def reject(request: httpx.Request) -> httpx.Response:
@@ -156,6 +191,87 @@ class SignupClientTests(unittest.TestCase):
                 self.assertNotIn("pessoa@example.test", str(raised.exception))
                 self.assertNotIn("senha123", str(raised.exception))
 
+    def test_resend_and_verification_send_only_expected_payloads(self) -> None:
+        observed: list[tuple[str, bytes]] = []
+
+        async def respond(request: httpx.Request) -> httpx.Response:
+            observed.append((request.url.path, request.read()))
+            return httpx.Response(200, json={"success": True})
+
+        async def run() -> None:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(respond)
+            ) as client:
+                await request_signup_resend(
+                    client,
+                    f"https://auth.example{AUTH_SIGNUP_RESEND_PATH}",
+                    "pessoa@example.test",
+                )
+                await request_signup_verification(
+                    client,
+                    f"https://auth.example{AUTH_SIGNUP_VERIFY_PATH}",
+                    "pessoa@example.test",
+                    "123456",
+                    "senha123",
+                )
+
+        asyncio.run(run())
+        self.assertEqual(
+            observed,
+            [
+                (
+                    AUTH_SIGNUP_RESEND_PATH,
+                    b'{"email":"pessoa@example.test"}',
+                ),
+                (
+                    AUTH_SIGNUP_VERIFY_PATH,
+                    b'{"email":"pessoa@example.test","code":"123456",'
+                    b'"password":"senha123"}',
+                ),
+            ],
+        )
+
+    def test_signup_verification_rejects_bad_code_and_sanitizes_network_errors(
+        self,
+    ) -> None:
+        async def respond(
+            status_code: int, payload: dict[str, object]
+        ) -> None:
+            async def handler(request: httpx.Request) -> httpx.Response:
+                return httpx.Response(status_code, json=payload, request=request)
+
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(handler)
+            ) as client:
+                await request_signup_verification(
+                    client,
+                    f"https://auth.example{AUTH_SIGNUP_VERIFY_PATH}",
+                    "person@example.test",
+                    "123456",
+                    "private-password",
+                )
+
+        with self.assertRaises(SignupRejectedError):
+            asyncio.run(respond(200, {"success": False}))
+
+        async def fail_network(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("private transport detail", request=request)
+
+        async def call() -> None:
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(fail_network)
+            ) as client:
+                await request_signup_verification(
+                    client,
+                    f"https://auth.example{AUTH_SIGNUP_VERIFY_PATH}",
+                    "person@example.test",
+                    "123456",
+                    "private-password",
+                )
+
+        with self.assertRaises(SignupUnavailableError) as raised:
+            asyncio.run(call())
+        self.assertNotIn("private", str(raised.exception))
 
 class SignupValidationTests(unittest.TestCase):
     def test_valid_signup_data_passes(self) -> None:
@@ -246,13 +362,18 @@ def _component_text(component: object) -> str:
 
 
 class SignupStateTests(unittest.TestCase):
-    def test_signup_success_uses_shared_token_and_redirects_home(self) -> None:
+    def test_signup_success_stores_only_transient_email_and_password(self) -> None:
         class State:
             is_loading = False
             error_message = ""
             auth_token = ""
+            account_name = ""
             signup_password_visible = False
             signup_confirmation_visible = False
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
+            signup_notice_pending = False
+            signup_notice_visible = False
 
         state = State()
         with (
@@ -260,7 +381,6 @@ class SignupStateTests(unittest.TestCase):
             patch(
                 "doafacil.login.request_signup",
                 new_callable=AsyncMock,
-                return_value=SignupResult("temporary-token", 23),
             ) as request,
         ):
             async def run() -> list[rx.event.EventSpec]:
@@ -271,27 +391,27 @@ class SignupStateTests(unittest.TestCase):
 
             events = asyncio.run(run())
 
-        self.assertEqual(state.auth_token, "temporary-token")
+        self.assertEqual(state.auth_token, "")
+        self.assertEqual(state.signup_email, "pessoa@example.test")
+        self.assertEqual(state._signup_password, "senha123")
+        self.assertEqual(state.verification_flow, "signup")
+        self.assertEqual(state.recovery_resend_seconds, 30)
         self.assertFalse(state.is_loading)
         self.assertEqual(state.error_message, "")
-        self.assertEqual(len(events), 1)
-        self.assertIn("/", str(events[0]))
+        self.assertTrue(any("/verificar-email" in str(event) for event in events))
         request.assert_awaited_once()
         self.assertEqual(len(request.await_args.args), 7)
         state_fields = LoginState.__own_fields__
         self.assertNotIn("password", state_fields)
         self.assertNotIn("confirm_password", state_fields)
+        self.assertNotIn("code", state_fields)
         self.assertNotIn("form_data", state_fields)
 
-    def test_signup_errors_are_localized_and_clear_old_token(self) -> None:
+    def test_signup_errors_are_generic_and_clear_old_token(self) -> None:
         cases = (
             (
-                EmailAlreadyRegisteredError(),
-                "Este e-mail já está cadastrado.",
-            ),
-            (
                 SignupRejectedError(),
-                "Não foi possível criar sua conta. Confira os dados e tente novamente.",
+                "Não foi possível iniciar seu cadastro. Confira os dados e tente novamente.",
             ),
             (
                 SignupUnavailableError(),
@@ -304,8 +424,13 @@ class SignupStateTests(unittest.TestCase):
                     is_loading = False
                     error_message = ""
                     auth_token = "old-token"
+                    account_name = ""
                     signup_password_visible = False
                     signup_confirmation_visible = False
+                    password_reset_notice_pending = False
+                    password_reset_notice_visible = False
+                    signup_notice_pending = False
+                    signup_notice_visible = False
 
                 state = State()
                 with (
@@ -334,6 +459,11 @@ class SignupStateTests(unittest.TestCase):
             is_loading = False
             error_message = ""
             auth_token = ""
+            account_name = ""
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
+            signup_notice_pending = False
+            signup_notice_visible = False
 
         invalid_state = State()
         with patch("doafacil.login.request_signup") as request:
@@ -364,6 +494,11 @@ class SignupStateTests(unittest.TestCase):
             is_loading = False
             error_message = ""
             auth_token = ""
+            account_name = ""
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
+            signup_notice_pending = False
+            signup_notice_visible = False
 
         state = State()
         with patch("doafacil.login.request_signup") as request:
@@ -376,6 +511,238 @@ class SignupStateTests(unittest.TestCase):
         self.assertEqual(state.error_message, "Informe seu nome.")
         self.assertFalse(state.is_loading)
         request.assert_not_called()
+
+    def test_signup_verification_rejects_non_six_digit_code_without_request(self) -> None:
+        class State:
+            recovery_is_loading = False
+            recovery_error_message = ""
+            verification_flow = "signup"
+            signup_email = "pessoa@example.test"
+            _signup_password = "senha123"
+            recovery_resend_seconds = 30
+
+        state = State()
+        with patch("doafacil.login.request_signup_verification") as request:
+            async def run() -> list[object]:
+                events = []
+                async for event in LoginState.verify_recovery_code.fn(
+                    state, {"code": "12345"}
+                ):
+                    events.append(event)
+                return events
+
+            self.assertEqual(asyncio.run(run()), [])
+
+        request.assert_not_called()
+        self.assertEqual(state.recovery_error_message, RECOVERY_CODE_ERROR)
+        self.assertFalse(hasattr(state, "code"))
+
+    def test_signup_resend_respects_countdown_and_calls_resend_when_ready(self) -> None:
+        class State:
+            recovery_is_loading = False
+            recovery_error_message = ""
+            recovery_resend_seconds = 30
+            verification_flow = "signup"
+            signup_email = "pessoa@example.test"
+            _signup_password = "senha123"
+
+        state = State()
+        with patch("doafacil.login.request_signup_resend") as request:
+            async def run() -> list[object]:
+                events = []
+                async for event in LoginState.resend_recovery_code.fn(state):
+                    events.append(event)
+                return events
+
+            self.assertEqual(asyncio.run(run()), [])
+        request.assert_not_called()
+
+        state.recovery_resend_seconds = 0
+        with (
+            patch.dict(os.environ, {AUTH_API_ENV: "https://auth.example/api"}),
+            patch(
+                "doafacil.login.request_signup_resend",
+                new_callable=AsyncMock,
+            ) as request,
+        ):
+            async def run_ready() -> list[object]:
+                events = []
+                async for event in LoginState.resend_recovery_code.fn(state):
+                    events.append(event)
+                return events
+
+            events = asyncio.run(run_ready())
+
+        request.assert_awaited_once()
+        self.assertEqual(state.recovery_resend_seconds, 30)
+        self.assertTrue(
+            any("countdown_recovery_resend" in str(event) for event in events)
+        )
+
+    def test_signup_verification_success_clears_password_and_redirects_without_session(
+        self,
+    ) -> None:
+        class State:
+            recovery_is_loading = False
+            recovery_error_message = ""
+            verification_flow = "signup"
+            signup_email = "pessoa@example.test"
+            _signup_password = "senha123"
+            recovery_resend_seconds = 8
+            signup_notice_pending = False
+            signup_notice_visible = False
+            auth_token = ""
+
+        state = State()
+        with (
+            patch.dict(os.environ, {AUTH_API_ENV: "https://auth.example/api"}),
+            patch(
+                "doafacil.login.request_signup_verification",
+                new_callable=AsyncMock,
+            ) as request,
+        ):
+            async def run() -> list[object]:
+                events = []
+                async for event in LoginState.verify_recovery_code.fn(
+                    state, {"code": "123456"}
+                ):
+                    events.append(event)
+                return events
+
+            events = asyncio.run(run())
+
+        request.assert_awaited_once()
+        self.assertEqual(
+            request.await_args.args[2:],
+            ("pessoa@example.test", "123456", "senha123"),
+        )
+        self.assertEqual(state.signup_email, "")
+        self.assertEqual(state._signup_password, "")
+        self.assertEqual(state.verification_flow, "")
+        self.assertEqual(state.recovery_resend_seconds, 0)
+        self.assertTrue(state.signup_notice_pending)
+        self.assertFalse(state.signup_notice_visible)
+        self.assertEqual(state.auth_token, "")
+        self.assertFalse(state.recovery_is_loading)
+        self.assertTrue(any("/login" in str(event) for event in events))
+        self.assertFalse(hasattr(state, "code"))
+
+    def test_signup_verification_failure_uses_neutral_and_network_messages(self) -> None:
+        cases = (
+            (SignupRejectedError(), RECOVERY_CODE_ERROR),
+            (SignupUnavailableError(), "Não foi possível conectar ao serviço de autenticação. Tente novamente."),
+        )
+        for error, expected in cases:
+            with self.subTest(error=type(error).__name__):
+                class State:
+                    recovery_is_loading = False
+                    recovery_error_message = ""
+                    verification_flow = "signup"
+                    signup_email = "pessoa@example.test"
+                    _signup_password = "senha123"
+                    recovery_resend_seconds = 30
+
+                state = State()
+                with (
+                    patch.dict(os.environ, {AUTH_API_ENV: "https://auth.example/api"}),
+                    patch(
+                        "doafacil.login.request_signup_verification",
+                        new_callable=AsyncMock,
+                        side_effect=error,
+                    ),
+                ):
+                    async def run() -> list[object]:
+                        events = []
+                        async for event in LoginState.verify_recovery_code.fn(
+                            state, {"code": "123456"}
+                        ):
+                            events.append(event)
+                        return events
+
+                    self.assertEqual(asyncio.run(run()), [])
+
+                self.assertEqual(state.recovery_error_message, expected)
+                self.assertEqual(state._signup_password, "senha123")
+                self.assertFalse(state.recovery_is_loading)
+
+    def test_using_another_signup_email_clears_password_and_flow(self) -> None:
+        class State:
+            verification_flow = "signup"
+            signup_email = "pessoa@example.test"
+            _signup_password = "senha123"
+            recovery_error_message = "old error"
+            recovery_resend_seconds = 12
+
+        state = State()
+        LoginState.use_another_recovery_email.fn(state)
+        self.assertEqual(state.signup_email, "")
+        self.assertEqual(state._signup_password, "")
+        self.assertEqual(state.verification_flow, "")
+        self.assertEqual(state.recovery_error_message, "")
+        self.assertEqual(state.recovery_resend_seconds, 0)
+
+    def test_verification_route_without_state_keeps_recovery_destination(self) -> None:
+        class State:
+            verification_flow = ""
+            recovery_email = ""
+            signup_email = ""
+            _signup_password = ""
+
+        redirect = LoginState.require_verification_email.fn(State())
+        self.assertIn("/recuperar-senha", str(redirect))
+
+    def test_signup_notice_is_consumed_once_and_cleared_on_input(self) -> None:
+        class State:
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
+            signup_notice_pending = True
+            signup_notice_visible = False
+            signup_email = "pessoa@example.test"
+            _signup_password = "senha123"
+            verification_flow = "signup"
+
+        state = State()
+        LoginState.consume_password_reset_notice.fn(state)
+        self.assertTrue(state.signup_notice_visible)
+        self.assertFalse(state.signup_notice_pending)
+        self.assertEqual(state.signup_email, "")
+        self.assertEqual(state._signup_password, "")
+        self.assertEqual(state.verification_flow, "")
+        LoginState.dismiss_password_reset_notice_on_input.fn(state, "a")
+        self.assertFalse(state.signup_notice_visible)
+        self.assertFalse(state.signup_notice_pending)
+        state.signup_notice_visible = True
+        LoginState.consume_password_reset_notice.fn(state)
+        self.assertFalse(state.signup_notice_visible)
+
+    def test_login_attempt_and_logout_clear_signup_notice(self) -> None:
+        class State:
+            is_loading = False
+            error_message = ""
+            auth_token = ""
+            account_name = ""
+            password_reset_notice_pending = False
+            password_reset_notice_visible = False
+            signup_notice_pending = True
+            signup_notice_visible = True
+
+        state = State()
+
+        async def login_attempt() -> list[object]:
+            events = []
+            async for event in LoginState.login.fn(state, {}):
+                events.append(event)
+            return events
+
+        self.assertEqual(asyncio.run(login_attempt()), [])
+        self.assertFalse(state.signup_notice_pending)
+        self.assertFalse(state.signup_notice_visible)
+
+        state.signup_notice_pending = True
+        state.signup_notice_visible = True
+        LoginState.logout.fn(state)
+        self.assertFalse(state.signup_notice_pending)
+        self.assertFalse(state.signup_notice_visible)
 
     def test_signup_visibility_flags_toggle_independently(self) -> None:
         class State:
@@ -395,6 +762,54 @@ class SignupStateTests(unittest.TestCase):
 
 
 class SignupPageTests(unittest.TestCase):
+    def test_login_displays_transient_signup_confirmation_notice(self) -> None:
+        from doafacil.login import login_page
+
+        page = login_page()
+        self.assertIn(
+            "Cadastro confirmado! Você já pode entrar com seu e-mail e sua senha.",
+            _component_text(page),
+        )
+        self.assertIn("signup_notice_visible", str(page))
+
+    def test_verification_page_supports_both_flows_and_destinations(self) -> None:
+        page = verify_recovery_page()
+        contents = _component_text(page)
+        self.assertIn(
+            "Se for possível confirmar este e-mail, enviaremos um código "
+            "de 6 dígitos para",
+            contents,
+        )
+        self.assertIn(
+            "Se existir uma conta com esse e-mail, enviamos um código "
+            "de 6 dígitos para",
+            contents,
+        )
+
+        links = {
+            _component_text(node): node
+            for node in _component_nodes(page)
+            if type(node).__name__ == "Link"
+        }
+        for label in ("← Voltar", "Usar outro e-mail"):
+            self.assertIn(label, links)
+            self.assertIn("/cadastro", str(links[label]))
+            self.assertIn("/recuperar-senha", str(links[label]))
+        self.assertIn("leave_verification_for_signup", str(links["← Voltar"]))
+        self.assertIn(
+            "use_another_recovery_email",
+            str(links["Usar outro e-mail"]),
+        )
+
+    def test_verification_page_code_is_not_bound_to_reflex_state(self) -> None:
+        code = next(
+            node
+            for node in _component_nodes(verify_recovery_page())
+            if getattr(getattr(node, "name", None), "_var_value", None) == "code"
+        )
+        self.assertIsNone(getattr(code, "value", None))
+        self.assertNotIn("code", LoginState.__own_fields__)
+
     def test_signup_page_has_required_fields_and_27_states(self) -> None:
         page = signup_page()
         self.assertEqual(page.min_height, "100vh")

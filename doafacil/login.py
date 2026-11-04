@@ -13,12 +13,13 @@ import reflex as rx
 AUTH_API_ENV = "XANO_AUTH_API_URL"
 AUTH_LOGIN_PATH = "/auth/login"
 AUTH_SIGNUP_PATH = "/auth/signup"
+AUTH_SIGNUP_RESEND_PATH = "/auth/signup_resend"
+AUTH_SIGNUP_VERIFY_PATH = "/auth/signup_verify"
 AUTH_ME_PATH = "/auth/me"
 PASSWORD_RESET_REQUEST_PATH = "/reset/request_code"
 PASSWORD_RESET_VERIFY_PATH = "/reset/verify_code"
 PASSWORD_RESET_CONFIRM_PATH = "/reset/confirm_password"
 ACCOUNT_FALLBACK_NAME = "Minha conta"
-DUPLICATE_SIGNUP_MESSAGE = "An account with this email already exists."
 RECOVERY_CODE_ERROR = (
     "Código inválido ou vencido. Confira e tente de novo, ou peça um novo código."
 )
@@ -44,10 +45,6 @@ class LoginUnavailableError(LoginError):
 
 
 class SignupError(LoginError):
-    pass
-
-
-class EmailAlreadyRegisteredError(SignupError):
     pass
 
 
@@ -90,12 +87,6 @@ class LoginResult:
 
 
 @dataclass(frozen=True, repr=False)
-class SignupResult:
-    auth_token: str
-    user_id: int
-
-
-@dataclass(frozen=True, repr=False)
 class RecoveryTokenResult:
     reset_token: str
 
@@ -110,14 +101,15 @@ def login_error_message(error: LoginError) -> str:
 
 
 def signup_error_message(error: LoginError) -> str:
-    if isinstance(error, EmailAlreadyRegisteredError):
-        return "Este e-mail já está cadastrado."
     if isinstance(error, (SignupUnavailableError, LoginConfigurationError)):
         return (
             "Não foi possível conectar ao serviço de autenticação. "
             "Tente novamente."
         )
-    return "Não foi possível criar sua conta. Confira os dados e tente novamente."
+    return (
+        "Não foi possível iniciar seu cadastro. "
+        "Confira os dados e tente novamente."
+    )
 
 
 def _auth_api_endpoint(path: str) -> str:
@@ -149,6 +141,14 @@ def auth_login_endpoint() -> str:
 
 def auth_signup_endpoint() -> str:
     return _auth_api_endpoint(AUTH_SIGNUP_PATH)
+
+
+def auth_signup_resend_endpoint() -> str:
+    return _auth_api_endpoint(AUTH_SIGNUP_RESEND_PATH)
+
+
+def auth_signup_verify_endpoint() -> str:
+    return _auth_api_endpoint(AUTH_SIGNUP_VERIFY_PATH)
 
 
 def auth_me_endpoint() -> str:
@@ -323,19 +323,6 @@ async def request_login(
     return LoginResult(auth_token=auth_token, user_id=user_id)
 
 
-def _contains_duplicate_signup_message(value: object) -> bool:
-    if isinstance(value, str):
-        return value.strip() == DUPLICATE_SIGNUP_MESSAGE
-    if isinstance(value, Mapping):
-        return any(
-            _contains_duplicate_signup_message(item)
-            for item in value.values()
-        )
-    if isinstance(value, (list, tuple)):
-        return any(_contains_duplicate_signup_message(item) for item in value)
-    return False
-
-
 async def request_signup(
     client: httpx.AsyncClient,
     endpoint: str,
@@ -344,7 +331,7 @@ async def request_signup(
     password: str,
     city: str,
     state: str,
-) -> SignupResult:
+) -> None:
     try:
         response = await client.post(
             endpoint,
@@ -359,30 +346,62 @@ async def request_signup(
     except httpx.RequestError:
         raise SignupUnavailableError from None
 
+    if response.is_error:
+        raise SignupRejectedError from None
+
     try:
         payload = response.json()
     except ValueError:
-        payload = None
-
-    if response.is_error:
-        if _contains_duplicate_signup_message(payload):
-            raise EmailAlreadyRegisteredError from None
+        raise SignupUnavailableError from None
+    if not isinstance(payload, dict) or payload.get("success") is not True:
         raise SignupRejectedError from None
 
+
+async def request_signup_resend(
+    client: httpx.AsyncClient, endpoint: str, email: str
+) -> None:
+    try:
+        response = await client.post(endpoint, json={"email": email})
+    except httpx.RequestError:
+        raise SignupUnavailableError from None
+
+    if response.is_error:
+        raise SignupUnavailableError from None
+    try:
+        payload = response.json()
+    except ValueError:
+        raise SignupUnavailableError from None
+    if not isinstance(payload, dict) or payload.get("success") is not True:
+        raise SignupRejectedError from None
+
+
+async def request_signup_verification(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    email: str,
+    code: str,
+    password: str,
+) -> None:
+    try:
+        response = await client.post(
+            endpoint,
+            json={"email": email, "code": code, "password": password},
+        )
+    except httpx.RequestError:
+        raise SignupUnavailableError from None
+
+    if response.is_error:
+        raise SignupUnavailableError from None
+    try:
+        payload = response.json()
+    except ValueError:
+        raise SignupUnavailableError from None
     if not isinstance(payload, dict):
         raise SignupUnavailableError from None
-
-    auth_token = payload.get("authToken")
-    user_id = payload.get("user_id")
-    if (
-        not isinstance(auth_token, str)
-        or not auth_token
-        or isinstance(user_id, bool)
-        or not isinstance(user_id, int)
-    ):
+    if payload.get("success") is False:
+        raise SignupRejectedError from None
+    if payload.get("success") is not True:
         raise SignupUnavailableError from None
-
-    return SignupResult(auth_token=auth_token, user_id=user_id)
 
 
 def validate_signup_data(form_data: Mapping[str, object]) -> str:
@@ -447,6 +466,9 @@ class LoginState(rx.State):
     signup_password_visible: bool = False
     signup_confirmation_visible: bool = False
     recovery_email: str = ""
+    signup_email: str = ""
+    _signup_password: str = ""
+    verification_flow: str = ""
     _reset_token: str = ""
     recovery_error_message: str = ""
     recovery_is_loading: bool = False
@@ -456,12 +478,28 @@ class LoginState(rx.State):
     recovery_confirmation_visible: bool = False
     password_reset_notice_pending: bool = False
     password_reset_notice_visible: bool = False
+    signup_notice_pending: bool = False
+    signup_notice_visible: bool = False
 
     @rx.var
     def masked_recovery_email(self) -> str:
         if "@" not in self.recovery_email:
             return ""
         local_part, domain = self.recovery_email.split("@", maxsplit=1)
+        if not local_part or not domain:
+            return ""
+        return f"{local_part[0]}***@{domain}"
+
+    @rx.var
+    def masked_verification_email(self) -> str:
+        email = (
+            self.signup_email
+            if self.verification_flow == "signup"
+            else self.recovery_email
+        )
+        if "@" not in email:
+            return ""
+        local_part, domain = email.split("@", maxsplit=1)
         if not local_part or not domain:
             return ""
         return f"{local_part[0]}***@{domain}"
@@ -474,31 +512,55 @@ class LoginState(rx.State):
     def consume_password_reset_notice(self) -> None:
         self.password_reset_notice_visible = self.password_reset_notice_pending
         self.password_reset_notice_pending = False
+        self.signup_notice_visible = self.signup_notice_pending
+        self.signup_notice_pending = False
         self.recovery_email = ""
         self._reset_token = ""
         self.recovery_error_message = ""
         self.recovery_resend_seconds = 0
+        self.signup_email = ""
+        self._signup_password = ""
+        self.verification_flow = ""
 
     @rx.event
     def clear_password_reset_notice(self) -> None:
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
+        self.signup_notice_pending = False
+        self.signup_notice_visible = False
 
     @rx.event
     def dismiss_password_reset_notice_on_input(self, value: str) -> None:
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
+        self.signup_notice_pending = False
+        self.signup_notice_visible = False
 
     @rx.event
     def navigate_to_signup_from_login(self) -> rx.event.EventSpec:
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
+        self.signup_notice_pending = False
+        self.signup_notice_visible = False
         return rx.redirect("/cadastro")
 
     @rx.event
     def set_recovery_email(self, value: str) -> None:
         self.recovery_email = value
         self.recovery_error_message = ""
+
+    @rx.event
+    def require_verification_email(self) -> rx.event.EventSpec | None:
+        if self.verification_flow == "signup":
+            if self.signup_email and self._signup_password:
+                return None
+            self.signup_email = ""
+            self._signup_password = ""
+            self.verification_flow = ""
+            return rx.redirect("/recuperar-senha")
+        if not self.recovery_email:
+            return rx.redirect("/recuperar-senha")
+        return None
 
     @rx.event
     def require_recovery_email(self) -> rx.event.EventSpec | None:
@@ -514,14 +576,32 @@ class LoginState(rx.State):
 
     @rx.event
     def use_another_recovery_email(self) -> None:
+        if self.verification_flow == "signup":
+            self.signup_email = ""
+            self._signup_password = ""
+            self.verification_flow = ""
+            self.recovery_error_message = ""
+            self.recovery_resend_seconds = 0
+            return
         self.recovery_email = ""
         self._reset_token = ""
         self.recovery_error_message = ""
         self.recovery_resend_seconds = 0
+        self.verification_flow = ""
+
+    @rx.event
+    def leave_verification_for_signup(self) -> None:
+        if self.verification_flow == "signup":
+            self.signup_email = ""
+            self._signup_password = ""
+            self.verification_flow = ""
 
     @rx.event
     def return_to_login(self) -> None:
         self.recovery_email = ""
+        self.signup_email = ""
+        self._signup_password = ""
+        self.verification_flow = ""
         self._reset_token = ""
         self.recovery_error_message = ""
         self.recovery_resend_seconds = 0
@@ -529,6 +609,8 @@ class LoginState(rx.State):
         self.recovery_confirmation_visible = False
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
+        self.signup_notice_pending = False
+        self.signup_notice_visible = False
 
     @rx.event
     def toggle_recovery_password_visibility(self) -> None:
@@ -568,6 +650,9 @@ class LoginState(rx.State):
             return
 
         self.recovery_email = email
+        self.signup_email = ""
+        self._signup_password = ""
+        self.verification_flow = "recovery"
         self.recovery_resend_seconds = 30
         self.recovery_is_loading = False
         yield rx.redirect("/verificar-email")
@@ -579,6 +664,32 @@ class LoginState(rx.State):
     ) -> AsyncGenerator[rx.event.EventSpec, None]:
         if self.recovery_is_loading or self.recovery_resend_seconds > 0:
             return
+        if self.verification_flow == "signup":
+            if not self.signup_email or not self._signup_password:
+                self.signup_email = ""
+                self._signup_password = ""
+                self.verification_flow = ""
+                yield rx.redirect("/recuperar-senha")
+                return
+
+            self.recovery_is_loading = True
+            self.recovery_error_message = ""
+            try:
+                endpoint = auth_signup_resend_endpoint()
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await request_signup_resend(
+                        client, endpoint, self.signup_email
+                    )
+            except LoginError:
+                self.recovery_error_message = RECOVERY_UNAVAILABLE_MESSAGE
+                self.recovery_is_loading = False
+                return
+
+            self.recovery_resend_seconds = 30
+            self.recovery_is_loading = False
+            yield LoginState.countdown_recovery_resend
+            return
+
         if not self.recovery_email:
             yield rx.redirect("/recuperar-senha")
             return
@@ -627,6 +738,47 @@ class LoginState(rx.State):
         if not re.fullmatch(r"\d{6}", code):
             self.recovery_error_message = RECOVERY_CODE_ERROR
             return
+
+        if self.verification_flow == "signup":
+            if not self.signup_email or not self._signup_password:
+                self.signup_email = ""
+                self._signup_password = ""
+                self.verification_flow = ""
+                yield rx.redirect("/recuperar-senha")
+                return
+
+            self.recovery_is_loading = True
+            self.recovery_error_message = ""
+            try:
+                endpoint = auth_signup_verify_endpoint()
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await request_signup_verification(
+                        client,
+                        endpoint,
+                        self.signup_email,
+                        code,
+                        self._signup_password,
+                    )
+            except SignupRejectedError:
+                self.recovery_error_message = RECOVERY_CODE_ERROR
+            except LoginError:
+                self.recovery_error_message = RECOVERY_UNAVAILABLE_MESSAGE
+            else:
+                self.signup_email = ""
+                self._signup_password = ""
+                self.verification_flow = ""
+                self.recovery_resend_seconds = 0
+                self.recovery_error_message = ""
+                self.signup_notice_pending = True
+                self.signup_notice_visible = False
+                self.auth_token = ""
+                self.account_name = ""
+                self.recovery_is_loading = False
+                yield rx.redirect("/login")
+                return
+            self.recovery_is_loading = False
+            return
+
         if not self.recovery_email:
             yield rx.redirect("/recuperar-senha")
             return
@@ -725,6 +877,8 @@ class LoginState(rx.State):
         self.account_name = ""
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
+        self.signup_notice_pending = False
+        self.signup_notice_visible = False
 
     @rx.event
     def toggle_password_visibility(self) -> None:
@@ -751,6 +905,8 @@ class LoginState(rx.State):
         self.account_name = ""
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
+        self.signup_notice_pending = False
+        self.signup_notice_visible = False
 
         email = form_data.get("email", "").strip()
         password = form_data.get("password", "")
@@ -788,6 +944,13 @@ class LoginState(rx.State):
         self.error_message = ""
         self.auth_token = ""
         self.account_name = ""
+        self.recovery_email = ""
+        self._reset_token = ""
+        self.recovery_error_message = ""
+        self.recovery_resend_seconds = 0
+        self.verification_flow = ""
+        self.signup_email = ""
+        self._signup_password = ""
 
         validation_message = validate_signup_data(form_data)
         if validation_message:
@@ -798,7 +961,7 @@ class LoginState(rx.State):
         try:
             endpoint = auth_signup_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:
-                result = await request_signup(
+                await request_signup(
                     client,
                     endpoint,
                     str(form_data["name"]),
@@ -810,9 +973,13 @@ class LoginState(rx.State):
         except LoginError as error:
             self.error_message = signup_error_message(error)
         else:
-            self.auth_token = result.auth_token
+            self.signup_email = str(form_data["email"]).strip()
+            self._signup_password = str(form_data["password"])
+            self.verification_flow = "signup"
+            self.recovery_resend_seconds = 30
             self.is_loading = False
-            yield rx.redirect("/")
+            yield rx.redirect("/verificar-email")
+            yield LoginState.countdown_recovery_resend
             return
 
         self.is_loading = False
@@ -871,6 +1038,29 @@ def login_page() -> rx.Component:
                                     rx.text(
                                         "Senha alterada com sucesso! Entre "
                                         "com a sua nova senha.",
+                                        color="#166534",
+                                        width="100%",
+                                    ),
+                                    role="status",
+                                    align="center",
+                                    width="100%",
+                                    padding="12px",
+                                    background="#DCFCE7",
+                                    border_radius="8px",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                LoginState.signup_notice_visible,
+                                rx.hstack(
+                                    rx.icon(
+                                        "circle-check",
+                                        size=20,
+                                        color="#166534",
+                                    ),
+                                    rx.text(
+                                        "Cadastro confirmado! Você já pode "
+                                        "entrar com seu e-mail e sua senha.",
                                         color="#166534",
                                         width="100%",
                                     ),
