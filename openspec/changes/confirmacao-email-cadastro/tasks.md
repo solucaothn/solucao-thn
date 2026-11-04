@@ -2,10 +2,10 @@
 
 ## 1. Frontend Reflex e testes relacionados
 
-- [ ] 1.1 Atualizar o início do cadastro para tratar a resposta sem token, manter e-mail e senha somente no estado transitório Reflex após a resposta e navegar para `/verificar-email`; atualizar `tests/test_signup.py` para remover as expectativas de criação imediata, token e resposta distinguível de e-mail já cadastrado. Verificar com `python -m unittest discover -s tests -p test_signup.py`.
-- [ ] 1.2 Adaptar a tela compartilhada `/verificar-email` para distinguir cadastro de recuperação, usar `signup_resend` e `signup_verify` no cadastro, enviar e-mail, código e senha na verificação, e apagar a senha ao concluir ou ao acionar “Usar outro e-mail”; acrescentar testes para código de seis dígitos, payloads, neutralidade simulada, reenvio antes/depois de 30 segundos, falha de rede e navegação. Verificar com os testes de cadastro e recuperação.
-- [ ] 1.3 Após a verificação bem-sucedida, limpar os dados transitórios e redirecionar ao login com aviso verde de cadastro confirmado, sem definir token; acrescentar testes de estado, ausência de sessão, navegação e limpeza do aviso ao digitar, tentar entrar, sair ou recarregar.
-- [ ] 1.4 Executar `python -m unittest discover -s tests` e confirmar que os testes de recuperação de senha continuam passando sem mudanças em seus contratos. Os testes com `httpx.MockTransport` validam o comportamento do frontend e respostas simuladas, não comprovam o contrato real nem os limites aplicados pelo Xano.
+- [x] 1.1 Atualizar o início do cadastro para tratar a resposta sem token, manter e-mail e senha somente no estado transitório Reflex após a resposta e navegar para `/verificar-email`; atualizar `tests/test_signup.py` para remover as expectativas de criação imediata, token e resposta distinguível de e-mail já cadastrado. Verificar com `python -m unittest discover -s tests -p test_signup.py`.
+- [x] 1.2 Adaptar a tela compartilhada `/verificar-email` para distinguir cadastro de recuperação, usar `signup_resend` e `signup_verify` no cadastro, enviar e-mail, código e senha na verificação, e apagar a senha ao concluir ou ao acionar “Usar outro e-mail”; acrescentar testes para código de seis dígitos, payloads, neutralidade simulada, reenvio antes/depois de 30 segundos, falha de rede e navegação. Verificar com os testes de cadastro e recuperação.
+- [x] 1.3 Após a verificação bem-sucedida, limpar os dados transitórios e redirecionar ao login com aviso verde de cadastro confirmado, sem definir token; acrescentar testes de estado, ausência de sessão, navegação e limpeza do aviso ao digitar, tentar entrar, sair ou recarregar.
+- [x] 1.4 Executar `python -m unittest discover -s tests` e confirmar que os testes de recuperação de senha continuam passando sem mudanças em seus contratos. Os testes com `httpx.MockTransport` validam o comportamento do frontend e respostas simuladas, não comprovam o contrato real nem os limites aplicados pelo Xano.
 
 ## 2. Xano
 

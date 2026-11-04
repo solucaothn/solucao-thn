@@ -240,6 +240,7 @@ class RecoveryStateTests(unittest.TestCase):
         self.assertIn("recovery_email", fields)
         self.assertIn("_reset_token", fields)
         self.assertNotIn("_reset_token", LoginState.vars)
+        self.assertNotIn("_signup_password", LoginState.vars)
 
     def test_request_success_stores_email_sets_timer_and_advances(self) -> None:
         class State:
@@ -331,6 +332,7 @@ class RecoveryStateTests(unittest.TestCase):
             recovery_is_loading = False
             recovery_error_message = ""
             recovery_email = "person@example.test"
+            verification_flow = "recovery"
             _reset_token = ""
 
         state = State()
@@ -361,6 +363,7 @@ class RecoveryStateTests(unittest.TestCase):
             recovery_is_loading = False
             recovery_error_message = ""
             recovery_email = "person@example.test"
+            verification_flow = "recovery"
             _reset_token = ""
 
         state = State()
@@ -481,6 +484,8 @@ class RecoveryStateTests(unittest.TestCase):
         class State:
             password_reset_notice_pending = True
             password_reset_notice_visible = False
+            signup_notice_pending = False
+            signup_notice_visible = False
 
         state = State()
         LoginState.consume_password_reset_notice.fn(state)
@@ -496,6 +501,7 @@ class RecoveryStateTests(unittest.TestCase):
     def test_using_another_email_clears_email_token_and_timer(self) -> None:
         class State:
             recovery_email = "person@example.test"
+            verification_flow = "recovery"
             _reset_token = "ephemeral-token"
             recovery_error_message = "old error"
             recovery_resend_seconds = 12
@@ -552,6 +558,7 @@ class RecoveryStateTests(unittest.TestCase):
             recovery_error_message = ""
             recovery_email = "person@example.test"
             recovery_resend_seconds = 0
+            verification_flow = "recovery"
 
         state = State()
         with (
