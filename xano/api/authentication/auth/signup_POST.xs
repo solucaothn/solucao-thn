@@ -24,16 +24,56 @@ query "auth/signup" verb=POST {
       value = {success: true}
     }
 
+    var $password_length_valid {
+      value = false
+    }
+
+    var $password_letter_valid {
+      value = false
+    }
+
+    var $password_digit_valid {
+      value = false
+    }
+
     var $password_valid {
-      value = true
+      value = false
     }
 
     conditional {
-      if (($input.password|strlen) < 8 || ("/[A-Za-z]/"|regex_matches:$input.password) == false || ("/[0-9]/"|regex_matches:$input.password) == false) {
-        var.update $password_valid {
-          value = false
+      if ("/^.{8,}$/"|regex_matches:$input.password) {
+        var.update $password_length_valid {
+          value = true
         }
+      }
+    }
 
+    conditional {
+      if ("/[A-Za-z]/"|regex_matches:$input.password) {
+        var.update $password_letter_valid {
+          value = true
+        }
+      }
+    }
+
+    conditional {
+      if ("/[0-9]/"|regex_matches:$input.password) {
+        var.update $password_digit_valid {
+          value = true
+        }
+      }
+    }
+
+    conditional {
+      if ($password_length_valid && $password_letter_valid && $password_digit_valid) {
+        var.update $password_valid {
+          value = true
+        }
+      }
+    }
+
+    conditional {
+      if ($password_valid == false) {
         var.update $response_data {
           value = {success: false}
         }
