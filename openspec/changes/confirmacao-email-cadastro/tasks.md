@@ -17,8 +17,8 @@
 
 ## 3. Documentação
 
-- [ ] 3.1 Atualizar a seção da tela 12 em `docs/design/README.md` para documentar seu uso também na confirmação de cadastro, textos distintos por fluxo e acréscimos que não estão no Figma; verificar que a descrição de recuperação continua correta.
-- [ ] 3.2 Atualizar `docs/guia-do-colaborador.md` com o fluxo de confirmação, os novos endpoints, a senha não persistida, os limites e a sequência de segurança para alterações no workspace Xano; conferir que o guia não contradiz os artifacts.
+- [x] 3.1 Atualizar a seção da tela 12 em `docs/design/README.md` para documentar seu uso também na confirmação de cadastro, textos distintos por fluxo e acréscimos que não estão no Figma; verificar que a descrição de recuperação continua correta.
+- [x] 3.2 Atualizar `docs/guia-do-colaborador.md` com o fluxo de confirmação, os novos endpoints, a senha não persistida, os limites e a sequência de segurança para alterações no workspace Xano; conferir que o guia não contradiz os artifacts.
 
 ## 4. Verificação manual pós-publicação
 

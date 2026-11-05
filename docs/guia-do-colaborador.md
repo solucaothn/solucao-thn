@@ -103,6 +103,26 @@ Em aberto com o grupo: status e transições da doação, mensagens entre usuár
 - Recuperação de senha: código de 6 dígitos, válido por 10 minutos, 5 tentativas por código, reenvio após 30 segundos, no máximo 5 envios por hora. As respostas são neutras (não revelam se a conta existe). Trocar a senha não cria sessão: a pessoa volta ao login com um aviso verde.
 - Toda página nova tem animação de entrada, conforme o `AGENTS.md`.
 
+### Confirmação de e-mail no cadastro
+
+A conta só é criada depois que a pessoa confirma o código enviado ao e-mail. O fluxo usa:
+
+- `POST /auth/signup`: valida os dados e inicia ou atualiza a pendência. Não cria conta nem sessão e não devolve token de autenticação.
+- `POST /auth/signup_resend`: solicita outro código para o e-mail da pendência.
+- `POST /auth/signup_verify`: recebe e-mail, código e senha; cria a conta somente se o código e a senha forem válidos. A resposta não cria sessão nem contém token.
+- Tabela `signup_pending`: mantém os dados necessários ao cadastro pendente, o hash do código, tentativas, horários de envio e expiração. Não armazena a senha.
+- Função `Signup/send_confirmation_code`: envia o código de cadastro pelo SendGrid; não reutiliza o envio de recuperação de senha.
+
+O código tem seis dígitos, vale por 10 minutos e pode ser tentado até cinco vezes. Um novo envio só é permitido após 30 segundos e há no máximo cinco envios por hora. A pendência expira 24 horas depois do último envio permitido e só é removida quando acessada após expirar. Os limites e a validação são aplicados no Xano.
+
+As respostas de `auth/signup` são neutras mesmo quando o e-mail já pertence a uma conta: o status e o corpo não revelam essa condição, embora o tempo de resposta possa diferir. E-mail existente não deve gerar pendência nem envio de código.
+
+A senha é enviada ao Xano para validação no início e novamente na verificação, mas nunca é gravada no Xano. Após o início aceito, fica somente no estado transitório do Reflex até a verificação, e é apagada ao concluir ou ao usar “Usar outro e-mail”. O valor de “Confirmar senha” chega transitoriamente ao servidor Reflex junto ao envio do formulário, mas não é guardado no estado nem enviado ao Xano. O código também não fica no estado Reflex.
+
+O estado de cadastro pendente é transitório no servidor Reflex: reiniciar o servidor ou abrir outra aba pode perdê-lo. Se a guarda da tela `/verificar-email` não encontrar o e-mail no estado, redireciona para `/recuperar-senha`; iniciar novamente o cadastro permite obter um novo estado de fluxo. No fluxo de cadastro, “Usar outro e-mail” limpa e-mail e senha e retorna a `/cadastro`.
+
+Nas validações Xano desse fluxo, e-mail e código usam verificações de comprimento com `strlen` em vez de padrões de regex com barra invertida. A senha segue as regras da conta: mínimo de oito caracteres, com letra e dígito.
+
 ## 9. Design
 
 - As telas ficam em `docs/design` como PNG. O `README.md` dessa pasta **prevalece sobre as imagens**.
@@ -143,11 +163,12 @@ Se a formatação real de algum deles precisar mudar, isso vai num commit separa
 
 ## 11. Trabalhando com o Xano
 
-- Antes de editar o Xano: `xano pull` com a árvore do Git limpa (commitada).
-- Escreva ou altere o XanoScript e valide pelo Xano Developer MCP.
-- Rode o dry-run e leia o que ele vai criar, alterar ou apagar. Só então faça o push real.
-- Avise o grupo antes do push real.
-- Depois do push, commite os arquivos sincronizados.
+- Antes de editar o Xano, confira o status e peça confirmação explícita antes de rodar `xano workspace pull -d ./xano`; preserve todas as alterações preexistentes.
+- Consulte o Xano Developer MCP antes de escrever XanoScript e valide nele cada arquivo `.xs` alterado ou criado.
+- Rode `xano workspace push -d ./xano --dry-run` e revise a saída completa. Se aparecer alteração não aprovada — especialmente em `donation_photo` ou `password_reset_code` — pare e avise o grupo.
+- Avise o grupo e obtenha o OK antes de publicar mudanças que afetam consumidores compartilhados. Obtenha a confirmação explícita necessária imediatamente antes do push real.
+- Depois da aprovação, faça o push apenas das alterações previstas. Ao preparar commits, revise cada caminho e adicione arquivos individualmente; nunca use `git add .` em `xano/`, pois o workspace contém alterações compartilhadas que podem não pertencer à tarefa.
+- Depois do push, confira o estado do workspace e versione somente os arquivos Xano aprovados para a change.
 
 ## 12. Dicas para agentes de código
 
