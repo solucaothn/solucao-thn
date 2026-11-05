@@ -729,7 +729,9 @@ class RecoveryPageTests(unittest.TestCase):
     def test_login_has_accessible_success_notice_and_recovery_link(self) -> None:
         from doafacil.login import login_page
 
-        nodes = _component_nodes(login_page())
+        page = login_page()
+        nodes = _component_nodes(page)
+        contents = _component_text(page)
         self.assertTrue(
             any(
                 "status" in str(getattr(node, "role", ""))
@@ -745,6 +747,10 @@ class RecoveryPageTests(unittest.TestCase):
             if _component_text(node) == "Esqueci minha senha"
         )
         self.assertIn("/recuperar-senha", str(forgot))
+        self.assertLess(
+            contents.index("Esqueci minha senha"),
+            contents.index("Senha alterada com sucesso!"),
+        )
 
     def test_recovery_autofill_styles_and_design_documentation(self) -> None:
         css_file = Path(__file__).parents[1] / "doafacil" / "doafacil.py"

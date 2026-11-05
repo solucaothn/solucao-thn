@@ -766,9 +766,15 @@ class SignupPageTests(unittest.TestCase):
         from doafacil.login import login_page
 
         page = login_page()
-        self.assertIn(
-            "Cadastro confirmado! Você já pode entrar com seu e-mail e sua senha.",
-            _component_text(page),
+        contents = _component_text(page)
+        signup_notice = (
+            "Cadastro confirmado! Você já pode entrar com seu e-mail "
+            "e sua senha."
+        )
+        self.assertIn(signup_notice, contents)
+        self.assertLess(
+            contents.index("Esqueci minha senha"),
+            contents.index(signup_notice),
         )
         self.assertIn("signup_notice_visible", str(page))
 

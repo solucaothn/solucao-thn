@@ -161,8 +161,10 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 ### 12-verifique-email.png — Verificar código
 
 - Cartão com o título “Verifique seu e-mail”, campo Código de seis dígitos, dica para verificar o spam, contagem “Reenviar código em 0:30” e botão “Continuar”.
-- A tela mostra o e-mail parcialmente mascarado em uma mensagem neutra, oferece “Usar outro e-mail” e “← Voltar” para a solicitação.
-- A máscara, a mensagem neutra, a dica, a contagem, os links, o cabeçalho e a animação `auth-card-enter` são acréscimos que não estão no Figma.
+- A tela também é usada para confirmar o cadastro. No fluxo de recuperação, mantém a mensagem neutra atual: “Se existir uma conta com esse e-mail, enviamos um código de 6 dígitos para <e-mail mascarado>.” No fluxo de cadastro, mostra “Se for possível confirmar este e-mail, enviaremos um código de 6 dígitos para <e-mail mascarado>.”
+- Em ambos os fluxos, oferece “Usar outro e-mail”. “← Voltar” retorna à solicitação no fluxo de recuperação e a `/cadastro` no fluxo de cadastro.
+- Após a confirmação do cadastro, o login mostra o aviso verde “Cadastro confirmado! Você já pode entrar com seu e-mail e sua senha.” abaixo do link “Esqueci minha senha”.
+- A máscara, as mensagens neutras, a dica, a contagem, os links, o cabeçalho, o uso compartilhado com cadastro, o aviso de cadastro no login e a animação `auth-card-enter` são acréscimos que não estão no Figma.
 
 ### 13-nova-senha.png — Definir nova senha
 
