@@ -44,7 +44,7 @@ query "auth/signup_resend" verb=POST {
     } as $existing_user
 
     conditional {
-      if ($existing_user == null) {
+      if ($input.email != null && ($input.email|strlen) >= 5 && $existing_user == null) {
         try_catch {
           try {
             db.transaction {

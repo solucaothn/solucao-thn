@@ -26,6 +26,18 @@ query "auth/signup_verify" verb=POST {
       value = false
     }
 
+    var $password_length_valid {
+      value = false
+    }
+
+    var $password_letter_valid {
+      value = false
+    }
+
+    var $password_digit_valid {
+      value = false
+    }
+
     var $password_valid {
       value = false
     }
@@ -33,7 +45,7 @@ query "auth/signup_verify" verb=POST {
     conditional {
       if ($input.email != null) {
         var.update $email_valid {
-          value = "/^[^@\s]+@[^@\s]+\.[^@\s]+$/"|regex_matches:$input.email
+          value = ($input.email|strlen) >= 5
         }
       }
     }
@@ -41,7 +53,7 @@ query "auth/signup_verify" verb=POST {
     conditional {
       if ($input.code != null) {
         var.update $code_format_valid {
-          value = "/^[0-9]{6}$/"|regex_matches:$input.code
+          value = ($input.code|strlen) == 6
         }
       }
     }
@@ -49,7 +61,31 @@ query "auth/signup_verify" verb=POST {
     conditional {
       if ($input.password != null) {
         conditional {
-          if (($input.password|strlen) >= 8 && ("/[A-Za-z]/"|regex_matches:$input.password) && ("/[0-9]/"|regex_matches:$input.password)) {
+          if ("/^.{8,}$/"|regex_matches:$input.password) {
+            var.update $password_length_valid {
+              value = true
+            }
+          }
+        }
+
+        conditional {
+          if ("/[A-Za-z]/"|regex_matches:$input.password) {
+            var.update $password_letter_valid {
+              value = true
+            }
+          }
+        }
+
+        conditional {
+          if ("/[0-9]/"|regex_matches:$input.password) {
+            var.update $password_digit_valid {
+              value = true
+            }
+          }
+        }
+
+        conditional {
+          if ($password_length_valid && $password_letter_valid && $password_digit_valid) {
             var.update $password_valid {
               value = true
             }
