@@ -1027,52 +1027,6 @@ def login_page() -> rx.Component:
                                 text_align="center",
                                 width="100%",
                             ),
-                            rx.cond(
-                                LoginState.password_reset_notice_visible,
-                                rx.hstack(
-                                    rx.icon(
-                                        "circle-check",
-                                        size=20,
-                                        color="#166534",
-                                    ),
-                                    rx.text(
-                                        "Senha alterada com sucesso! Entre "
-                                        "com a sua nova senha.",
-                                        color="#166534",
-                                        width="100%",
-                                    ),
-                                    role="status",
-                                    align="center",
-                                    width="100%",
-                                    padding="12px",
-                                    background="#DCFCE7",
-                                    border_radius="8px",
-                                ),
-                                rx.fragment(),
-                            ),
-                            rx.cond(
-                                LoginState.signup_notice_visible,
-                                rx.hstack(
-                                    rx.icon(
-                                        "circle-check",
-                                        size=20,
-                                        color="#166534",
-                                    ),
-                                    rx.text(
-                                        "Cadastro confirmado! Você já pode "
-                                        "entrar com seu e-mail e sua senha.",
-                                        color="#166534",
-                                        width="100%",
-                                    ),
-                                    role="status",
-                                    align="center",
-                                    width="100%",
-                                    padding="12px",
-                                    background="#DCFCE7",
-                                    border_radius="8px",
-                                ),
-                                rx.fragment(),
-                            ),
                             rx.vstack(
                                 rx.text(
                                     "E-mail",
@@ -1171,6 +1125,52 @@ def login_page() -> rx.Component:
                                 spacing="2",
                                 width="100%",
                                 position="relative",
+                            ),
+                            rx.cond(
+                                LoginState.password_reset_notice_visible,
+                                rx.hstack(
+                                    rx.icon(
+                                        "circle-check",
+                                        size=20,
+                                        color="#166534",
+                                    ),
+                                    rx.text(
+                                        "Senha alterada com sucesso! Entre "
+                                        "com a sua nova senha.",
+                                        color="#166534",
+                                        width="100%",
+                                    ),
+                                    role="status",
+                                    align="center",
+                                    width="100%",
+                                    padding="12px",
+                                    background="#DCFCE7",
+                                    border_radius="8px",
+                                ),
+                                rx.fragment(),
+                            ),
+                            rx.cond(
+                                LoginState.signup_notice_visible,
+                                rx.hstack(
+                                    rx.icon(
+                                        "circle-check",
+                                        size=20,
+                                        color="#166534",
+                                    ),
+                                    rx.text(
+                                        "Cadastro confirmado! Você já pode "
+                                        "entrar com seu e-mail e sua senha.",
+                                        color="#166534",
+                                        width="100%",
+                                    ),
+                                    role="status",
+                                    align="center",
+                                    width="100%",
+                                    padding="12px",
+                                    background="#DCFCE7",
+                                    border_radius="8px",
+                                ),
+                                rx.fragment(),
                             ),
                             rx.cond(
                                 LoginState.error_message != "",
