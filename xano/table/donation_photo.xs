@@ -7,12 +7,13 @@ table donation_photo {
     timestamp created_at?=now
     int donation_id
     int position
-    image photo
+    image? photo
   }
 
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree", field: [{name: "donation_id", op: "asc"}]}
   ]
+
   guid = "X2vTfVgqUVsVs46yqiZqTghRTn4"
 }
