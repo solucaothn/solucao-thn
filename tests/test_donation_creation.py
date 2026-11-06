@@ -11,6 +11,7 @@ from doafacil.cadastro_doacao import (
     IMAGE_TYPES,
     PHOTO_UPLOAD_ID,
     DonationCreateState,
+    DonationMissingPhotosError,
     DonationServiceError,
     DonationSessionExpiredError,
     _fetch_categories,
@@ -600,7 +601,7 @@ class DonationCreationTests(unittest.TestCase):
             {"id": 22, "status": "disponível"},
         )
 
-    def test_publication_sends_multipart_without_photos(self) -> None:
+    def test_publication_rejects_missing_photos_response(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:
             self.assertIn(
                 "multipart/form-data",
@@ -611,16 +612,27 @@ class DonationCreationTests(unittest.TestCase):
             self.assertIn(b'name="title"', body)
             self.assertNotIn(b'name="photos[]"', body)
             return httpx.Response(
-                200,
-                json={"donation": {"id": 23, "status": "disponível"}},
+                400,
+                json={
+                    "error": {
+                        "details": [
+                            {
+                                "reason": (
+                                    "Adicione pelo menos uma foto para "
+                                    "continuar."
+                                )
+                            }
+                        ]
+                    }
+                },
                 request=request,
             )
 
-        async def publish() -> dict[str, object]:
+        async def publish() -> None:
             async with httpx.AsyncClient(
                 transport=httpx.MockTransport(respond)
             ) as client:
-                return await _publish_donation(
+                await _publish_donation(
                     client,
                     "https://xano.example/api:catalog/catalog/donations/publish",
                     "test-token",
@@ -635,10 +647,82 @@ class DonationCreationTests(unittest.TestCase):
                     [],
                 )
 
-        self.assertEqual(
-            asyncio.run(publish()),
-            {"id": 23, "status": "disponível"},
+        with self.assertRaises(DonationMissingPhotosError):
+            asyncio.run(publish())
+
+    def test_missing_photos_response_keeps_form_and_shows_specific_message(
+        self,
+    ) -> None:
+        async def respond(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                400,
+                json={
+                    "details": [
+                        {
+                            "arbitrary_text_field": (
+                                "Adicione pelo menos uma foto para continuar."
+                            )
+                        }
+                    ]
+                },
+                request=request,
+            )
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        state = SimpleNamespace(
+            is_publishing=False,
+            published=False,
+            auth_token="test-token",
+            current_step=5,
+            title="Mesa",
+            description="Em bom estado",
+            category_id="3",
+            condition="Bom",
+            delivery_method="A combinar",
+            contact_preference="E-mail",
+            categories=[{"id": 3, "name": "Livros"}],
+            city="Recife",
+            state="PE",
+            donation_error_message="",
+            success_message="",
+            upload_progress="",
         )
+
+        async def publish() -> list[object]:
+            events = []
+            async for event in DonationCreateState.publish.fn(state, []):
+                events.append(event)
+            return events
+
+        with (
+            patch.dict(
+                "os.environ",
+                {"XANO_API_URL": "https://xano.example/api:catalog"},
+            ),
+            patch(
+                "doafacil.cadastro_doacao.httpx.AsyncClient",
+                return_value=client,
+            ),
+        ):
+            asyncio.run(publish())
+
+        self.assertEqual(state.current_step, 5)
+        self.assertEqual(state.title, "Mesa")
+        self.assertEqual(state.description, "Em bom estado")
+        self.assertEqual(state.category_id, "3")
+        self.assertEqual(state.condition, "Bom")
+        self.assertEqual(state.delivery_method, "A combinar")
+        self.assertEqual(state.contact_preference, "E-mail")
+        self.assertEqual(state.city, "Recife")
+        self.assertEqual(state.state, "PE")
+        self.assertEqual(
+            state.donation_error_message,
+            "Adicione pelo menos uma foto para continuar.",
+        )
+        self.assertFalse(state.published)
+        self.assertFalse(state.is_publishing)
+        self.assertEqual(state.success_message, "")
+        self.assertEqual(state.upload_progress, "")
 
     def test_publication_rejects_success_response_without_valid_donation(
         self,

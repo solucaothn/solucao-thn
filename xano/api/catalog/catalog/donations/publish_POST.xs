@@ -22,6 +22,11 @@ query "catalog/donations/publish" verb=POST {
   }
 
   stack {
+    precondition ($input.photos != null && ($input.photos|count) > 0) {
+      error_type = "inputerror"
+      error = "Adicione pelo menos uma foto para continuar."
+    }
+
     precondition ($input.photos == null || ($input.photos|count) <= 5) {
       error_type = "inputerror"
       error = "Selecione no máximo cinco fotos."
