@@ -7,10 +7,11 @@ table password_reset_code {
     int user_id {
       table = "user"
     }
+  
     password code_hash?
     timestamp code_expires_at?
-    int attempts?=0
-    bool code_used?=false
+    int attempts?
+    bool code_used?
     text reset_token_hash?
     timestamp reset_token_expires_at?
     bool reset_token_used?=true
@@ -26,5 +27,6 @@ table password_reset_code {
     {type: "btree|unique", field: [{name: "user_id"}]}
     {type: "btree", field: [{name: "reset_token_hash"}]}
   ]
+
   guid = "2tppd2-jpCokdc1mzic8qu-Bhqo"
 }
