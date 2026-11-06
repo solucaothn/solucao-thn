@@ -33,14 +33,34 @@ CONDITIONS = ("Ótimo", "Bom", "Regular")
 DELIVERY_METHODS = ("A combinar",)
 CONTACT_PREFERENCES = ("E-mail", "Chat do DoaFácil")
 EXCLUDED_CATEGORY_NAMES = frozenset({"alimentos", "móveis"})
+MISSING_PHOTOS_MESSAGE = "Adicione pelo menos uma foto para continuar."
 
 
 class DonationServiceError(Exception):
     pass
 
 
+class DonationMissingPhotosError(DonationServiceError):
+    pass
+
+
 class DonationSessionExpiredError(DonationServiceError):
     pass
+
+
+def _contains_error_message(payload: object, message: str) -> bool:
+    if isinstance(payload, str):
+        return message in payload
+    if isinstance(payload, dict):
+        return any(
+            _contains_error_message(value, message)
+            for value in payload.values()
+        )
+    if isinstance(payload, list):
+        return any(
+            _contains_error_message(value, message) for value in payload
+        )
+    return False
 
 
 def _api_endpoint(environment_key: str, path: str) -> str:
@@ -226,6 +246,12 @@ async def _publish_donation(
     if response.status_code in {401, 403}:
         raise DonationSessionExpiredError
     if response.is_error:
+        try:
+            error_payload = response.json()
+        except ValueError:
+            raise DonationServiceError from None
+        if _contains_error_message(error_payload, MISSING_PHOTOS_MESSAGE):
+            raise DonationMissingPhotosError
         raise DonationServiceError
 
     try:
@@ -387,9 +413,7 @@ class DonationCreateState(LoginState):
             return
         if self.current_step == 3:
             if not files:
-                self.donation_error_message = (
-                    "Adicione pelo menos uma foto para continuar."
-                )
+                self.donation_error_message = MISSING_PHOTOS_MESSAGE
                 return
             self.current_step = 4
             self.donation_error_message = ""
@@ -513,6 +537,8 @@ class DonationCreateState(LoginState):
             yield LoginState.logout
             yield rx.redirect("/login")
             return
+        except DonationMissingPhotosError:
+            self.donation_error_message = MISSING_PHOTOS_MESSAGE
         except DonationServiceError:
             self.donation_error_message = (
                 "Não foi possível publicar sua doação. "

@@ -2,8 +2,8 @@
 
 ## 1. Frontend e testes
 
-- [ ] 1.1 Tratar a resposta Xano de falta de fotos em `doafacil/cadastro_doacao.py`, exibindo “Adicione pelo menos uma foto para continuar.” sem limpar os dados do formulário; verificar o comportamento com teste focado.
-- [ ] 1.2 Atualizar `tests/test_donation_creation.py` para que publicação sem fotos não seja considerada sucesso e cobrir a resposta simulada de falta de fotos, a mensagem e a preservação dos dados; executar `python -m unittest tests.test_donation_creation`.
+- [x] 1.1 Tratar a resposta Xano de falta de fotos em `doafacil/cadastro_doacao.py`, exibindo “Adicione pelo menos uma foto para continuar.” sem limpar os dados do formulário; verificar o comportamento com teste focado.
+- [x] 1.2 Atualizar `tests/test_donation_creation.py` para que publicação sem fotos não seja considerada sucesso e cobrir a resposta simulada de falta de fotos, a mensagem e a preservação dos dados; executar `python -m unittest tests.test_donation_creation`.
 
 ## 2. Auditoria prévia
 
