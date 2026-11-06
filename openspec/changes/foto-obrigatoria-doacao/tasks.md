@@ -12,7 +12,7 @@
 ## 3. Xano e publicação
 
 - [ ] 3.1 (manual) Mostrar `git status --short --branch` e aguardar confirmação explícita do Higor antes de executar `xano workspace pull -d ./xano`; após o pull, mostrar `git status` e `git diff --stat` em `xano/`, preservando todas as mudanças existentes.
-- [ ] 3.2 Consultar a documentação do Xano Developer MCP antes de editar XanoScript; validar cada arquivo alterado no MCP e ajustar `publish_POST` para rejeitar `photos` ausente, nulo ou vazio antes de upload ou `db.add`, mantendo o limite de cinco fotos. Alterar `donation_photo.photo` para obrigatório somente se a auditoria confirmar que não há linhas vazias; conferir os arquivos e a validação do MCP.
+- [x] 3.2 Consultar a documentação do Xano Developer MCP antes de editar XanoScript; validar cada arquivo alterado no MCP e ajustar `publish_POST` para rejeitar `photos` ausente, nulo ou vazio antes de upload ou `db.add`, mantendo o limite de cinco fotos. Alterar `donation_photo.photo` para obrigatório somente se a auditoria confirmar que não há linhas vazias; conferir os arquivos e a validação do MCP.
 - [ ] 3.3 Executar e revisar `xano workspace push -d ./xano --dry-run`; verificar que as alterações se limitam a `publish_POST` e, se autorizada pela auditoria, `donation_photo`. Se houver qualquer alteração adicional, parar e avisar o grupo sem fazer push.
 - [ ] 3.4 (manual) Avisar o grupo de que o contrato de `POST /catalog/donations/publish` está mudando e obter o OK explícito do grupo antes da publicação real; registrar a autorização.
 - [ ] 3.5 (manual) Obter a confirmação explícita do Higor para o push real depois da revisão do dry-run e do OK do grupo; sem as duas autorizações, não publicar.

@@ -7,7 +7,7 @@ table donation_photo {
     timestamp created_at?=now
     int donation_id
     int position
-    image? photo
+    image photo
   }
 
   index = [
