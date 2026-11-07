@@ -25,4 +25,4 @@
 
 ## 5. Documentação
 
-- [ ] 5.1 Atualizar `docs/guia-do-colaborador.md` com a validação de fotos obrigatória no backend, resposta de erro, tratamento no site, auditoria condicional da tabela e fluxo de autorização/publicação; conferir que o guia corresponde à change.
+- [x] 5.1 Atualizar `docs/guia-do-colaborador.md` com a validação de fotos obrigatória no backend, resposta de erro, tratamento no site, auditoria condicional da tabela e fluxo de autorização/publicação; conferir que o guia corresponde à change.

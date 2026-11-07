@@ -123,6 +123,16 @@ O estado de cadastro pendente é transitório no servidor Reflex: reiniciar o se
 
 Nas validações Xano desse fluxo, e-mail e código usam verificações de comprimento com `strlen` em vez de padrões de regex com barra invertida. A senha segue as regras da conta: mínimo de oito caracteres, com letra e dígito.
 
+### Fotos obrigatórias na publicação de doações
+
+A foto da doação é obrigatória tanto no wizard quanto no backend. O endpoint `POST /catalog/donations/publish` recusa `photos` ausente, nulo ou vazio com erro `inputerror` (HTTP 400) e a mensagem “Adicione pelo menos uma foto para continuar.”. Essa validação ocorre antes de qualquer upload ou gravação. O limite continua sendo de cinco fotos.
+
+O corpo do erro contém os campos `code` (`ERROR_CODE_INPUT_ERROR`), `message` e `payload`. O site procura a mensagem “Adicione pelo menos uma foto para continuar.” em qualquer campo textual do JSON de erro e, quando a encontra, mostra a mesma mensagem sem limpar os dados do formulário nem marcar a doação como publicada. Outros erros continuam usando o tratamento genérico.
+
+O campo `donation_photo.photo` é obrigatório. A auditoria confirmou que não havia linhas dessa tabela sem foto antes da alteração. Doações antigas com `donation.photo` vazio não foram alteradas.
+
+O endpoint `publish` foi criado por outro integrante e pode ter outros consumidores. Antes do push real de mudanças nele, avise o grupo, obtenha o OK explícito do grupo e a confirmação necessária para publicar. Revise o dry-run e interrompa a publicação se ele mostrar alterações fora do escopo aprovado.
+
 ## 9. Design
 
 - As telas ficam em `docs/design` como PNG. O `README.md` dessa pasta **prevalece sobre as imagens**.
