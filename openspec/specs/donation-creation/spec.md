@@ -43,7 +43,7 @@ O sistema MUST permitir informar título do objeto, descrição, uma categoria e
 - **THEN** essa informação MUST ser coletada na segunda etapa e persistida com um dos três valores permitidos
 
 ### Requirement: Seleção de fotos da doação
-O sistema MUST permitir selecionar de uma a cinco imagens aceitas para uma doação e MUST informar visualmente o progresso de cada arquivo enquanto ele é processado. Arquivos que não sejam formatos de imagem aceitos pelo armazenamento do Xano, incluindo documentos PDF, MUST ser rejeitados com mensagem compreensível. O doador MUST selecionar pelo menos uma foto para avançar da etapa 3 e publicar pelo wizard, ainda que o endpoint Xano aceite requisições sem fotos.
+O sistema MUST permitir selecionar de uma a cinco imagens aceitas para uma doação e MUST informar visualmente o progresso de cada arquivo enquanto ele é processado. Arquivos que não sejam formatos de imagem aceitos pelo armazenamento do Xano, incluindo documentos PDF, MUST ser rejeitados com mensagem compreensível. O doador MUST selecionar pelo menos uma foto para avançar da etapa 3 e publicar pelo wizard, e o backend MUST também rejeitar publicações sem fotos.
 
 #### Scenario: Avanço com ao menos uma foto
 - **WHEN** o doador seleciona uma imagem aceita
@@ -65,7 +65,12 @@ O sistema MUST permitir selecionar de uma a cinco imagens aceitas para uma doaç
 
 #### Scenario: Arquivo não aceito ou falha no upload
 - **WHEN** um arquivo não é uma imagem aceita ou o upload falha
-- **THEN** o sistema MUST identificar a falha, permitir correção ou nova tentativa e MUST não apresentar a doação como publicada
+- **THEN** o sistema MUST identificar a falha, permitir correção ou nova tentativa e MUST NOT apresentar a doação como publicada
+
+#### Scenario: Publicação sem fotos pelo endpoint
+- **WHEN** uma requisição autenticada ao endpoint de publicação contém `photos` ausente, nulo ou vazio
+- **THEN** o backend MUST rejeitar a requisição com erro `inputerror` (HTTP 400) e a mensagem “Adicione pelo menos uma foto para continuar.”
+- **AND** MUST NOT criar uma doação, linhas de fotos associadas ou arquivos de imagem sem dono
 
 ### Requirement: Entrega e preferência de contato
 O sistema MUST apresentar “A combinar” como única modalidade de entrega selecionável e MUST oferecer somente as preferências “E-mail” e “Chat do DoaFácil”. Esta change MUST persistir somente a preferência de contato e MUST NOT solicitar nem persistir telefone, endereço específico ou outro dado pessoal de contato.
@@ -108,7 +113,7 @@ A interface MUST apresentar placeholders e textos de seleção do cadastro de do
 - **THEN** os textos “Selecione uma forma de contato”, “E-mail” e “Chat do DoaFácil” MUST permanecer em cor escura legível, sem aparência apagada
 
 ### Requirement: Publicação autenticada e persistente
-O sistema MUST publicar a doação por meio de uma operação autenticada no Xano. O backend MUST derivar o responsável da sessão autenticada, validar a categoria, a condição, a modalidade de entrega, a preferência de contato e o limite de fotos, e persistir os dados completos. Uma publicação aceita MUST iniciar com status “disponível”. Falhas de validação, autenticação, rede ou persistência MUST ser informadas sem apagar os dados ainda não publicados nem exibir uma confirmação de sucesso.
+O sistema MUST publicar a doação por meio de uma operação autenticada no Xano. O backend MUST derivar o responsável da sessão autenticada, validar a categoria, a condição, a modalidade de entrega, a preferência de contato e o limite de uma a cinco fotos, e persistir os dados completos. Uma publicação aceita MUST iniciar com status “disponível”. Falhas de validação, autenticação, rede ou persistência MUST ser informadas sem apagar os dados ainda não publicados nem exibir uma confirmação de sucesso.
 
 #### Scenario: Publicação aceita
 - **WHEN** uma pessoa autenticada envia dados válidos e o Xano conclui a persistência
@@ -121,6 +126,11 @@ O sistema MUST publicar a doação por meio de uma operação autenticada no Xan
 #### Scenario: Falha durante a publicação
 - **WHEN** o Xano rejeita a requisição ou ocorre uma falha de rede/persistência
 - **THEN** a interface MUST apresentar uma mensagem de erro, manter os valores do wizard e MUST NOT mostrar a doação como publicada
+
+#### Scenario: Xano rejeita publicação sem fotos
+- **WHEN** o backend rejeita a publicação por não receber fotos
+- **THEN** a interface MUST apresentar “Adicione pelo menos uma foto para continuar.” e manter os valores do wizard
+- **AND** MUST NOT mostrar a doação como publicada
 
 ### Requirement: Reinício do formulário a cada nova entrada
 Cada nova entrada em `/cadastro-doacao` MUST iniciar um novo cadastro vazio e habilitado, limpando os dados e estados temporários da visita anterior antes de carregar as categorias e a localização do perfil.
