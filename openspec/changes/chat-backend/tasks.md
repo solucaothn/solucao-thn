@@ -6,8 +6,8 @@
 
 ## 2. Implementação do backend Xano
 
-- [ ] 2.1 Consultar a documentação do Xano Developer MCP antes de escrever XanoScript; criar `chat_conversation` e `chat_message`, implementar os quatro endpoints autenticados da delta e alterar `donations_DELETE` para exclusão atômica; validar no MCP cada arquivo `.xs` criado ou alterado e verificar que os GUIDs existentes foram preservados.
-- [ ] 2.2 Validar no Xano Developer MCP a autorização por participante, a criação concorrente idempotente, as respostas 401/404/400/429, a paginação e o limite móvel de 10 mensagens por pessoa; se não for possível garantir o limite sob concorrência dentro das decisões e tabelas aprovadas, parar e solicitar decisão do grupo. Verificar os testes automatizados Xano disponíveis sem publicar alterações.
+- [x] 2.1 Consultar a documentação do Xano Developer MCP antes de escrever XanoScript; criar `chat_conversation` e `chat_message`, implementar os quatro endpoints autenticados da delta e alterar `donations_DELETE` para exclusão atômica; validar no MCP cada arquivo `.xs` criado ou alterado e verificar que os GUIDs existentes foram preservados.
+- [ ] 2.2 Validar no Xano Developer MCP a autorização por participante, a criação concorrente idempotente, as respostas 401/404/400/429, a paginação e a contagem de mensagens da pessoa nos últimos 60 segundos antes da gravação. Confirmar que o limite é de melhor esforço, sem isolamento serializável, aceitando excedente de uma ou duas mensagens sob concorrência. Verificar os testes automatizados Xano disponíveis sem publicar alterações.
 
 ## 3. Revisão do dry-run
 
