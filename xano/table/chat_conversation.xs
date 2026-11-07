@@ -1,0 +1,27 @@
+table chat_conversation {
+  auth = false
+
+  schema {
+    int id
+    timestamp created_at?=now
+    int donation_id {
+      table = "donation"
+    }
+    int donor_id {
+      table = "user"
+    }
+    int interested_user_id {
+      table = "user"
+    }
+    timestamp last_message_at?=now
+  }
+
+  index = [
+    {type: "primary", field: [{name: "id"}]}
+    {type: "btree|unique", field: [{name: "donation_id"}, {name: "interested_user_id"}]}
+    {type: "btree", field: [{name: "donor_id"}, {name: "last_message_at", op: "desc"}]}
+    {type: "btree", field: [{name: "interested_user_id"}, {name: "last_message_at", op: "desc"}]}
+  ]
+
+  guid = "h0ykjXR6vtB3cScAX8T0t2cJq7k"
+}

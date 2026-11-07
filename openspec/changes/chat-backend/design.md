@@ -48,9 +48,9 @@ Não há envio em tempo real nesta mudança. A interface futura consultará os e
 
 ### Limite por remetente em janela móvel
 
-Contar no máximo dez mensagens por usuário em qualquer janela móvel de 60 segundos, incluindo todas as conversas. O texto só é gravado se a pessoa for participante, a doação permitir envio e o limite não tiver sido excedido. A implementação não deve criar um mecanismo de rate limit que possa ser contornado alternando conversas.
+Contar as mensagens da pessoa autenticada nos últimos 60 segundos, considerando todas as conversas, antes de gravar uma nova mensagem. O envio é de melhor esforço: não usar isolamento serializável; sob concorrência, o limite pode ser excedido por uma ou duas mensagens. A implementação não deve criar um mecanismo que possa ser contornado alternando conversas.
 
-Antes de escolher o mecanismo de contagem, verificar no Xano Developer MCP as opções disponíveis e como compor a consulta e a gravação. Uma contagem seguida de gravação sem coordenação pode permitir que envios simultâneos excedam o limite; validar concorrência no Xano real. Não ampliar o modelo com outra tabela sem revisão do grupo.
+Consultar as mensagens recentes dentro da operação de envio e recusar novas mensagens quando a contagem já for dez. Não ampliar o modelo com outra tabela.
 
 ### Registro de eventos
 
@@ -63,7 +63,7 @@ Modificar `DELETE /catalog/donations` para, após confirmar que a pessoa autenti
 ## Riscos / Compensações
 
 - **Corrida ao criar conversa única** → confiar no índice único, tratar a colisão recuperando a linha existente e validar no Xano real com solicitações concorrentes.
-- **Limite de 10 mensagens ultrapassado por solicitações simultâneas** → confirmar mecanismo que aplica o limite por usuário de forma segura; realizar teste concorrente real antes do push. Se não for possível garantir sem mudar o modelo ou as decisões, parar e pedir decisão do grupo.
+- **Limite de mensagens ultrapassado por solicitações simultâneas** → a contagem seguida da gravação é de melhor esforço e pode permitir uma ou duas mensagens excedentes sob concorrência; esse risco é aceito, sem isolamento serializável nem tabela adicional.
 - **Consultas periódicas caras no plano gratuito** → limitar página, usar cursores e índices; evitar polling de conversas não abertas e acompanhar volume/custo em validação real.
 - **Vazamento por respostas de erro ou campos relacionados** → construir saídas explícitas com primeiro nome apenas e uniformizar o 404; testar as quatro APIs para ausência de e-mail e sobrenome.
 - **Exclusão parcial de doação** → executar exclusão de mensagens, conversas e doação atomicamente e testar falha intermediária no Xano antes de publicar.
