@@ -2,7 +2,7 @@
 
 Este guia explica como trabalhar no DoaFácil sem quebrar o que já funciona. Leia inteiro antes de mexer em qualquer coisa. Ele vale para pessoas e para agentes de código (Copilot etc.).
 
-Última atualização: 21/10/2026.
+Última atualização: 10/11/2026.
 
 ## 1. O que é o projeto
 
@@ -83,7 +83,9 @@ python -m unittest discover -s tests -v
 
 - Explorar Doações (ainda sem design).
 - Detalhe da doação e Minhas doações.
-- Interesse, mensagens, avaliações e administração (sem tabelas ainda).
+- Interface do chat (o backend já existe; veja “Chat da doação” na seção 8).
+- **Pendência:** `DELETE /catalog/donations` apaga mensagens, conversas e a doação, mas não as linhas de `donation_photo` dessa doação. As fotos ficam órfãs no banco. Corrigir numa change própria, combinada com o grupo.
+- Interesse, avaliações e administração (sem tabelas ainda).
 - Páginas "Como funciona" e "Categorias".
 - Botões e links da home que ainda não levam a lugar nenhum.
 
@@ -132,6 +134,63 @@ O corpo do erro contém os campos `code` (`ERROR_CODE_INPUT_ERROR`), `message` e
 O campo `donation_photo.photo` é obrigatório. A auditoria confirmou que não havia linhas dessa tabela sem foto antes da alteração. Doações antigas com `donation.photo` vazio não foram alteradas.
 
 O endpoint `publish` foi criado por outro integrante e pode ter outros consumidores. Antes do push real de mudanças nele, avise o grupo, obtenha o OK explícito do grupo e a confirmação necessária para publicar. Revise o dry-run e interrompa a publicação se ele mostrar alterações fora do escopo aprovado.
+
+### Chat da doação (backend)
+
+O chat entre quem doa e quem tem interesse existe só no Xano. A interface ainda não foi feita e não faz parte desta change.
+
+Tabelas:
+
+- `chat_conversation`: uma conversa por par doação + interessado (índice único), com `donor_id`, `interested_user_id` e `last_message_at`.
+- `chat_message`: mensagens da conversa, com `sender_id`, `text` e `created_at`.
+
+Endpoints (grupo Catalog, todos exigem login; sem login, HTTP 401):
+
+- `POST /catalog/chat/conversations/start` (`donation_id`): inicia a conversa ou devolve a que já existe para essa pessoa e doação.
+- `GET /catalog/chat/conversations` (`page` e `limit` opcionais; padrão 20, máximo 50): lista as conversas em que a pessoa participa, da mais recente para a mais antiga.
+- `GET /catalog/chat/messages` (`conversation_id`; `after_message_id` e `limit` opcionais; padrão 50, máximo 100): lê as mensagens da conversa em ordem de envio.
+- `POST /catalog/chat/messages` (`conversation_id`, `message_text`): envia uma mensagem.
+
+Regras:
+
+- **404 genérico:** conversa ou doação inexistente, de outra pessoa ou fora das condições recebe sempre a mesma resposta “Conversa não encontrada.”, para não revelar o que existe. Isso inclui a dona tentando abrir conversa na própria doação.
+- **Quem pode conversar:** só a dona e a pessoa interessada. Conversa nova só em doação disponível, com contato “Chat do DoaFácil”. Enviar mensagem só com a doação disponível ou reservada.
+- **Só o primeiro nome:** as respostas identificam a outra pessoa e o remetente apenas pelo primeiro nome. Nunca trazem e-mail nem sobrenome.
+- **Tamanho:** de 1 a 1000 caracteres depois de tirar espaços das pontas; fora disso, HTTP 400. O tamanho é validado antes do limite de envio. O texto é guardado e devolvido como texto, e a interface precisa mostrá-lo como texto, sem interpretar HTML.
+- **Limite de envio:** 10 mensagens por pessoa em 60 segundos, somando todas as conversas; acima disso, HTTP 429 com “Limite de mensagens atingido. Tente novamente em instantes.”. É de melhor esforço: sob envios simultâneos pode passar uma ou duas a mais.
+- **Logs:** só `chat_started` (conversa nova) e `chat_message_sent` (envio aceito), com `user_id`, ação e data. Leituras, repetições e erros não geram evento.
+- **Apagar a doação apaga as conversas:** `DELETE /catalog/donations` remove as mensagens, as conversas e a doação na mesma transação. Depois disso, quem tentar ler a conversa recebe o 404 genérico. As linhas de `donation_photo` não são apagadas (pendência registrada na seção 7).
+
+> **Atenção ao limite da plataforma:** o plano gratuito do Xano limita a **instância inteira** a 10 requisições a cada 20 segundos, somando todos os endpoints e todas as pessoas. Acima disso, o próprio Xano responde HTTP 429 com uma mensagem diferente da do chat. Telas com atualização automática (por exemplo, buscar mensagens novas) precisam de intervalo longo entre as consultas, senão derrubam o resto do site.
+
+Publicar mudanças no chat segue a seção 11: validar no MCP, dry-run revisado, aviso ao grupo e só então o push.
+
+#### Testar o chat contra o Xano real
+
+O script `scripts/teste_chat_real.py` roda os cenários do chat contra o Xano publicado. Ele fica fora de `tests/`, então o `unittest` não o executa.
+
+Antes de rodar, tenha:
+
+- **3 contas de teste:** a dona da doação, uma interessada e uma não participante que nunca tenha tido conversa.
+- **1 doação da dona**, disponível e com contato “Chat do DoaFácil”.
+- As variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas no terminal (seção 4).
+
+Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_chat_real.py
+```
+
+O script pede e-mail e senha de cada conta e depois o ID da doação. **A senha não aparece ao digitar**, nem como asteriscos: digite e aperte Enter. Nada é gravado em arquivo, e tokens e e-mails não são impressos. Cada cenário mostra OK ou FALHOU com o status HTTP; nas falhas, só os campos `code` e `message` do erro.
+
+Cuidados:
+
+- **O script cria dados reais:** uma conversa e cerca de 12 mensagens na doação informada.
+- **Espere pelo menos 1 minuto entre execuções.** As mensagens da execução anterior ainda contam no limite de 10 por 60 segundos e fazem os cenários falharem.
+- O script tem pausas entre as requisições por causa do limite da plataforma, então leva alguns minutos. Não rode outros testes no Xano ao mesmo tempo.
+- Opcionalmente, o script pede o ID de uma segunda doação, disponível, com contato por “E-mail” e sem conversa da interessada, para conferir que ela não abre conversa. Enter pula.
+- **O cenário 9 conclui a doação, e isso não tem volta.** O script pergunta antes; com `s`, espera cerca de 1 minuto e marca a doação como reservada e depois concluída. Uma doação concluída não serve para uma nova execução.
+- **O cenário 10 apaga a doação.** No fim, o script pergunta “Apagar a doação de teste agora? (s/N)”. Só responda `s` se for uma doação de teste; qualquer outra resposta mantém a doação.
 
 ## 9. Design
 
