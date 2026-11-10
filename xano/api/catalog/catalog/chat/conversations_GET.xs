@@ -159,4 +159,5 @@ query "catalog/chat/conversations" verb=GET {
     has_more     : $has_more
     next_page    : $next_page
   }
+  guid = "v-tcgoaNzPmISQLnDJgaLh7GTQg"
 }
