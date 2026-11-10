@@ -1079,12 +1079,23 @@ def index() -> rx.Component:
 
 app = rx.App(
     style={
+        # O placeholder herda o -webkit-text-fill-color do campo, que vence o
+        # color; por isso a cor dele também vai no -webkit-text-fill-color.
         "#donation-title::placeholder": {
-            "color": "#333333",
+            "color": "#6B6B6B",
+            "WebkitTextFillColor": "#6B6B6B",
             "opacity": "1",
         },
         "#donation-description::placeholder": {
-            "color": "#333333",
+            "color": "#6B6B6B",
+            "WebkitTextFillColor": "#6B6B6B",
+            "opacity": "1",
+        },
+        # Texto digitado ou colado: cor aplicada direto no <input>/<textarea>
+        # pelo id, sem depender da herança do tema do Radix.
+        "#donation-title, #donation-description": {
+            "color": "#1F1F1F",
+            "WebkitTextFillColor": "#1F1F1F",
             "opacity": "1",
         },
         (

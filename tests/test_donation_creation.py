@@ -17,6 +17,7 @@ from doafacil.cadastro_doacao import (
     _fetch_categories,
     _fetch_profile,
     _parse_categories,
+    _back_link,
     _publish_donation,
     _step_five,
     _step_four,
@@ -889,6 +890,24 @@ class DonationCreationTests(unittest.TestCase):
         )
         self.assertIn("auth-card-enter", str(page))
 
+    def test_back_link_sits_in_full_width_strip_aligned_left(self) -> None:
+        container = _back_link()
+        style = {key: _literal(value) for key, value in container.style.items()}
+
+        self.assertEqual(style.get("width"), "100%")
+        self.assertEqual(style.get("padding"), "0.75rem 1.25rem 0")
+        self.assertNotIn("maxWidth", style)
+        self.assertNotIn("max_width", style)
+        self.assertNotIn("margin", style)
+
+        link = container.children[0]
+        self.assertEqual(link.custom_attrs["aria-label"], "Voltar ao início")
+        self.assertEqual(_literal(link.children[0].to), "/")
+        self.assertIn(
+            '"aria-label":"Voltar ao in\\u00edcio"',
+            str(donation_creation_page()),
+        )
+
     def test_email_visibility_notice_is_conditional_on_preference(self) -> None:
         step = _step_five()
         notice = (
@@ -942,8 +961,21 @@ class DonationCreationTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     app.style[f"#{field_id}::placeholder"],
-                    {"color": "#333333", "opacity": "1"},
+                    {
+                        "color": "#6B6B6B",
+                        "WebkitTextFillColor": "#6B6B6B",
+                        "opacity": "1",
+                    },
                 )
+
+        self.assertEqual(
+            app.style["#donation-title, #donation-description"],
+            {
+                "color": "#1F1F1F",
+                "WebkitTextFillColor": "#1F1F1F",
+                "opacity": "1",
+            },
+        )
 
         select_triggers = {
             _literal(node.id): node
