@@ -22,6 +22,4 @@ table chat_conversation {
     {type: "btree", field: [{name: "donor_id"}, {name: "last_message_at", op: "desc"}]}
     {type: "btree", field: [{name: "interested_user_id"}, {name: "last_message_at", op: "desc"}]}
   ]
-
-  guid = "h0ykjXR6vtB3cScAX8T0t2cJq7k"
 }

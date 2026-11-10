@@ -60,16 +60,43 @@ query "catalog/chat/conversations" verb=GET {
       output = ["id", "donation_id", "donor_id", "interested_user_id", "last_message_at"]
     } as $conversations
   
+    var $other_user_ids {
+      value = []
+    }
+
+    foreach ($conversations) {
+      each as $conversation {
+        conditional {
+          if ($conversation.donor_id == $auth.id) {
+            var.update $other_user_ids {
+              value = $other_user_ids|push:$conversation.interested_user_id
+            }
+          }
+          else {
+            var.update $other_user_ids {
+              value = $other_user_ids|push:$conversation.donor_id
+            }
+          }
+        }
+      }
+    }
+
+    db.query user {
+      where = $db.user.id in $other_user_ids
+      return = {type: "list"}
+      output = ["id", "name"]
+    } as $other_users
+
     var $conversation_items {
       value = []
     }
-  
+
     foreach ($conversations) {
       each as $conversation {
         var $other_user_id {
           value = $conversation.donor_id
         }
-      
+
         conditional {
           if ($conversation.donor_id == $auth.id) {
             var.update $other_user_id {
@@ -77,22 +104,23 @@ query "catalog/chat/conversations" verb=GET {
             }
           }
         }
-      
-        db.get user {
-          field_name = "id"
-          field_value = $other_user_id
-          output = ["name"]
-        } as $other_user
-      
-        precondition ($other_user != null) {
-          error_type = "notfound"
-          error = "Conversa não encontrada."
+
+        var $other_user {
+          value = $other_users|find:$$.id == $other_user_id
         }
-      
+
         var $other_user_first_name {
-          value = (($other_user.name ?? "")|trim|split:" "|first)
+          value = "Usuário"
         }
-      
+
+        conditional {
+          if ($other_user != null) {
+            var.update $other_user_first_name {
+              value = (($other_user.name ?? "")|trim|split:" "|first)
+            }
+          }
+        }
+
         var.update $conversation_items {
           value = $conversation_items
             |push:```
@@ -131,6 +159,4 @@ query "catalog/chat/conversations" verb=GET {
     has_more     : $has_more
     next_page    : $next_page
   }
-
-  guid = "B1wQ7fLm4k9Vx2sH6pNc3rTy8aDe"
 }

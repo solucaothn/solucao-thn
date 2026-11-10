@@ -71,27 +71,64 @@ query "catalog/chat/messages" verb=GET {
       output = ["id", "conversation_id", "sender_id", "text", "created_at"]
     } as $messages
   
+    db.get user {
+      field_name = "id"
+      field_value = $conversation.donor_id
+      output = ["name"]
+    } as $donor_user
+
+    db.get user {
+      field_name = "id"
+      field_value = $conversation.interested_user_id
+      output = ["name"]
+    } as $interested_user
+
+    var $donor_first_name {
+      value = "Usuário"
+    }
+
+    conditional {
+      if ($donor_user != null) {
+        var.update $donor_first_name {
+          value = (($donor_user.name ?? "")|trim|split:" "|first)
+        }
+      }
+    }
+
+    var $interested_first_name {
+      value = "Usuário"
+    }
+
+    conditional {
+      if ($interested_user != null) {
+        var.update $interested_first_name {
+          value = (($interested_user.name ?? "")|trim|split:" "|first)
+        }
+      }
+    }
+
     var $messages_with_names {
       value = []
     }
-  
+
+    var $last_message_id {
+      value = null
+    }
+
     foreach ($messages) {
       each as $message {
-        db.get user {
-          field_name = "id"
-          field_value = $message.sender_id
-          output = ["name"]
-        } as $sender
-      
-        precondition ($sender != null) {
-          error_type = "notfound"
-          error = "Conversa não encontrada."
-        }
-      
         var $sender_first_name {
-          value = (($sender.name ?? "")|trim|split:" "|first)
+          value = $interested_first_name
         }
-      
+
+        conditional {
+          if ($message.sender_id == $conversation.donor_id) {
+            var.update $sender_first_name {
+              value = $donor_first_name
+            }
+          }
+        }
+
         var.update $messages_with_names {
           value = $messages_with_names
             |push:```
@@ -104,21 +141,25 @@ query "catalog/chat/messages" verb=GET {
               }
               ```
         }
+
+        var.update $last_message_id {
+          value = $message.id
+        }
       }
     }
-  
+
     var $has_more {
       value = $remaining_count > $page_limit
     }
-  
+
     var $next_after_message_id {
       value = null
     }
-  
+
     conditional {
-      if ($has_more && ($messages|count) > 0) {
+      if ($has_more && $last_message_id != null) {
         var.update $next_after_message_id {
-          value = $messages[-1].id
+          value = $last_message_id
         }
       }
     }
@@ -129,6 +170,4 @@ query "catalog/chat/messages" verb=GET {
     has_more              : $has_more
     next_after_message_id: $next_after_message_id
   }
-
-  guid = "Z4sNv9hJ3qBc7wKp1mTx6dFa8yRe"
 }

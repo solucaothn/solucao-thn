@@ -114,7 +114,7 @@ O sistema MUST listar somente conversas das quais a pessoa autenticada participa
 - **THEN** o endpoint MUST responder HTTP 401 sem retornar dados de outras pessoas
 
 ### Requirement: Limites de envio
-O sistema MUST limitar a dez mensagens por pessoa autenticada em qualquer janela móvel de 60 segundos, considerando todas as conversas dessa pessoa.
+O sistema MUST limitar a dez mensagens por pessoa autenticada em qualquer janela móvel de 60 segundos, considerando todas as conversas dessa pessoa. O limite é de melhor esforço: a contagem das mensagens recentes ocorre antes da gravação, sem isolamento serializável, e sob envios concorrentes o limite pode ser excedido por uma ou duas mensagens.
 
 #### Scenario: Envio dentro do limite
 - **WHEN** uma pessoa envia até dez mensagens em qualquer janela móvel de 60 segundos
@@ -128,6 +128,11 @@ O sistema MUST limitar a dez mensagens por pessoa autenticada em qualquer janela
 #### Scenario: Limite compartilhado entre conversas
 - **WHEN** uma pessoa envia mensagens em conversas diferentes dentro da mesma janela móvel de 60 segundos
 - **THEN** o sistema MUST contabilizar os envios conjuntamente para essa pessoa
+
+#### Scenario: Envios concorrentes perto do limite
+- **WHEN** uma pessoa envia mensagens simultâneas quando já está perto de dez mensagens na janela móvel de 60 segundos
+- **THEN** o sistema MAY aceitar até duas mensagens além do limite
+- **AND** MUST recusar com HTTP 429 os envios feitos depois que a contagem registrada atingir dez
 
 ### Requirement: Registro de eventos sem dados pessoais
 O sistema MUST registrar pela função existente somente os eventos `chat_started` e `chat_message_sent`, contendo o identificador do usuário ator, a ação e a data, sem registrar conteúdo da conversa ou outros dados pessoais.
