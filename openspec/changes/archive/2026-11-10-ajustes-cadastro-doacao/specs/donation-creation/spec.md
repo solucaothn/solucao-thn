@@ -24,11 +24,17 @@ A página `/cadastro-doacao` MUST apresentar a seta de retorno no canto superior
 ## MODIFIED Requirements
 
 ### Requirement: Legibilidade dos textos de exemplo e seleção
-A interface MUST apresentar placeholders e textos de seleção do cadastro de doação em cor preta ou cinza bem escura, legível sobre os fundos existentes, em todas as cinco etapas. O texto digitado ou colado pela pessoa nos campos de texto do cadastro MUST aparecer em cor escura opaca, no mínimo tão escura quanto o placeholder, independentemente do tema claro ou escuro do sistema operacional.
+A interface MUST apresentar os textos de exemplo dos campos de texto do cadastro de doação em cinza médio legível, equivalente a `#6B6B6B`, para que não se confundam com texto digitado. Os prompts e textos de seleção MUST usar cor preta ou cinza bem escura, em todas as cinco etapas. O texto digitado ou colado MUST aparecer em cor escura opaca, mais escura que o texto de exemplo, independentemente do tema claro ou escuro do sistema.
+
+#### Scenario: Texto de exemplo dos campos em cinza médio
+- **WHEN** o campo “Nome do item” da etapa 1 ou o campo “Descrição” da etapa 2 está vazio
+- **THEN** o texto de exemplo MUST usar cor equivalente a `#6B6B6B`, com opacidade total
+- **AND** MUST NOT herdar a cor do texto digitado nem aparecer semitransparente
 
 #### Scenario: Placeholders e prompts escuros
-- **WHEN** qualquer etapa do cadastro apresenta texto de exemplo em campo ou um prompt de seleção, incluindo “Selecione uma categoria” e “Selecione a condição”
-- **THEN** esses textos MUST usar cor escura equivalente a `#333333` ou mais escura
+- **WHEN** qualquer etapa do cadastro apresenta um prompt de seleção, incluindo “Selecione uma categoria” e “Selecione a condição”
+- **THEN** esses prompts MUST usar cor escura equivalente a `#333333` ou mais escura
+- **AND** os textos de exemplo dos campos de texto MUST seguir o cenário “Texto de exemplo dos campos em cinza médio”, e não esta regra
 - **AND** o placeholder de um Select do Radix MUST manter essa cor no elemento de conteúdo interno marcado pelo estado de placeholder, sem alterar o fundo do controle
 - **AND** a regra MUST NOT alterar a aparência das opções na lista aberta
 
@@ -48,3 +54,8 @@ A interface MUST apresentar placeholders e textos de seleção do cadastro de do
 #### Scenario: Tema escuro do sistema
 - **WHEN** o sistema operacional ou o navegador está no tema escuro e a pessoa digita num desses campos
 - **THEN** o texto MUST continuar escuro e legível sobre o fundo branco do campo
+
+#### Scenario: Placeholder volta ao apagar o texto
+- **WHEN** a pessoa digita ou cola um texto em “Nome do item” ou “Descrição” e depois apaga todo o conteúdo
+- **THEN** o campo MUST voltar a mostrar o texto de exemplo, em cor equivalente a `#6B6B6B`
+- **AND** o valor do campo guardado pelo formulário MUST ficar vazio

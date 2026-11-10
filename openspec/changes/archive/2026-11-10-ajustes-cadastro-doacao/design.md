@@ -24,7 +24,8 @@ Situação observada no código antes da mudança:
 
 **Fora do escopo:**
 - Corrigir login, cadastro de conta, recuperação de senha e busca da home.
-- Mudar a cor dos placeholders, o destino da seta ou os botões do rodapé do wizard.
+- Mudar o destino da seta ou os botões do rodapé do wizard.
+- Mudar a cor dos prompts dos Selects e das preferências de contato. Só o placeholder dos dois campos de texto muda (decisão 4).
 
 ## Decisões
 
@@ -40,18 +41,30 @@ Situação observada no código antes da mudança:
 
 Pelo código, todos estes campos usam o mesmo padrão: `color="#333333"` no componente e nenhuma regra de cor no elemento de texto. O placeholder deles é `#6b6b6b`, então o texto digitado afetado seria até mais claro que o placeholder.
 
-| Formulário | Campos (`id`) | Controlado (`DebounceInput`)? | Risco |
-|---|---|---|---|
-| Recuperação de senha, etapa de e-mail | `recovery-email` | Sim (`value` + `on_change`) | **Alto:** mesmo padrão do wizard |
-| Recuperação de senha, código e nova senha | `recovery-code`, `recovery-password`, `recovery-password-confirmation` | Não | Médio, se a hipótese 2 se confirmar |
-| Login | `login-email`, `login-password` | Não (só `on_change`) | Médio, se a hipótese 2 se confirmar |
-| Cadastro de conta | `signup-name`, `signup-email`, `signup-city`, `signup-password`, `signup-confirm-password` | Não | Médio, se a hipótese 2 se confirmar |
-| Home, busca (somente visual) | `public-home-search` | Não | Médio, se a hipótese 2 se confirmar |
+| Formulário | Campos (`id`) | Controlado (`DebounceInput`)? | Risco | Confirmado no navegador |
+|---|---|---|---|---|
+| Recuperação de senha, etapa de e-mail | `recovery-email` | Sim (`value` + `on_change`) | **Alto:** mesmo padrão do wizard | Não |
+| Recuperação de senha, código e nova senha | `recovery-code`, `recovery-password`, `recovery-password-confirmation` | Não | Médio, se a hipótese 2 se confirmar | Não |
+| Login | `login-email`, `login-password` | Não (só `on_change`) | Médio, se a hipótese 2 se confirmar | Não |
+| Cadastro de conta | `signup-name`, `signup-email`, `signup-city`, `signup-password`, `signup-confirm-password` | Não | Médio, se a hipótese 2 se confirmar | Não |
+| Home, busca (somente visual) | `public-home-search` | Não | Médio, se a hipótese 2 se confirmar | Não |
 
-A tarefa 1.2 confirma no navegador quais deles têm o problema de fato. O resultado entra nesta tabela e alimenta uma change futura.
+Resultado da tarefa 1.2: nenhum desses formulários mostrou texto claro no navegador. Não há correção pendente para eles.
+
+## Ajuste posterior: placeholder
+
+Depois da primeira verificação manual, surgiram dois pontos:
+
+- **O placeholder herda o `-webkit-text-fill-color` do campo.** Um teste em Chrome headless, com uma página estática que reproduz as regras, mediu o `::placeholder` com `color` `rgb(51, 51, 51)`, mas `-webkit-text-fill-color` `rgb(31, 31, 31)`. Essa propriedade é herdada e vence o `color` na pintura, então o placeholder era desenhado na cor do texto digitado. Com `-webkit-text-fill-color` definido no próprio `::placeholder`, a medida passou a `rgb(107, 107, 107)` nas duas propriedades.
+- **Decisão do grupo:** o placeholder dos dois campos de texto passa de `#333333` para `#6B6B6B`, igual aos outros formulários, para não parecer texto digitado. O contraste sobre branco é de cerca de 5,3:1, acima do mínimo AA (4,5:1). Os prompts dos Selects e as preferências de contato continuam `#333333`.
+
+**Decisão 4:** as regras `#donation-title::placeholder` e `#donation-description::placeholder` passam a ter `color` e `-webkit-text-fill-color` em `#6B6B6B` e `opacity: 1`.
+
+**Placeholder que não volta ao apagar:** na página estática, o placeholder volta normalmente depois de digitar e apagar, mesmo com a regra do `-webkit-text-fill-color`. Então essa regra sozinha não deixa o campo vazio. O JSX compilado do campo também está correto: com o estado vazio, `value` vira `""`. O que se confirmou é que o placeholder era pintado na cor do texto. Se o campo continuar vazio na tarefa 5.3, a suspeita restante é o `DebounceInput` com valor controlado: um valor antigo do estado chegando depois do apagamento, ou o componente sem repassar o valor vazio. Isso pede investigação com o React DevTools.
 
 ## Riscos / Trade-offs
 
 - **Causa não confirmada.** Se a causa for outra, por exemplo uma regra de `opacity` no contêiner, a regra por `id` pode não bastar. A verificação manual com DevTools (tarefas 1.1 e 3.2) detecta isso antes de concluir.
 - **Regras globais por `id`.** Elas dependem de os `id`s continuarem únicos. Hoje são, e os testes já checam esses `id`s.
-- **Diferença pequena entre placeholder e texto.** `#333333` e `#1F1F1F` ficam próximos. É uma consequência da spec atual, que exige placeholder escuro. Se o grupo quiser mais diferença, isso é outra decisão, sobre o placeholder.
+- **Diferença entre placeholder e texto.** Resolvida pela decisão 4: `#6B6B6B` no placeholder contra `#1F1F1F` no texto.
+- **Causa do campo vazio sem placeholder não reproduzida.** A correção da decisão 4 trata o efeito confirmado (placeholder com a cor do texto). Se o sintoma continuar, a tarefa 5.3 registra e a investigação segue pelo `DebounceInput`.

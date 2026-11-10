@@ -11,12 +11,13 @@ O cadastro de doação (`/cadastro-doacao`) tem dois problemas visuais relatados
 
 - A seta de retorno do cadastro de doação passa a ficar no canto superior esquerdo da área de conteúdo, logo abaixo do cabeçalho, na mesma posição nas cinco etapas e em qualquer largura de tela. O destino continua sendo a home (`/`) e o rótulo acessível continua “Voltar ao início”.
 - O texto digitado ou colado no “Nome do item” (etapa 1) e na “Descrição” (etapa 2) passa a ter cor escura legível, mais escura que o placeholder, inclusive com o tema escuro do sistema operacional.
+- O placeholder desses dois campos passa de `#333333` para `#6B6B6B`, igual aos outros formulários, para não parecer texto digitado, e volta a aparecer quando o campo é apagado. Os prompts dos Selects e as preferências de contato continuam escuros.
 - Levantamento, sem correção nesta change, dos formulários de login, cadastro de conta e recuperação de senha que usam o mesmo padrão de campo. O resultado é registrado no design para uma change futura.
 
 ## Fora do escopo
 
 - Corrigir login, cadastro de conta, recuperação de senha e a busca da home. Esses formulários só são verificados e listados.
-- Mudar o destino da seta, os botões “Voltar” e “Continuar” do rodapé do wizard, a cor dos placeholders ou o conteúdo das etapas.
+- Mudar o destino da seta, os botões “Voltar” e “Continuar” do rodapé do wizard, a cor dos prompts dos Selects ou o conteúdo das etapas.
 - Qualquer alteração no Xano (`xano/`) ou nas APIs.
 
 ## Capacidades
@@ -27,7 +28,7 @@ Nenhuma.
 
 ### Capacidades modificadas
 
-- `donation-creation`: o requisito “Legibilidade dos textos de exemplo e seleção” passa a cobrir também o texto digitado ou colado. Entra um requisito novo para a posição da seta de retorno.
+- `donation-creation`: o requisito “Legibilidade dos textos de exemplo e seleção” passa a cobrir também o texto digitado ou colado, muda o placeholder dos campos de texto para `#6B6B6B` e exige que ele volte quando o campo é apagado. Entra um requisito novo para a posição da seta de retorno.
 
 ## Impacto
 

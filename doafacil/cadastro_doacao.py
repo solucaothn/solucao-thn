@@ -1070,6 +1070,22 @@ def _wizard_content() -> rx.Component:
     )
 
 
+def _back_link() -> rx.Component:
+    # Faixa de largura total: a seta fica no canto esquerdo, logo abaixo do
+    # cabeçalho, e não acompanha a coluna centralizada do wizard.
+    return rx.box(
+        rx.link(
+            rx.icon("chevron-left", size=24),
+            href="/",
+            color="#166B3B",
+            font_weight="600",
+            aria_label="Voltar ao início",
+        ),
+        width="100%",
+        padding="0.75rem 1.25rem 0",
+    )
+
+
 def donation_creation_page() -> rx.Component:
     return rx.box(
         rx.box(
@@ -1090,19 +1106,7 @@ def donation_creation_page() -> rx.Component:
             display="flex",
             justify_content="center",
         ),
-        rx.box(
-            rx.link(
-                rx.icon("chevron-left", size=24),
-                href="/",
-                color="#166B3B",
-                font_weight="600",
-                aria_label="Voltar ao início",
-            ),
-            width="100%",
-            max_width="1000px",
-            margin="0 auto",
-            padding="0 1.25rem",
-        ),
+        _back_link(),
         rx.vstack(
             rx.cond(
                 DonationCreateState.is_loading_data,
