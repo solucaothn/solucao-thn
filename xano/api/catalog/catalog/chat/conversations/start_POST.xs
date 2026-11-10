@@ -73,18 +73,13 @@ query "catalog/chat/conversations/start" verb=POST {
               output = ["id", "donation_id", "donor_id", "interested_user_id", "last_message_at"]
             } as $existing_conversation
           
-            conditional {
-              if ($existing_conversation != null) {
-                var.update $conversation {
-                  value = $existing_conversation
-                }
-              }
-              else {
-                throw {
-                  name = $error.name
-                  value = $error.message
-                }
-              }
+            precondition ($existing_conversation != null) {
+              error_type = "notfound"
+              error = "Conversa não encontrada."
+            }
+
+            var.update $conversation {
+              value = $existing_conversation
             }
           }
         }
@@ -96,14 +91,17 @@ query "catalog/chat/conversations/start" verb=POST {
       field_value = $conversation.donor_id
       output = ["name"]
     } as $donor
-  
-    precondition ($donor != null) {
-      error_type = "notfound"
-      error = "Conversa não encontrada."
-    }
-  
+
     var $donor_first_name {
-      value = (($donor.name ?? "")|trim|split:" "|first)
+      value = "Usuário"
+    }
+
+    conditional {
+      if ($donor != null) {
+        var.update $donor_first_name {
+          value = (($donor.name ?? "")|trim|split:" "|first)
+        }
+      }
     }
   }
 
@@ -113,6 +111,4 @@ query "catalog/chat/conversations/start" verb=POST {
     last_message_at      : $conversation.last_message_at
     other_user_first_name: $donor_first_name
   }
-
-  guid = "V2gDk1mT8hRw5zYqJ4cLp9sN6bXa"
 }

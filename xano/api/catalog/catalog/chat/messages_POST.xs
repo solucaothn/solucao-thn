@@ -41,8 +41,13 @@ query "catalog/chat/messages" verb=POST {
           error = "Conversa não encontrada."
         }
       
+        var $rate_window_start {
+          value = now
+            |add_secs_to_timestamp:(-60|to_int)
+        }
+
         db.query chat_message {
-          where = ($db.chat_message.sender_id == $auth.id && $db.chat_message.created_at >= now - 60000)
+          where = ($db.chat_message.sender_id == $auth.id && $db.chat_message.created_at >= $rate_window_start)
           return = {type: "count"}
         } as $recent_message_count
       
@@ -82,14 +87,17 @@ query "catalog/chat/messages" verb=POST {
       field_value = $auth.id
       output = ["name"]
     } as $sender
-  
-    precondition ($sender != null) {
-      error_type = "notfound"
-      error = "Conversa não encontrada."
-    }
-  
+
     var $sender_first_name {
-      value = (($sender.name ?? "")|trim|split:" "|first)
+      value = "Usuário"
+    }
+
+    conditional {
+      if ($sender != null) {
+        var.update $sender_first_name {
+          value = (($sender.name ?? "")|trim|split:" "|first)
+        }
+      }
     }
   }
 
@@ -100,6 +108,4 @@ query "catalog/chat/messages" verb=POST {
     text             : $message.text
     created_at       : $message.created_at
   }
-
-  guid = "e8cZP3fY6wQa1mTk4hVn7rJx9sBd"
 }
