@@ -108,4 +108,5 @@ query "catalog/chat/messages" verb=POST {
     text             : $message.text
     created_at       : $message.created_at
   }
+  guid = "xj3dbcReD9PMSUm3CVazuR3KHzA"
 }

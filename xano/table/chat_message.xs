@@ -18,4 +18,5 @@ table chat_message {
     {type: "btree", field: [{name: "conversation_id"}, {name: "id"}]}
     {type: "btree", field: [{name: "sender_id"}, {name: "created_at", op: "desc"}]}
   ]
+  guid = "garkBTBvuO66CwyhPrmt9vWzHPs"
 }

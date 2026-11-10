@@ -111,4 +111,5 @@ query "catalog/chat/conversations/start" verb=POST {
     last_message_at      : $conversation.last_message_at
     other_user_first_name: $donor_first_name
   }
+  guid = "glP_tB6dJlsTKyRbf5SADE-yHXo"
 }
