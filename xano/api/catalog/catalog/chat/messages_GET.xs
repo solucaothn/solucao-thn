@@ -5,7 +5,7 @@ query "catalog/chat/messages" verb=GET {
   input {
     int conversation_id
     int after_message_id?
-    int limit? filters=min:1
+    int limit?
   }
 
   stack {
