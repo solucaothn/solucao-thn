@@ -3,8 +3,8 @@ query "catalog/chat/conversations" verb=GET {
   auth = "user"
 
   input {
-    int page? filters=min:1
-    int limit? filters=min:1
+    int page?
+    int limit?
   }
 
   stack {
@@ -81,11 +81,23 @@ query "catalog/chat/conversations" verb=GET {
       }
     }
 
-    db.query user {
-      where = $db.user.id in $other_user_ids
-      return = {type: "list"}
-      output = ["id", "name"]
-    } as $other_users
+    var $other_users {
+      value = []
+    }
+
+    conditional {
+      if (($other_user_ids|count) > 0) {
+        db.query user {
+          where = $db.user.id in $other_user_ids
+          return = {type: "list"}
+          output = ["id", "name"]
+        } as $found_users
+
+        var.update $other_users {
+          value = $found_users
+        }
+      }
+    }
 
     var $conversation_items {
       value = []
