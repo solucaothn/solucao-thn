@@ -189,4 +189,32 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo não fazem parte dos dados aprovados para exibição. Bairro, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade. Avaliações, histórico de doações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que mostra "O chat ainda não está disponível.". O botão Acessar perfil do doador continua oculto porque o perfil público não foi implementado, e não é apresentado como “Em breve”.
+Cor, Material e Tipo não fazem parte dos dados aprovados para exibição. Bairro, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade. Avaliações, histórico de doações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O botão Acessar perfil do doador continua oculto porque o perfil público não foi implementado, e não é apresentado como “Em breve”.
+## Chat
+
+### Frame `chat-1` do Figma — página `/chat`
+
+A referência é o frame `chat-1` do arquivo do Figma (ainda sem PNG em `docs/design`). Esta seção prevalece sobre o frame.
+
+O que segue o Figma:
+
+- Cabeçalho branco com o logotipo centralizado e “← Voltar ao início” (link para `/`) alinhado à esquerda na mesma linha, sem faixa própria. Em telas estreitas aparece só a seta, com o rótulo acessível “Voltar ao início”.
+- Fundo creme na área das mensagens, com 24 px de espaço lateral para as bolhas não encostarem nas bordas; a lista usa 16 px de espaço lateral no título “Conversas” e nos itens.
+- Lista de conversas à esquerda (cerca de 280 px, fundo branco, itens com divisória clara) e conversa à direita, separadas por uma linha verde `#18A566`.
+- Cabeçalho da conversa com cerca de 52 px, fundo branco, texto centralizado e linha verde embaixo.
+- Bolhas com largura máxima de 450 px, `padding` de 10 px, cantos de 8 px, sombra leve e texto em negrito: as da própria pessoa à direita, as da outra pessoa à esquerda.
+- Separador de dia em forma de pílula (“Hoje”, “Ontem” ou dd/mm/aaaa).
+- Campo “Digite aqui...” com fundo branco, borda `#18A566` e cantos de 4 px.
+
+Diferenças aprovadas em relação ao Figma:
+
+- **Sem foto e sem “Online”:** cada pessoa aparece com um círculo verde `#00A859` com a inicial do primeiro nome. Não há indicador de presença.
+- **Título da doação:** na lista, abaixo do primeiro nome, e no cabeçalho da conversa, no lugar da prévia da última mensagem (que o backend não fornece) e do “Online”.
+- **Botão “Enviar”** ao lado do campo; Enter também envia. O ícone de imagem do frame (anexar fotos) não foi implementado: o chat só aceita texto.
+- **Cores com contraste AA:** o Figma usa texto branco sobre cinza `#CDD2DF` e sobre verde `#32C470`, o que fica abaixo do contraste mínimo. As bolhas recebidas usam fundo `#E9ECEF` com texto `#1F1F1F`; as enviadas, `#007A42` (o verde dos botões primários) com texto branco. A pílula do dia também usa `#007A42`.
+- **Tamanhos de texto legíveis:** o frame usa 8 px no subtítulo da lista e no placeholder; aqui são 0,75 rem e o tamanho padrão do campo. O placeholder usa `#6B6B6B`, como nos outros formulários.
+- **Controles acrescentados:** “Conversas” com o botão “Atualizar conversas” no topo da lista, “Carregar mais conversas”, “Carregar anteriores” no topo das mensagens, “Tentar novamente” em erro e, em telas estreitas, “Voltar às conversas”.
+- **Telas estreitas:** a lista e a conversa aparecem uma de cada vez.
+- **Textos neutros:** “Você ainda não tem conversas.”, “Escolha uma conversa para ver as mensagens.” e “Ainda não há mensagens. Escreva a primeira.”. As mensagens do mockup não são usadas.
+- **Somente leitura:** numa doação concluída, o campo e o botão ficam desativados, com o aviso “Esta doação foi concluída. A conversa fica disponível somente para leitura.”.
+- **Animação:** o conteúdo principal usa `page-fade-enter`, que respeita `prefers-reduced-motion`; o cabeçalho e as mensagens carregadas depois não ganham animação própria.

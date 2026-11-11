@@ -8,7 +8,8 @@ from unittest.mock import patch
 import httpx
 
 from doafacil.detalhe_doacao import (
-    CHAT_UNAVAILABLE_MESSAGE,
+    CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE,
+    CHAT_START_ERROR_MESSAGE,
     DONATION_DETAIL_ERROR_MESSAGE,
     DONATION_NOT_FOUND_MESSAGE,
     DONOR_CHAT_PREFERENCE_MESSAGE,
@@ -279,12 +280,110 @@ class DonationDetailTests(unittest.TestCase):
                 self.assertFalse(hasattr(state, "email"))
                 self.assertFalse(hasattr(state, "owner_id"))
 
-    def test_chat_button_handler_sets_message_without_navigation(self) -> None:
-        state = _contact_state(auth_token="private-token")
-        result = DonationDetailState.show_chat_unavailable.fn(state)
+    def test_chat_button_without_session_redirects_without_request(self) -> None:
+        state = _chat_state(auth_token="")
+        with (
+            patch("doafacil.detalhe_doacao.rx.redirect", return_value="login-redirect") as redirect,
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient") as async_client,
+        ):
+            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+        self.assertEqual(result, "login-redirect")
+        redirect.assert_called_once_with("/login")
+        async_client.assert_not_called()
 
+    def test_chat_button_starts_conversation_and_opens_chat(self) -> None:
+        requests: list[httpx.Request] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(
+                200,
+                json={
+                    "conversation_id": 77,
+                    "donation_id": 42,
+                    "last_message_at": 1762800000000,
+                    "other_user_first_name": "Ana",
+                    "donation_title": "Carrinho de brinquedo",
+                    "donation_status": "disponível",
+                },
+                request=request,
+            )
+
+        state = _chat_state(auth_token="private-token")
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+            patch("doafacil.detalhe_doacao.rx.redirect", return_value="chat-redirect") as redirect,
+        ):
+            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+
+        self.assertEqual(result, "chat-redirect")
+        redirect.assert_called_once_with("/chat?conversa=77")
+        self.assertEqual(requests[0].url.path, "/api:catalog/catalog/chat/conversations/start")
+        self.assertEqual(requests[0].headers["Authorization"], "Bearer private-token")
+        self.assertEqual(requests[0].read(), b'{"donation_id":42}')
+        self.assertFalse(state.is_starting_chat)
+
+    def test_chat_button_errors_show_messages_without_navigation(self) -> None:
+        cases = [
+            (404, {"code": "ERROR_CODE_NOT_FOUND", "message": "Conversa não encontrada."}, CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE, False),
+            (500, {"message": "x"}, CHAT_START_ERROR_MESSAGE, True),
+        ]
+        for status, body, expected, is_error in cases:
+            with self.subTest(status=status):
+                state = _chat_state(auth_token="private-token")
+                client = httpx.AsyncClient(
+                    transport=httpx.MockTransport(
+                        lambda request, s=status, b=body: httpx.Response(s, json=b, request=request)
+                    )
+                )
+                with (
+                    patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+                    patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+                    patch("doafacil.detalhe_doacao.rx.redirect") as redirect,
+                ):
+                    result = asyncio.run(DonationDetailState.start_chat.fn(state))
+                self.assertIsNone(result)
+                redirect.assert_not_called()
+                self.assertEqual(state.contact_message, expected)
+                self.assertIs(state.contact_message_is_error, is_error)
+
+    def test_chat_button_network_error_and_401(self) -> None:
+        def fail(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("sem rede", request=request)
+
+        state = _chat_state(auth_token="private-token")
+        client = httpx.AsyncClient(transport=httpx.MockTransport(fail))
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+        ):
+            result = asyncio.run(DonationDetailState.start_chat.fn(state))
         self.assertIsNone(result)
-        self.assertEqual(state.contact_message, CHAT_UNAVAILABLE_MESSAGE)
+        self.assertEqual(state.contact_message, CHAT_START_ERROR_MESSAGE)
+
+        state = _chat_state(auth_token="expired-token")
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(401, json={"message": "x"}, request=request)
+            )
+        )
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+            patch("doafacil.detalhe_doacao.rx.redirect", return_value="login-redirect"),
+        ):
+            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+        self.assertEqual(result, "login-redirect")
+        self.assertEqual(state.auth_token, "")
+        self.assertEqual(state.account_name, "")
+
+    def test_chat_button_is_wired_and_disabled_while_starting(self) -> None:
+        rendered = str(donation_detail_page())
+        self.assertIn("start_chat", rendered)
+        self.assertIn("is_starting_chat", rendered)
+        self.assertNotIn("show_chat_unavailable", rendered)
 
     def test_parser_keeps_only_public_fields_and_deduplicates_photos(self) -> None:
         detail = _parse_donation_detail(DETAIL_PAYLOAD, expected_id=42)
@@ -677,6 +776,17 @@ def _contact_state(
         auth_token=auth_token,
         contact_message="",
         contact_message_is_error=False,
+    )
+
+
+def _chat_state(*, auth_token: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        donation_id=42,
+        auth_token=auth_token,
+        account_name="Bia" if auth_token else "",
+        contact_message="",
+        contact_message_is_error=False,
+        is_starting_chat=False,
     )
 
 

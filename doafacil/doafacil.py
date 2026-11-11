@@ -8,6 +8,7 @@ import httpx
 import reflex as rx
 
 from doafacil.cadastro import signup_page
+from doafacil.chat import ChatState, chat_page
 from doafacil.cadastro_doacao import (
     DonationCreateState,
     donation_creation_page,
@@ -947,6 +948,25 @@ def index() -> rx.Component:
                         rx.cond(
                             LoginState.auth_token,
                             rx.hstack(
+                                # Entrada no chat; no celular, só o ícone.
+                                rx.link(
+                                    rx.hstack(
+                                        rx.icon("message-circle", size=18),
+                                        rx.text(
+                                            "Mensagens",
+                                            display=rx.breakpoints(
+                                                initial="none", md="inline"
+                                            ),
+                                        ),
+                                        spacing="1",
+                                        align="center",
+                                    ),
+                                    href="/chat",
+                                    aria_label="Mensagens",
+                                    color="#168447",
+                                    font_weight="700",
+                                    white_space="nowrap",
+                                ),
                                 rx.text(
                                     "Olá, ",
                                     LoginState.account_name,
@@ -1120,6 +1140,10 @@ app = rx.App(
             "color": "#6b6b6b",
             "opacity": "1",
         },
+        "#chat-message-input::placeholder": {
+            "color": "#6b6b6b",
+            "opacity": "1",
+        },
         "#login-email::placeholder": {
             "color": "#6b6b6b",
             "opacity": "1",
@@ -1249,4 +1273,9 @@ app.add_page(
     donation_detail_page,
     route="/doacao/[id]",
     on_load=DonationDetailState.load_donation,
+)
+app.add_page(
+    chat_page,
+    route="/chat",
+    on_load=ChatState.load_chat,
 )

@@ -62,7 +62,7 @@ python -m unittest discover -s tests -v
 
 ## 5. Estrutura do repositório
 
-- `doafacil/`: código do frontend (`doafacil.py`, `login.py`, `cadastro.py`, `cadastro_doacao.py`, `recuperacao_senha.py`).
+- `doafacil/`: código do frontend (`doafacil.py`, `login.py`, `cadastro.py`, `cadastro_doacao.py`, `recuperacao_senha.py`, `detalhe_doacao.py`, `chat.py`).
 - `assets/`: CSS de animação, logo, imagens e favicon.
 - `tests/`: testes com `unittest`.
 - `docs/`: visão geral, modelo de domínio, este guia e `design/` (telas em PNG + README).
@@ -78,12 +78,12 @@ python -m unittest discover -s tests -v
 - Animação de entrada nas páginas.
 - Recuperação de senha por código: API no Xano e as três telas (`/recuperar-senha`, `/verificar-email`, `/nova-senha`).
 - Cadastro de doação em 5 etapas (`/cadastro-doacao`) e endpoint `catalog/donations/publish`.
+- Chat da doação: página `/chat` (lista de conversas e mensagens), botão “Chat” no detalhe da doação e link “Mensagens” no cabeçalho logado da home. Veja “Chat da doação” na seção 8.
 
 ## 7. O que ainda falta
 
 - Explorar Doações (ainda sem design).
 - Detalhe da doação e Minhas doações.
-- Interface do chat (o backend já existe; veja “Chat da doação” na seção 8).
 - **Pendência:** `DELETE /catalog/donations` apaga mensagens, conversas e a doação, mas não as linhas de `donation_photo` dessa doação. As fotos ficam órfãs no banco. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
 - Páginas "Como funciona" e "Categorias".
@@ -137,7 +137,7 @@ O endpoint `publish` foi criado por outro integrante e pode ter outros consumido
 
 ### Chat da doação (backend)
 
-O chat entre quem doa e quem tem interesse existe só no Xano. A interface ainda não foi feita e não faz parte desta change.
+O chat entre quem doa e quem tem interesse tem o backend no Xano (abaixo) e a tela em `/chat` (veja “Tela do chat” no fim desta seção).
 
 Tabelas:
 
@@ -172,6 +172,34 @@ Regras:
 > **Atenção ao limite da plataforma:** o plano gratuito do Xano limita a **instância inteira** a 10 requisições a cada 20 segundos, somando todos os endpoints e todas as pessoas. Acima disso, o próprio Xano responde HTTP 429 com uma mensagem diferente da do chat. Telas com atualização automática (por exemplo, buscar mensagens novas) precisam de intervalo longo entre as consultas, senão derrubam o resto do site.
 
 Publicar mudanças no chat segue a seção 11: validar no MCP, dry-run revisado, aviso ao grupo e só então o push.
+
+#### Tela do chat
+
+O código fica em `doafacil/chat.py`: cliente dos endpoints, `ChatState` e a página `/chat`. Os testes estão em `tests/test_chat.py`, com respostas simuladas no formato real dos endpoints.
+
+Como se entra no chat:
+
+- **Quem tem interesse:** clica em “Chat” no detalhe da doação. O botão inicia a conversa (ou reabre a que já existe) e abre `/chat?conversa=<id>`. Se a doação não aceitar conversa, inclusive quando é a própria pessoa que doou, aparece a mensagem neutra “Não é possível conversar sobre esta doação pelo chat.”.
+- **Quem doa:** usa o link “Mensagens” no cabeçalho logado da home (no celular, só o ícone).
+- **Sem login:** `/chat` e o botão “Chat” levam ao `/login`. Uma sessão recusada pelo Xano (401) também é limpa e leva ao `/login`.
+
+Atualização automática:
+
+- **Quando roda:** só com uma conversa aberta e a aba visível, a cada 15 segundos. Pede só as mensagens novas (`after_message_id`). Com a aba oculta, sem conversa aberta ou fora de `/chat`, não há consultas.
+- **Depois de um 429:** qualquer 429 numa consulta automática pausa as consultas por 60 segundos, sem mostrar erro.
+- **Lista de conversas:** não se atualiza sozinha; recarrega ao abrir `/chat` ou pelo botão “Atualizar conversas”.
+- **Carga no Xano:** cerca de 4 requisições por minuto por aba com conversa aberta. Não aumente esse intervalo para menos de 15 segundos (limite da plataforma acima).
+
+Textos de erro do envio:
+
+| Situação | Texto |
+|---|---|
+| 429 do chat (mensagem “Limite de mensagens atingido…”) | “Você enviou muitas mensagens em pouco tempo. Aguarde um minuto.” |
+| 429 da plataforma (`ERROR_CODE_TOO_MANY_REQUESTS` com outra mensagem) | “O site está com muitos acessos agora. Tente de novo em instantes.” |
+| 400 | “A mensagem precisa ter entre 1 e 1000 caracteres.” |
+| 404 | “Não foi possível enviar. Esta conversa não está mais disponível para novas mensagens.” (a conversa passa a somente leitura) |
+
+Em todos os casos o texto digitado continua no campo. Numa doação concluída, o campo e o botão “Enviar” ficam desativados, com aviso de somente leitura. O texto das mensagens é sempre mostrado como texto simples, nunca como HTML.
 
 #### Testar o chat contra o Xano real
 

@@ -124,7 +124,7 @@ As pausas para o limite da plataforma continuam.
    - **Bolhas da outra pessoa:** à esquerda, em `#E9ECEF`, com texto `#1F1F1F`.
    - **Cores do Figma:** o texto branco sobre cinza-claro e sobre verde-claro do Figma não atinge o contraste AA. A diferença fica registrada no README de design.
    - **Separadores de dia:** com fuso fixo UTC−3. O Brasil não tem horário de verão desde 2019, e isso evita a dependência `tzdata`.
-   - **Fundo e layout:** fundo creme na área de mensagens; cabeçalho branco com logo; seta “Voltar ao início” como no cadastro de doação.
+   - **Fundo e layout:** fundo creme na área de mensagens; cabeçalho branco com logo e “← Voltar ao início” à esquerda na mesma linha, como no frame `chat-1` (sem faixa própria; em telas estreitas só a seta, com rótulo acessível); 24 px de espaço lateral na área de mensagens e 16 px na lista.
 10. **Layout responsivo.** Em `md` ou mais: lista de 280 px e conversa ao lado. Abaixo disso, o estado `mobile_view` mostra a lista ou a conversa, com “Voltar às conversas”.
 11. **Botão “Chat” do detalhe.** O `DonationDetailState.start_chat` substitui `show_chat_unavailable`:
     - sem token, vai para `/login`;
