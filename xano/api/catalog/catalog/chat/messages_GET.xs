@@ -7,9 +7,16 @@ query "catalog/chat/messages" verb=GET {
     int after_message_id?
     int before_message_id?
     int limit?
+    int edited_since?
   }
 
   stack {
+    // Horário do servidor no início da consulta; o frontend o devolve como
+    // edited_since na consulta seguinte (o relógio do navegador não entra).
+    var $server_time {
+      value = now
+    }
+  
     precondition ($input.after_message_id == null || $input.before_message_id == null) {
       error_type = "inputerror"
       error = "Informe somente um cursor de mensagens."
@@ -86,6 +93,11 @@ query "catalog/chat/messages" verb=GET {
       value = []
     }
   
+    // Mensagens já exibidas que foram editadas desde a consulta anterior.
+    var $edited_raw {
+      value = []
+    }
+  
     conditional {
       if ($input.after_message_id != null) {
         // Mensagens novas (atualização automática), em ordem crescente.
@@ -102,7 +114,14 @@ query "catalog/chat/messages" verb=GET {
             paging: {page: 1, per_page: $page_limit, metadata: false}
           }
         
-          output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+          output = [
+            "id"
+            "conversation_id"
+            "sender_id"
+            "text"
+            "created_at"
+            "edited_at"
+          ]
         } as $newer_messages
       
         var.update $messages {
@@ -111,6 +130,38 @@ query "catalog/chat/messages" verb=GET {
       
         var.update $has_newer {
           value = $newer_count > $page_limit
+        }
+      
+        // Edições das mensagens até after_message_id desde edited_since, com
+        // 5 s de folga (repetições são substituídas pelo id no frontend).
+        conditional {
+          if ($input.edited_since != null) {
+            var $edited_floor {
+              value = $input.edited_since - 5000
+            }
+          
+            db.query chat_message {
+              where = ($db.chat_message.conversation_id == $conversation.id && $db.chat_message.id <= $input.after_message_id && $db.chat_message.edited_at >= $edited_floor)
+              sort = {id: "asc"}
+              return = {
+                type  : "list"
+                paging: {page: 1, per_page: 100, metadata: false}
+              }
+            
+              output = [
+                "id"
+                "conversation_id"
+                "sender_id"
+                "text"
+                "created_at"
+                "edited_at"
+              ]
+            } as $edited_since_messages
+          
+            var.update $edited_raw {
+              value = $edited_since_messages
+            }
+          }
         }
       }
     
@@ -132,7 +183,14 @@ query "catalog/chat/messages" verb=GET {
                 paging: {page: 1, per_page: $page_limit, metadata: false}
               }
             
-              output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+              output = [
+                "id"
+                "conversation_id"
+                "sender_id"
+                "text"
+                "created_at"
+                "edited_at"
+              ]
             } as $latest_messages
           
             var.update $recent_messages {
@@ -149,7 +207,14 @@ query "catalog/chat/messages" verb=GET {
                 paging: {page: 1, per_page: $page_limit, metadata: false}
               }
             
-              output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+              output = [
+                "id"
+                "conversation_id"
+                "sender_id"
+                "text"
+                "created_at"
+                "edited_at"
+              ]
             } as $previous_messages
           
             var.update $recent_messages {
@@ -222,6 +287,20 @@ query "catalog/chat/messages" verb=GET {
       }
     }
   
+    // "Visto": última mensagem lida pela OUTRA pessoa (decisão aprovada pelo
+    // Higor na chat-visto-edicao). Só esse id, sem horário da leitura.
+    var $other_last_read_message_id {
+      value = $conversation.donor_last_read_message_id ?? 0
+    }
+  
+    conditional {
+      if ($conversation.donor_id == $auth.id) {
+        var.update $other_last_read_message_id {
+          value = $conversation.interested_last_read_message_id ?? 0
+        }
+      }
+    }
+  
     db.get user {
       field_name = "id"
       field_value = $conversation.donor_id
@@ -290,7 +369,48 @@ query "catalog/chat/messages" verb=GET {
                 sender_first_name: $sender_first_name,
                 sent_by_me: $sent_by_me,
                 text: $message.text,
-                created_at: $message.created_at
+                created_at: $message.created_at,
+                edited_at: $message.edited_at
+              }
+              ```
+        }
+      }
+    }
+  
+    // Mesmo formato para as editadas (laço igual ao de cima).
+    var $edited_with_names {
+      value = []
+    }
+  
+    foreach ($edited_raw) {
+      each as $edited_message {
+        var $edited_sender_first_name {
+          value = $interested_first_name
+        }
+      
+        conditional {
+          if ($edited_message.sender_id == $conversation.donor_id) {
+            var.update $edited_sender_first_name {
+              value = $donor_first_name
+            }
+          }
+        }
+      
+        var $edited_sent_by_me {
+          value = $edited_message.sender_id == $auth.id
+        }
+      
+        var.update $edited_with_names {
+          value = $edited_with_names
+            |push:```
+              {
+                id: $edited_message.id,
+                conversation_id: $edited_message.conversation_id,
+                sender_first_name: $edited_sender_first_name,
+                sent_by_me: $edited_sent_by_me,
+                text: $edited_message.text,
+                created_at: $edited_message.created_at,
+                edited_at: $edited_message.edited_at
               }
               ```
         }
@@ -299,11 +419,14 @@ query "catalog/chat/messages" verb=GET {
   }
 
   response = {
-    messages       : $messages_with_names
-    donation_title : $donation.title
-    donation_status: $donation.status
-    has_older      : $has_older
-    has_newer      : $has_newer
+    messages                  : $messages_with_names
+    donation_title            : $donation.title
+    donation_status           : $donation.status
+    has_older                 : $has_older
+    has_newer                 : $has_newer
+    other_last_read_message_id: $other_last_read_message_id
+    edited_messages           : $edited_with_names
+    server_time               : $server_time
   }
 
   guid = "_vyIXcGn_BV6HB8-w8xgjvBdiAw"

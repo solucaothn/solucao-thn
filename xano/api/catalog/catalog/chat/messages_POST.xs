@@ -63,7 +63,14 @@ query "catalog/chat/messages" verb=POST {
             text           : $input.message_text
           }
         
-          output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+          output = [
+            "id"
+            "conversation_id"
+            "sender_id"
+            "text"
+            "created_at"
+            "edited_at"
+          ]
         } as $message
       
         db.edit chat_conversation {
@@ -104,6 +111,7 @@ query "catalog/chat/messages" verb=POST {
     sent_by_me       : true
     text             : $message.text
     created_at       : $message.created_at
+    edited_at        : $message.edited_at
   }
 
   guid = "xj3dbcReD9PMSUm3CVazuR3KHzA"

@@ -12,6 +12,8 @@ grava nada em arquivo e não imprime tokens, e-mails nem corpos de resposta.
 
 Atenção: o script cria dados reais (conversa e mensagens) na doação informada.
 A paginação (8c-8h) usa as mensagens já criadas pela própria execução.
+Os cenários de “visto” e edição (VE1-VE11) também rodam nos dois modos; o VE11
+(fora do prazo) só roda se houver mensagem própria com mais de 15 minutos.
 Os cenários de não lidas (NL1-NL8) rodam nos dois modos, inclusive no rápido
 (TESTE_CHAT_RAPIDO=1); o unread_total é comparado com uma base medida antes
 dos envios, porque soma todas as conversas da conta.
@@ -290,9 +292,19 @@ def main() -> None:
                 headers=conta.headers if conta else {},
             )
 
+        def editar(conta: Conta | None, message_id: int, texto: str) -> httpx.Response:
+            # Sem conta: chamada sem token, para o cenário do 401.
+            time.sleep(PAUSA_SEGUNDOS)
+            return cliente.patch(
+                f"{api}/catalog/chat/messages",
+                json={"message_id": message_id, "message_text": texto},
+                headers=conta.headers if conta else {},
+            )
+
         if rapido:
             modo_rapido(
-                iniciar, enviar, ler_com, lista_de_mensagens, listar, total, dona, interessada
+                iniciar, enviar, ler_com, lista_de_mensagens, listar, total, editar,
+                dona, interessada, proibidos,
             )
             return
 
@@ -477,6 +489,11 @@ def main() -> None:
             conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, listar, total
         )
 
+        # VE. "Visto" e edição (também antes do cenário 8).
+        cenarios_visto_edicao(
+            conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, editar, proibidos
+        )
+
         # 5. Não participante tenta ler e enviar.
         r = ler(estranha, conversa_id)
         registrar("5a. Não participante lê a conversa → 404", r.status_code == 404, f"HTTP {r.status_code}", r)
@@ -505,7 +522,7 @@ def main() -> None:
         # 8. Rate limit: envia até o primeiro 429.
         print(
             f"\nCenário 8: enviando mensagens a cada {PAUSA_RATE_LIMIT_SEGUNDOS} s "
-            "(envios aceitos antes nesta execução: até 6)..."
+            "(envios aceitos antes nesta execução: até 7)..."
         )
         primeiro_429 = None
         r = None
@@ -669,6 +686,8 @@ def main() -> None:
             registrar("9a. Dona marca a doação como reservada → 200", r.status_code == 200, f"HTTP {r.status_code}", r)
             r = enviar(interessada, conversa_id, "Mensagem com a doação reservada")
             registrar("9b. Interessada envia com a doação reservada → 200", r.status_code == 200, f"HTTP {r.status_code}", r)
+            d = json_ou_none(r)
+            reservada_id = d.get("id") if isinstance(d, dict) else None
 
             r = mudar_status("concluída")
             registrar("9c. Dona marca a doação como concluída → 200", r.status_code == 200, f"HTTP {r.status_code}", r)
@@ -682,6 +701,17 @@ def main() -> None:
                 f"HTTP {r.status_code}, status concluída: {'sim' if concluida else 'não'}",
                 r,
             )
+            # 9f. Mensagem própria recente (9b), mas com a doação concluída.
+            if isinstance(reservada_id, int):
+                r = editar(interessada, reservada_id, "Edição com a doação concluída")
+                registrar(
+                    "9f. Interessada edita mensagem própria com a doação concluída → 404",
+                    r.status_code == 404,
+                    f"HTTP {r.status_code}",
+                    r,
+                )
+            else:
+                print("Cenário 9f pulado: o envio da 9b não devolveu id.")
 
         # 10. (Opcional) Dona apaga a doação; a conversa some para a interessada.
         resposta = input("\nApagar a doação de teste agora? (s/N) ").strip().lower()
@@ -855,10 +885,185 @@ def cenarios_nao_lidas(
     registrar("NL8. unread_total sem token → 401", r.status_code == 401, f"HTTP {r.status_code}", r)
 
 
-def modo_rapido(
-    iniciar, enviar, ler_com, lista_de_mensagens, listar, total, dona, interessada
+def _sem_edicao(valor: object) -> bool:
+    return valor is None or valor == 0
+
+
+def cenarios_visto_edicao(
+    conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, editar, proibidos
 ) -> None:
-    """Checagem rápida: 2a, 3, 3c, duas leituras e não lidas, sem status nem exclusão.
+    """“Visto” e edição (chat-visto-edicao).
+
+    Imprime só status HTTP, ids e sim/não; nunca textos de mensagens.
+    """
+    print("\n--- Visto e edição ---")
+    texto_original = "Teste de visto e edição"
+    texto_novo = "Teste de visto e edição (corrigido)"
+
+    # VE1. Envio novo da interessada: edited_at vazio.
+    r = enviar(interessada, conversa_id, texto_original)
+    d = json_ou_none(r)
+    mensagem_id = d.get("id") if isinstance(d, dict) else None
+    criada_em = d.get("created_at") if isinstance(d, dict) else None
+    registrar(
+        "VE1. Envio devolve edited_at vazio",
+        r.status_code == 200 and isinstance(mensagem_id, int) and isinstance(d, dict)
+        and "edited_at" in d and _sem_edicao(d.get("edited_at")),
+        f"HTTP {r.status_code}",
+        r,
+    )
+    if not isinstance(mensagem_id, int):
+        return
+
+    # VE2. A interessada lê antes da dona: ✓ (a outra pessoa ainda não leu).
+    r = ler_com(interessada, conversa_id, limit=100)
+    d = json_ou_none(r)
+    outra_leu = d.get("other_last_read_message_id") if isinstance(d, dict) else None
+    campos_ok = (
+        isinstance(d, dict)
+        and isinstance(outra_leu, int)
+        and isinstance(d.get("server_time"), int)
+        and d.get("edited_messages") == []
+    )
+    registrar(
+        "VE2. Antes da dona ler: other_last_read_message_id < mensagem (✓)",
+        r.status_code == 200 and campos_ok and outra_leu < mensagem_id,
+        f"HTTP {r.status_code}, campos novos: {'sim' if campos_ok else 'não'}, "
+        f"lida pela dona: {'sim' if isinstance(outra_leu, int) and outra_leu >= mensagem_id else 'não'}",
+        r,
+    )
+    lista_interessada = lista_de_mensagens(r)
+    tempo_servidor = d.get("server_time") if isinstance(d, dict) else None
+
+    # VE3. A dona lê; depois a interessada vê ✓✓.
+    rd = ler_com(dona, conversa_id, limit=100)
+    dd = json_ou_none(rd)
+    tempo_dona = dd.get("server_time") if isinstance(dd, dict) else None
+    ids_dona = [m.get("id") for m in lista_de_mensagens(rd)]
+    ultimo_dona = ids_dona[-1] if ids_dona else None
+    r = ler_com(interessada, conversa_id, after_message_id=mensagem_id)
+    d = json_ou_none(r)
+    outra_leu = d.get("other_last_read_message_id") if isinstance(d, dict) else None
+    registrar(
+        "VE3. Depois da dona ler: other_last_read_message_id ≥ mensagem (✓✓), também com after_message_id",
+        rd.status_code == 200 and r.status_code == 200 and isinstance(outra_leu, int) and outra_leu >= mensagem_id,
+        f"HTTP {rd.status_code} / {r.status_code}",
+        r,
+    )
+
+    # VE4. A interessada edita a própria mensagem.
+    r = editar(interessada, mensagem_id, texto_novo)
+    d = json_ou_none(r)
+    editada_em = d.get("edited_at") if isinstance(d, dict) else None
+    edicao_ok = (
+        isinstance(d, dict)
+        and d.get("id") == mensagem_id
+        and d.get("text") == texto_novo
+        and d.get("sent_by_me") is True
+        and d.get("created_at") == criada_em
+        and isinstance(editada_em, int)
+        and editada_em > 0
+        and "sender_id" not in d
+    )
+    vazamento = vaza_dados(r, proibidos) if r.status_code == 200 else None
+    registrar(
+        "VE4. Interessada edita mensagem própria → 200 com edited_at, sem '@' nem sobrenome",
+        r.status_code == 200 and edicao_ok and vazamento is None,
+        f"HTTP {r.status_code}, formato: {'ok' if edicao_ok else 'inesperado'}"
+        + (f", {vazamento}" if vazamento else ""),
+        r,
+    )
+
+    # VE5. A dona recebe a edição na consulta automática (after + edited_since).
+    if isinstance(ultimo_dona, int) and isinstance(tempo_dona, int):
+        r = ler_com(dona, conversa_id, after_message_id=ultimo_dona, edited_since=tempo_dona)
+        d = json_ou_none(r)
+        editadas = d.get("edited_messages") if isinstance(d, dict) else None
+        item = next(
+            (m for m in editadas or [] if isinstance(m, dict) and m.get("id") == mensagem_id), None
+        )
+        recebeu = (
+            isinstance(item, dict)
+            and item.get("text") == texto_novo
+            and isinstance(item.get("edited_at"), int)
+            and item.get("sent_by_me") is False
+        )
+        registrar(
+            "VE5. Dona recebe a edição em edited_messages (after_message_id + edited_since)",
+            r.status_code == 200 and recebeu,
+            f"HTTP {r.status_code}, recebeu a edição: {'sim' if recebeu else 'não'}",
+            r,
+        )
+
+        # VE6. Sem edited_since, edited_messages vem vazia.
+        r = ler_com(dona, conversa_id, after_message_id=ultimo_dona)
+        d = json_ou_none(r)
+        registrar(
+            "VE6. Sem edited_since → edited_messages vazia",
+            r.status_code == 200 and isinstance(d, dict) and d.get("edited_messages") == [],
+            f"HTTP {r.status_code}",
+            r,
+        )
+    else:
+        print("Cenários VE5 e VE6 pulados: a leitura da dona não trouxe id ou server_time.")
+
+    # VE7. Texto igual: 200 sem mudar edited_at.
+    r = editar(interessada, mensagem_id, texto_novo)
+    d = json_ou_none(r)
+    registrar(
+        "VE7. Texto igual → 200 sem mudar edited_at",
+        r.status_code == 200 and isinstance(d, dict) and d.get("edited_at") == editada_em,
+        f"HTTP {r.status_code}, edited_at igual: "
+        f"{'sim' if isinstance(d, dict) and d.get('edited_at') == editada_em else 'não'}",
+        r,
+    )
+
+    # VE8. Mensagem de outra pessoa ou inexistente: 404 genérico.
+    r = editar(dona, mensagem_id, "Tentativa da dona")
+    registrar("VE8a. Dona edita mensagem da interessada → 404", r.status_code == 404, f"HTTP {r.status_code}", r)
+    r = editar(interessada, mensagem_id + 100_000_000, "Mensagem inexistente")
+    registrar("VE8b. Editar id inexistente → 404", r.status_code == 404, f"HTTP {r.status_code}", r)
+
+    # VE9. Tamanho inválido: 400, sem alterar.
+    r = editar(interessada, mensagem_id, "   ")
+    registrar("VE9a. Texto novo vazio → 400", r.status_code == 400, f"HTTP {r.status_code}", r)
+    r = editar(interessada, mensagem_id, "a" * 1001)
+    registrar("VE9b. Texto novo com 1001 caracteres → 400", r.status_code == 400, f"HTTP {r.status_code}", r)
+
+    # VE10. Sem token.
+    r = editar(None, mensagem_id, "Sem token")
+    registrar("VE10. Edição sem token → 401", r.status_code == 401, f"HTTP {r.status_code}", r)
+
+    # VE11. Fora do prazo: mensagem própria com mais de 15 min (de execução anterior).
+    antiga = None
+    if isinstance(tempo_servidor, int):
+        limite = tempo_servidor - (15 * 60 + 60) * 1000
+        antiga = next(
+            (
+                m.get("id")
+                for m in lista_interessada
+                if m.get("sent_by_me") is True
+                and isinstance(m.get("created_at"), int)
+                and m["created_at"] < limite
+            ),
+            None,
+        )
+    if antiga is None:
+        print(
+            "Cenário VE11 pulado: nenhuma mensagem própria com mais de 15 minutos nas "
+            "últimas 100 da conversa (rode de novo mais tarde com a mesma doação)."
+        )
+    else:
+        r = editar(interessada, antiga, "Edição fora do prazo")
+        registrar("VE11. Edição fora do prazo de 15 minutos → 400", r.status_code == 400, f"HTTP {r.status_code}", r)
+
+
+def modo_rapido(
+    iniciar, enviar, ler_com, lista_de_mensagens, listar, total, editar,
+    dona, interessada, proibidos,
+) -> None:
+    """Checagem rápida: 2a, 3, 3c, duas leituras, não lidas, visto e edição,
+    sem status nem exclusão.
 
     Imprime só status HTTP e tamanho da lista.
     Pode ser repetido com a mesma doação (respeitando 1 minuto entre execuções).
@@ -894,6 +1099,9 @@ def modo_rapido(
         )
     cenarios_nao_lidas(
         conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, listar, total
+    )
+    cenarios_visto_edicao(
+        conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, editar, proibidos
     )
     resumo()
 

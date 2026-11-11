@@ -4,31 +4,31 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 
 ## 1. Parte A: preparar o workspace do Xano
 
-- [ ] 1.1 (manual) Mostrar `git status --short --branch` e pedir a confirmação explícita do Higor antes de `xano workspace pull -d ./xano`. Depois do pull, rodar `git diff --ignore-all-space --ignore-cr-at-eol` nos endpoints do chat e em `xano/table/chat_message.xs` e confirmar que só há diferença de formatação. Verificação: nenhuma mudança de conteúdo feita fora do repositório.
+- [x] 1.1 (manual) Mostrar `git status --short --branch` e pedir a confirmação explícita do Higor antes de `xano workspace pull -d ./xano`. Depois do pull, rodar `git diff --ignore-all-space --ignore-cr-at-eol` nos endpoints do chat e em `xano/table/chat_message.xs` e confirmar que só há diferença de formatação. Verificação: nenhuma mudança de conteúdo feita fora do repositório.
 
 ## 2. Parte A: tabela e endpoints
 
-- [ ] 2.1 Consultar no Xano Developer MCP as construções da decisão A6 e registrar a forma validada no `design.md`. Verificação: a A6 aponta as construções validadas.
-- [ ] 2.2 Em `xano/table/chat_message.xs`, acrescentar `edited_at` (timestamp opcional, sem padrão), sem mudar campos, índices nem o GUID. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
-- [ ] 2.3 Em `messages_GET.xs`, implementar as decisões A1 e A4, sem mudar a marcação de leitura nem os três modos:
+- [x] 2.1 Consultar no Xano Developer MCP as construções da decisão A6 e registrar a forma validada no `design.md`. Verificação: a A6 aponta as construções validadas.
+- [x] 2.2 Em `xano/table/chat_message.xs`, acrescentar `edited_at` (timestamp opcional, sem padrão), sem mudar campos, índices nem o GUID. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
+- [x] 2.3 Em `messages_GET.xs`, implementar as decisões A1 e A4, sem mudar a marcação de leitura nem os três modos:
   - `server_time` no início;
   - `other_last_read_message_id`;
   - `edited_at` em cada mensagem;
   - o input `edited_since` e a lista `edited_messages`.
 
   Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
-- [ ] 2.4 Em `messages_POST.xs`, devolver `edited_at` (decisão A5), sem mudar a regra de envio. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
-- [ ] 2.5 Criar `xano/api/catalog/catalog/chat/messages_PATCH.xs` com as checagens, a resposta e o log da decisão A3. Verificação: o arquivo passa na validação do MCP.
-- [ ] 2.6 (manual) Rodar `xano workspace push -d ./xano --dry-run` e revisar. Verificação: aparecem só os dois endpoints alterados e o novo. **A mudança na tabela não aparece no dry-run**, e isso é esperado; ela é conferida na 2.8.
-- [ ] 2.7 (manual) O Higor faz o push real e avisa o grupo. Verificação: o push conclui sem erros.
-- [ ] 2.8 (manual) No painel do Xano, abrir `chat_message` e conferir que `edited_at` existe, é timestamp e está vazio nas linhas antigas. Se não aparecer, criá-lo pelo painel com esse nome e tipo e rodar `xano workspace pull -d ./xano`. Verificação: o campo aparece no painel.
-- [ ] 2.9 (manual) Depois do push, rodar `xano workspace pull -d ./xano` para trazer o GUID do `messages_PATCH.xs`. Verificação: o GUID está no arquivo, e o `git diff --ignore-all-space --ignore-cr-at-eol` não mostra outras mudanças de conteúdo.
+- [x] 2.4 Em `messages_POST.xs`, devolver `edited_at` (decisão A5), sem mudar a regra de envio. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
+- [x] 2.5 Criar `xano/api/catalog/catalog/chat/messages_PATCH.xs` com as checagens, a resposta e o log da decisão A3. Verificação: o arquivo passa na validação do MCP.
+- [x] 2.6 (manual) Rodar `xano workspace push -d ./xano --dry-run` e revisar. Verificação: aparecem só os dois endpoints alterados e o novo. **A mudança na tabela não aparece no dry-run**, e isso é esperado; ela é conferida na 2.8.
+- [x] 2.7 (manual) O Higor faz o push real e avisa o grupo. Verificação: o push conclui sem erros.
+- [x] 2.8 (manual) No painel do Xano, abrir `chat_message` e conferir que `edited_at` existe, é timestamp e está vazio nas linhas antigas. Se não aparecer, criá-lo pelo painel com esse nome e tipo e rodar `xano workspace pull -d ./xano`. Verificação: o campo aparece no painel.
+- [x] 2.9 (manual) Depois do push, rodar `xano workspace pull -d ./xano` para trazer o GUID do `messages_PATCH.xs`. Verificação: o GUID está no arquivo, e o `git diff --ignore-all-space --ignore-cr-at-eol` não mostra outras mudanças de conteúdo.
 
 ## 3. Parte A: teste real e documentação do backend
 
-- [ ] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, nos dois modos, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem textos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
+- [x] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, nos dois modos, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem textos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
 - [ ] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK, com os opcionais pulados com aviso quando faltar dado.
-- [ ] 3.3 Atualizar a seção do chat em `docs/guia-do-colaborador.md` com:
+- [x] 3.3 Atualizar a seção do chat em `docs/guia-do-colaborador.md` com:
   - `edited_at`, o `PATCH catalog/chat/messages` e as regras de edição;
   - `other_last_read_message_id`, `edited_since`, `edited_messages` e `server_time`;
   - o log `chat_message_edited`;
