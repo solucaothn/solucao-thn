@@ -29,26 +29,26 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 
 ## 4. Parte B: cliente HTTP e estado do chat (`doafacil/chat.py`)
 
-- [ ] 4.1 Criar as funções do cliente (`start_conversation`, `list_conversations`, `fetch_messages` com `before`/`after`, `send_message`) com `httpx.AsyncClient` injetado, URL a partir de `XANO_API_URL`, Bearer, validação estrita das respostas (descartar campos inesperados) e erros classificados para 400, 401, 404, 429 do chat e 429 da plataforma. Verificação: `tests/test_chat.py` cobre URLs, parâmetros, respostas válidas e malformadas e cada erro com `httpx.MockTransport`, incluindo os dois corpos de 429; a suíte passa.
-- [ ] 4.2 Criar os auxiliares: inicial do avatar (“?” para nome vazio ou “Usuário”) e rótulo do dia (“Hoje”, “Ontem”, dd/mm/aaaa) com UTC−3 fixo. Verificação: testes com horários perto da meia-noite UTC.
-- [ ] 4.3 Criar o `ChatState(LoginState)` com `load_chat`: sem token, `/login` sem chamadas; carrega a lista; abre `?conversa=` com uma consulta sem cursor; trata 401 limpando a sessão. Verificação: testes do estado com o cliente simulado.
-- [ ] 4.4 Implementar `select_conversation`, `load_older_messages` (“Carregar anteriores”, com `before_message_id`, inserindo no topo sem duplicar e escondendo o botão sem `has_older`), `load_more_conversations` e `back_to_list`. Verificação: testes de cada handler.
-- [ ] 4.5 Implementar `send_message`: aparar o texto, ignorar o vazio, `is_sending`, limpar no sucesso, os textos da decisão 6 e somente leitura após um 404. Verificação: testes para cada status, para o vazio sem chamada e para o texto mantido nas falhas.
-- [ ] 4.6 Implementar `poll_tick` e `poll_if_visible`: sem chamada com a aba oculta, sem conversa aberta ou com a pausa ativa; `after_message_id` igual à última mensagem; sem duplicar; pausa de 60 s após qualquer 429. Verificação: testes de cada condição.
+- [x] 4.1 Criar as funções do cliente (`start_conversation`, `list_conversations`, `fetch_messages` com `before`/`after`, `send_message`) com `httpx.AsyncClient` injetado, URL a partir de `XANO_API_URL`, Bearer, validação estrita das respostas (descartar campos inesperados) e erros classificados para 400, 401, 404, 429 do chat e 429 da plataforma. Verificação: `tests/test_chat.py` cobre URLs, parâmetros, respostas válidas e malformadas e cada erro com `httpx.MockTransport`, incluindo os dois corpos de 429; a suíte passa.
+- [x] 4.2 Criar os auxiliares: inicial do avatar (“?” para nome vazio ou “Usuário”) e rótulo do dia (“Hoje”, “Ontem”, dd/mm/aaaa) com UTC−3 fixo. Verificação: testes com horários perto da meia-noite UTC.
+- [x] 4.3 Criar o `ChatState(LoginState)` com `load_chat`: sem token, `/login` sem chamadas; carrega a lista; abre `?conversa=` com uma consulta sem cursor; trata 401 limpando a sessão. Verificação: testes do estado com o cliente simulado.
+- [x] 4.4 Implementar `select_conversation`, `load_older_messages` (“Carregar anteriores”, com `before_message_id`, inserindo no topo sem duplicar e escondendo o botão sem `has_older`), `load_more_conversations` e `back_to_list`. Verificação: testes de cada handler.
+- [x] 4.5 Implementar `send_message`: aparar o texto, ignorar o vazio, `is_sending`, limpar no sucesso, os textos da decisão 6 e somente leitura após um 404. Verificação: testes para cada status, para o vazio sem chamada e para o texto mantido nas falhas.
+- [x] 4.6 Implementar `poll_tick` e `poll_if_visible`: sem chamada com a aba oculta, sem conversa aberta ou com a pausa ativa; `after_message_id` igual à última mensagem; sem duplicar; pausa de 60 s após qualquer 429. Verificação: testes de cada condição.
 
 ## 5. Parte B: página `/chat`
 
-- [ ] 5.1 Montar a página: cabeçalho com logo, “Voltar ao início”, lista (avatar, primeiro nome, título), cabeçalho da conversa (nome e título), “Carregar anteriores”, bolhas por `sent_by_me`, separadores de dia, formulário com “Digite aqui...” e “Enviar”, aviso de somente leitura, estados vazios e de erro, layout responsivo e `page-fade-enter`. O `rx.moment` de 15 s fica dentro do `rx.cond` da conversa aberta. Registrar a rota em `doafacil/doafacil.py`. Verificação: os testes de componente confirmam os textos fixos, a classe de animação, o `rx.moment` condicionado, `max_length=1000` e a ausência de `rx.html`; a suíte passa.
-- [ ] 5.2 Documentar a tela em `docs/design/README.md` (seção “Chat”): o que segue o Figma e as diferenças aprovadas (sem foto, sem “Online”, sem prévia, botão “Enviar”, cores com contraste AA, título da doação, “Carregar anteriores”, textos neutros). Verificação: o texto bate com a spec `donation-chat-interface`.
+- [x] 5.1 Montar a página: cabeçalho com logo, “Voltar ao início”, lista (avatar, primeiro nome, título), cabeçalho da conversa (nome e título), “Carregar anteriores”, bolhas por `sent_by_me`, separadores de dia, formulário com “Digite aqui...” e “Enviar”, aviso de somente leitura, estados vazios e de erro, layout responsivo e `page-fade-enter`. O `rx.moment` de 15 s fica dentro do `rx.cond` da conversa aberta. Registrar a rota em `doafacil/doafacil.py`. Verificação: os testes de componente confirmam os textos fixos, a classe de animação, o `rx.moment` condicionado, `max_length=1000` e a ausência de `rx.html`; a suíte passa.
+- [x] 5.2 Documentar a tela em `docs/design/README.md` (seção “Chat”): o que segue o Figma e as diferenças aprovadas (sem foto, sem “Online”, sem prévia, botão “Enviar”, cores com contraste AA, título da doação, “Carregar anteriores”, textos neutros). Verificação: o texto bate com a spec `donation-chat-interface`.
 
 ## 6. Parte B: botão “Chat” do detalhe
 
-- [ ] 6.1 Substituir `show_chat_unavailable` por `start_chat` (decisão 11) e remover `CHAT_UNAVAILABLE_MESSAGE`. Verificação: ajustar `tests/test_donation_detail.py` (o teste atual espera a mensagem antiga) e cobrir sem login, 200 com redirecionamento, 404 com a mensagem neutra, 401 e erro de rede; a suíte passa.
+- [x] 6.1 Substituir `show_chat_unavailable` por `start_chat` (decisão 11) e remover `CHAT_UNAVAILABLE_MESSAGE`. Verificação: ajustar `tests/test_donation_detail.py` (o teste atual espera a mensagem antiga) e cobrir sem login, 200 com redirecionamento, 404 com a mensagem neutra, 401 e erro de rede; a suíte passa.
 
 ## 7. Parte B: link “Mensagens” e guia
 
-- [ ] 7.1 Acrescentar “Mensagens” (`href="/chat"`) ao ramo autenticado do cabeçalho da home, como ícone com `aria_label` no celular. Verificação: um teste confirma o link só no ramo autenticado; a suíte passa.
-- [ ] 7.2 Atualizar `docs/guia-do-colaborador.md`: tirar “Interface do chat” de “O que ainda falta”, registrar a tela em “O que já está pronto” e explicar a atualização automática (15 s, aba visível, pausa de 60 s após um 429) e os dois textos de 429. Verificação: o texto bate com o `design.md`.
+- [x] 7.1 Acrescentar “Mensagens” (`href="/chat"`) ao ramo autenticado do cabeçalho da home, como ícone com `aria_label` no celular. Verificação: um teste confirma o link só no ramo autenticado; a suíte passa.
+- [x] 7.2 Atualizar `docs/guia-do-colaborador.md`: tirar “Interface do chat” de “O que ainda falta”, registrar a tela em “O que já está pronto” e explicar a atualização automática (15 s, aba visível, pausa de 60 s após um 429) e os dois textos de 429. Verificação: o texto bate com o `design.md`.
 
 ## 8. Verificação final
 

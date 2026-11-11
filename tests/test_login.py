@@ -710,6 +710,23 @@ class LoginPageTests(unittest.TestCase):
             if node not in (enter, logout):
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
+    def test_messages_link_only_in_authenticated_header(self) -> None:
+        page = index()
+        header_conds = [
+            node
+            for node in _component_nodes(page)
+            if type(node).__name__ == "Cond"
+            and "auth_token" in str(getattr(node, "cond", ""))
+            and "Sair" in str(node.children[0])
+        ]
+        self.assertEqual(len(header_conds), 1)
+        authenticated, visitor = (str(child) for child in header_conds[0].children)
+        self.assertIn("Mensagens", authenticated)
+        self.assertIn('to:"/chat"', authenticated)
+        self.assertIn('"aria-label":"Mensagens"', authenticated)
+        self.assertNotIn("Mensagens", visitor)
+        self.assertNotIn("/chat", visitor)
+
     def test_home_fades_static_content_without_animating_header_or_xano_data(self) -> None:
         nodes = _component_nodes(index())
         animated_nodes = [

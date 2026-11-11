@@ -7,6 +7,14 @@ from urllib.parse import quote, urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.chat import (
+    ChatError,
+    ChatNotFoundError,
+    ChatRateLimitError,
+    ChatUnauthorizedError,
+    rate_limit_message,
+    start_conversation,
+)
 from doafacil.login import LoginState
 
 
@@ -22,7 +30,12 @@ DONOR_CONTACT_ERROR_MESSAGE = (
 )
 DONOR_OWN_DONATION_MESSAGE = "Esta é a sua doação."
 DONOR_CHAT_PREFERENCE_MESSAGE = "Quem doa prefere contato pelo chat."
-CHAT_UNAVAILABLE_MESSAGE = "O chat ainda não está disponível."
+# 404 do início de conversa: neutro, sem dizer o motivo (preferência por
+# e-mail, doação da própria pessoa ou doação indisponível).
+CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE = (
+    "Não é possível conversar sobre esta doação pelo chat."
+)
+CHAT_START_ERROR_MESSAGE = "Não foi possível abrir o chat. Tente novamente."
 
 
 class DonationNotFoundError(Exception):
@@ -187,6 +200,7 @@ class DonationDetailState(LoginState):
     view_state: str = "loading"
     contact_message: str = ""
     contact_message_is_error: bool = False
+    is_starting_chat: bool = False
 
     @rx.event
     async def load_donation(self) -> None:
@@ -204,6 +218,7 @@ class DonationDetailState(LoginState):
         self.view_state = "loading"
         self.contact_message = ""
         self.contact_message_is_error = False
+        self.is_starting_chat = False
         donation_id = self.router.page.params.get("id", "")
 
         try:
@@ -271,9 +286,39 @@ class DonationDetailState(LoginState):
         )
 
     @rx.event
-    def show_chat_unavailable(self) -> None:
-        self.contact_message = CHAT_UNAVAILABLE_MESSAGE
+    async def start_chat(self) -> rx.event.EventSpec | None:
+        self.contact_message = ""
         self.contact_message_is_error = False
+        if not self.auth_token:
+            return rx.redirect("/login")
+        if self.is_starting_chat:
+            return None
+
+        self.is_starting_chat = True
+        try:
+            donation_id = _positive_donation_id(str(self.donation_id))
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                conversation = await start_conversation(
+                    client, self.auth_token, donation_id
+                )
+        except ChatUnauthorizedError:
+            self.auth_token = ""
+            self.account_name = ""
+            return rx.redirect("/login")
+        except ChatNotFoundError:
+            self.contact_message = CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE
+            return None
+        except ChatRateLimitError as error:
+            self.contact_message = rate_limit_message(error.kind)
+            self.contact_message_is_error = True
+            return None
+        except (ChatError, ValueError):
+            self.contact_message = CHAT_START_ERROR_MESSAGE
+            self.contact_message_is_error = True
+            return None
+        finally:
+            self.is_starting_chat = False
+        return rx.redirect(f"/chat?conversa={conversation['conversation_id']}")
 
 
 def _gallery_thumbnail(photo: rx.Var[str]) -> rx.Component:
@@ -384,7 +429,8 @@ def _donation_content() -> rx.Component:
                             spacing="2",
                             align="center",
                         ),
-                        on_click=DonationDetailState.show_chat_unavailable,
+                        on_click=DonationDetailState.start_chat,
+                        disabled=DonationDetailState.is_starting_chat,
                         width="100%",
                         height="48px",
                         background="white",
