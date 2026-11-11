@@ -45,7 +45,7 @@ query "catalog/chat/messages" verb=POST {
           value = now
             |add_secs_to_timestamp:(-60|to_int)
         }
-
+      
         db.query chat_message {
           where = ($db.chat_message.sender_id == $auth.id && $db.chat_message.created_at >= $rate_window_start)
           return = {type: "count"}
@@ -62,22 +62,18 @@ query "catalog/chat/messages" verb=POST {
             sender_id      : $auth.id
             text           : $input.message_text
           }
+        
           output = ["id", "conversation_id", "sender_id", "text", "created_at"]
         } as $message
       
         db.edit chat_conversation {
           field_name = "id"
           field_value = $conversation.id
-          data = {
-            last_message_at: "now"
-          }
+          data = {last_message_at: "now"}
         } as $updated_conversation
       
         function.run "Quick Start/log_event" {
-          input = {
-            user_id: $auth.id
-            action : "chat_message_sent"
-          }
+          input = {user_id: $auth.id, action: "chat_message_sent"}
         } as $chat_message_event
       }
     }
@@ -87,11 +83,11 @@ query "catalog/chat/messages" verb=POST {
       field_value = $auth.id
       output = ["name"]
     } as $sender
-
+  
     var $sender_first_name {
       value = "Usuário"
     }
-
+  
     conditional {
       if ($sender != null) {
         var.update $sender_first_name {
@@ -105,8 +101,10 @@ query "catalog/chat/messages" verb=POST {
     id               : $message.id
     conversation_id  : $message.conversation_id
     sender_first_name: $sender_first_name
+    sent_by_me       : true
     text             : $message.text
     created_at       : $message.created_at
   }
+
   guid = "xj3dbcReD9PMSUm3CVazuR3KHzA"
 }

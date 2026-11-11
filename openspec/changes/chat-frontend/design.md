@@ -73,7 +73,9 @@ O status volta exatamente como na tabela (`disponível`, `reservada`, `concluíd
 - **Com `after_message_id`:** como hoje: `id > after`, `sort id asc`, `has_newer` = contagem restante maior que o limite, `has_older = false`.
 - `sent_by_me` = `$message.sender_id == $auth.id`, calculado no laço que já monta `sender_first_name`. O `sender_id` não vai na resposta.
 - O `db.get donation` passa a pedir `title` e `status` para a resposta.
-- **A sintaxe da inversão da lista (por exemplo, um filtro `reverse`) e a do `find` precisam ser confirmadas no Xano Developer MCP antes de escrever o código.** Se não houver filtro de inversão, montar a lista crescente num `foreach` que insere no início.
+- **Sintaxe confirmada no Xano Developer MCP** (documentação `syntax/array-filters`, versão 2.7.1). A associação por chave usa `|find:$$.campo == valor`, a mesma forma já publicada em `conversations_GET` para os nomes.
+- **Inversão revisada após o teste real.** A primeira versão invertia a lista com `$recent_messages|reverse`, e o teste real (3.2) recebeu 200 com 0 mensagens nos modos sem cursor e `before_message_id`, com título e status corretos. A causa mais provável é o `|reverse` aplicado ao resultado do `db.query`; era o único elemento novo nesse caminho. A versão atual monta a lista crescente com `foreach ($recent_messages)` e `var.update $messages { value = $messages|unshift:$recent_message }`, o mesmo padrão de `foreach` + `|push` já publicado no projeto. Além disso, o ramo decrescente foi dividido num `conditional`: sem `before_message_id`, o `where` filtra só por `conversation_id`; com ele, por `conversation_id && id < before_message_id`. Assim nenhum `where` compara um `$input` que possa ser nulo. A versão antiga (`9b94baa`) usava `$input.after_message_id == null || ...` no `where` e funcionava, mas a separação elimina essa suspeita sem custo.
+- **Diagnóstico confirmado.** O histórico do Xano mostrou que, na versão com `|reverse` e `where` combinado, o `foreach` seguinte rodava 0 vezes. Campos de depuração temporários mostraram que a versão atual (duas consultas separadas e `foreach` + `|unshift`) devolve `debug_query_count = 2`, `debug_messages_count = 2` e 2 mensagens, sem `limit` e com `limit=100`. **Causa provável:** o `|reverse` aplicado ao resultado do `db.query` não produzia uma lista utilizável, e/ou o `where` combinado com `$input.before_message_id == null || ...` no ramo decrescente voltava vazio. As duas correções entraram juntas, então não dá para atribuir a falha a uma só. A forma atual evita as duas construções.
 
 **A5. `messages_POST`.** A resposta ganha `sent_by_me: true`. Nada mais muda: a validação 400 continua antes do limite 429.
 
@@ -141,10 +143,14 @@ As pausas para o limite da plataforma continuam.
     - Conversa sem mensagens: “Ainda não há mensagens. Escreva a primeira.”
     - Erro de carga: “Não foi possível carregar as conversas. Tente novamente.”
 
+## Pendência de debug (resolvida)
+
+- O debug temporário do `messages_GET.xs` foi removido: as variáveis `$debug_query_count` e `$debug_messages_count`, os campos de mesmo nome na resposta e o comentário. A impressão desses números também saiu do modo rápido do `scripts/teste_chat_real.py`. **A remoção só vale no Xano depois do dry-run e do push.**
+
 ## Riscos / Trade-offs
 
 - **Mudança de forma do `GET messages`.** `has_more` e `next_after_message_id` deixam de existir. O único consumidor é o script de teste real, atualizado na mesma parte.
-- **Sintaxe XanoScript da inversão e do `find`.** Precisa de confirmação no MCP. A alternativa com `foreach` está descrita na A4.
+- **Sintaxe XanoScript da inversão e do `find`.** Confirmada no MCP (decisão A4).
 - **Arquivos `xano/` com quebra de linha alterada.** O pull pode trazer de novo diferenças só de LF/CRLF. O dry-run e o commit incluem só os quatro arquivos do chat.
 - **Limite da plataforma.** Várias abas somam requisições. Os 15 s, a pausa de 60 s e a ausência de atualização da lista mantêm a carga baixa, sem garantia com muitos usuários.
 - **Status visível aos participantes.** Aprovado pelo grupo: o status já é público no detalhe da doação. A resposta do envio continua sem revelá-lo.

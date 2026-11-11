@@ -4,28 +4,28 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 
 ## 1. Parte A: preparar o workspace do Xano
 
-- [ ] 1.1 (manual) Mostrar `git status --short --branch` e pedir a confirmação explícita do Higor antes de `xano workspace pull -d ./xano`. Depois do pull, mostrar `git status` e `git diff --stat` em `xano/`, preservando as alterações preexistentes e ignorando as diferenças só de LF/CRLF (guia, seção 10.1). Verificação: os quatro arquivos do chat estão iguais ao que foi publicado na change `chat-backend`.
+- [x] 1.1 (manual) Mostrar `git status --short --branch` e pedir a confirmação explícita do Higor antes de `xano workspace pull -d ./xano`. Depois do pull, mostrar `git status` e `git diff --stat` em `xano/`, preservando as alterações preexistentes e ignorando as diferenças só de LF/CRLF (guia, seção 10.1). Verificação: os quatro arquivos do chat estão iguais ao que foi publicado na change `chat-backend`.
 
 ## 2. Parte A: endpoints do chat
 
-- [ ] 2.1 Consultar no Xano Developer MCP a sintaxe da inversão de lista e do `find` antes de escrever. Registrar a forma escolhida no `design.md` (decisão A4). Verificação: a decisão A4 aponta a construção validada.
-- [ ] 2.2 Em `start_POST.xs`, pedir `title` no `db.get donation` e devolver `donation_title` e `donation_status`. Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
-- [ ] 2.3 Em `conversations_GET.xs`, buscar título e status com **uma** consulta `donation ... in`, protegida por `|count > 0`, e incluir `donation_title` e `donation_status` em cada item. Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
-- [ ] 2.4 Em `messages_GET.xs`:
+- [x] 2.1 Consultar no Xano Developer MCP a sintaxe da inversão de lista e do `find` antes de escrever. Registrar a forma escolhida no `design.md` (decisão A4). Verificação: a decisão A4 aponta a construção validada.
+- [x] 2.2 Em `start_POST.xs`, pedir `title` no `db.get donation` e devolver `donation_title` e `donation_status`. Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
+- [x] 2.3 Em `conversations_GET.xs`, buscar título e status com **uma** consulta `donation ... in`, protegida por `|count > 0`, e incluir `donation_title` e `donation_status` em cada item. Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
+- [x] 2.4 Em `messages_GET.xs`:
   - acrescentar `int before_message_id?`, sem filtro, e a `precondition` 400 para os dois cursores juntos;
   - implementar os modos “últimas N” e `before_message_id` (ordem decrescente, invertida para crescente na resposta) e `after_message_id`;
   - devolver `has_older`, `has_newer`, `donation_title`, `donation_status` e `sent_by_me` em cada mensagem, sem `sender_id`.
 
   Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
-- [ ] 2.5 Em `messages_POST.xs`, acrescentar `sent_by_me: true` à resposta, mantendo a validação 400 antes do limite 429. Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
-- [ ] 2.6 (manual) Rodar `xano workspace push -d ./xano --dry-run` e revisar a saída inteira. Verificação: aparecem somente os quatro endpoints do chat; qualquer outro objeto interrompe a publicação.
-- [ ] 2.7 (manual) O Higor faz o push real (`xano workspace push -d ./xano`) e avisa o grupo da mudança nos endpoints do chat. Verificação: o push conclui sem erros.
+- [x] 2.5 Em `messages_POST.xs`, acrescentar `sent_by_me: true` à resposta, mantendo a validação 400 antes do limite 429. Verificação: o arquivo passa na validação do MCP e o GUID não mudou.
+- [x] 2.6 (manual) Rodar `xano workspace push -d ./xano --dry-run` e revisar a saída inteira. Verificação: aparecem somente os quatro endpoints do chat; qualquer outro objeto interrompe a publicação.
+- [x] 2.7 (manual) O Higor faz o push real (`xano workspace push -d ./xano`) e avisa o grupo da mudança nos endpoints do chat. Verificação: o push conclui sem erros.
 
 ## 3. Parte A: teste real e documentação do backend
 
-- [ ] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem corpos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
-- [ ] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK, inclusive os novos.
-- [ ] 3.3 Atualizar a seção “Chat da doação (backend)” de `docs/guia-do-colaborador.md` com os campos novos e os três modos do `GET messages`. Verificação: o texto bate com a spec delta `donation-chat`.
+- [x] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem corpos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
+- [x] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK, inclusive os novos.
+- [x] 3.3 Atualizar a seção “Chat da doação (backend)” de `docs/guia-do-colaborador.md` com os campos novos e os três modos do `GET messages`. Verificação: o texto bate com a spec delta `donation-chat`.
 
 ## 4. Parte B: cliente HTTP e estado do chat (`doafacil/chat.py`)
 

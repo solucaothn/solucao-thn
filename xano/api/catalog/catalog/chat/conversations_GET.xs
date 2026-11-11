@@ -54,24 +54,45 @@ query "catalog/chat/conversations" verb=GET {
       where = ($db.chat_conversation.donor_id == $auth.id || $db.chat_conversation.interested_user_id == $auth.id)
       sort = {last_message_at: "desc", id: "desc"}
       return = {
-        type: "list"
-        paging: {page: $page_number, per_page: $page_limit, metadata: false}
+        type  : "list"
+        paging: {
+          page    : $page_number
+          per_page: $page_limit
+          metadata: false
+        }
       }
-      output = ["id", "donation_id", "donor_id", "interested_user_id", "last_message_at"]
+    
+      output = [
+        "id"
+        "donation_id"
+        "donor_id"
+        "interested_user_id"
+        "last_message_at"
+      ]
     } as $conversations
   
     var $other_user_ids {
       value = []
     }
 
+    var $donation_ids {
+      value = []
+    }
+
     foreach ($conversations) {
       each as $conversation {
+        var.update $donation_ids {
+          value = $donation_ids|push:$conversation.donation_id
+        }
+
         conditional {
           if ($conversation.donor_id == $auth.id) {
             var.update $other_user_ids {
-              value = $other_user_ids|push:$conversation.interested_user_id
+              value = $other_user_ids
+                |push:$conversation.interested_user_id
             }
           }
+        
           else {
             var.update $other_user_ids {
               value = $other_user_ids|push:$conversation.donor_id
@@ -80,11 +101,11 @@ query "catalog/chat/conversations" verb=GET {
         }
       }
     }
-
+  
     var $other_users {
       value = []
     }
-
+  
     conditional {
       if (($other_user_ids|count) > 0) {
         db.query user {
@@ -92,9 +113,27 @@ query "catalog/chat/conversations" verb=GET {
           return = {type: "list"}
           output = ["id", "name"]
         } as $found_users
-
+      
         var.update $other_users {
           value = $found_users
+        }
+      }
+    }
+
+    var $donations {
+      value = []
+    }
+
+    conditional {
+      if (($donation_ids|count) > 0) {
+        db.query donation {
+          where = $db.donation.id in $donation_ids
+          return = {type: "list"}
+          output = ["id", "title", "status"]
+        } as $found_donations
+
+        var.update $donations {
+          value = $found_donations
         }
       }
     }
@@ -102,13 +141,13 @@ query "catalog/chat/conversations" verb=GET {
     var $conversation_items {
       value = []
     }
-
+  
     foreach ($conversations) {
       each as $conversation {
         var $other_user_id {
           value = $conversation.donor_id
         }
-
+      
         conditional {
           if ($conversation.donor_id == $auth.id) {
             var.update $other_user_id {
@@ -116,19 +155,43 @@ query "catalog/chat/conversations" verb=GET {
             }
           }
         }
-
+      
         var $other_user {
           value = $other_users|find:$$.id == $other_user_id
         }
-
+      
         var $other_user_first_name {
           value = "Usuário"
         }
-
+      
         conditional {
           if ($other_user != null) {
             var.update $other_user_first_name {
               value = (($other_user.name ?? "")|trim|split:" "|first)
+            }
+          }
+        }
+      
+        var $donation {
+          value = $donations|find:$$.id == $conversation.donation_id
+        }
+
+        var $donation_title {
+          value = "Doação"
+        }
+
+        var $donation_status {
+          value = ""
+        }
+
+        conditional {
+          if ($donation != null) {
+            var.update $donation_title {
+              value = $donation.title
+            }
+
+            var.update $donation_status {
+              value = $donation.status
             }
           }
         }
@@ -140,7 +203,9 @@ query "catalog/chat/conversations" verb=GET {
                 conversation_id: $conversation.id,
                 donation_id: $conversation.donation_id,
                 last_message_at: $conversation.last_message_at,
-                other_user_first_name: $other_user_first_name
+                other_user_first_name: $other_user_first_name,
+                donation_title: $donation_title,
+                donation_status: $donation_status
               }
               ```
         }
@@ -171,5 +236,6 @@ query "catalog/chat/conversations" verb=GET {
     has_more     : $has_more
     next_page    : $next_page
   }
+
   guid = "v-tcgoaNzPmISQLnDJgaLh7GTQg"
 }
