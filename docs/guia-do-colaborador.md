@@ -142,7 +142,7 @@ O chat entre quem doa e quem tem interesse tem o backend no Xano (abaixo) e a te
 Tabelas:
 
 - `chat_conversation`: uma conversa por par doação + interessado (índice único), com `donor_id`, `interested_user_id` e `last_message_at`. Os campos `donor_last_read_message_id` e `interested_last_read_message_id` guardam o id da última mensagem lida por cada participante (0, ou vazio, quando ainda não leu nada).
-- `chat_message`: mensagens da conversa, com `sender_id`, `text` e `created_at`.
+- `chat_message`: mensagens da conversa, com `sender_id`, `text`, `created_at` e `edited_at` (horário da última edição; vazio se a mensagem nunca foi editada).
 
 Endpoints (grupo Catalog, todos exigem login; sem login, HTTP 401):
 
@@ -157,9 +157,15 @@ Endpoints (grupo Catalog, todos exigem login; sem login, HTTP 401):
   Mandar os dois cursores juntos dá HTTP 400.
 
   Esse `GET` também **marca a conversa como lida** para quem lê, até a mensagem mais nova devolvida (veja “Mensagens não lidas” abaixo).
-- `POST /catalog/chat/messages` (`conversation_id`, `message_text`): envia uma mensagem.
 
-Cada mensagem (na leitura e na resposta do envio) traz `sent_by_me`, verdadeiro quando foi a pessoa logada que enviou. É assim que a tela decide o lado da mensagem, em vez de comparar nomes, que podem se repetir. O campo é calculado pela sessão, e a resposta não traz identificadores de usuário.
+  A resposta também traz, em todos os modos:
+  - `other_last_read_message_id`: a última mensagem que a **outra** pessoa leu (0 se nenhuma), para o “visto”;
+  - `server_time`: o horário do servidor no início da consulta;
+  - `edited_messages`: só no modo `after_message_id` com o parâmetro opcional `edited_since` (o `server_time` da consulta anterior). Traz as mensagens já exibidas (`id <= after_message_id`) editadas desde então, com 5 s de folga. Sem `edited_since`, vem vazia.
+- `POST /catalog/chat/messages` (`conversation_id`, `message_text`): envia uma mensagem.
+- `PATCH /catalog/chat/messages` (`message_id`, `message_text`): edita uma mensagem própria (veja “Edição de mensagens” abaixo).
+
+Cada mensagem (na leitura, no envio e na edição) traz `sent_by_me`, verdadeiro quando foi a pessoa logada que enviou. É assim que a tela decide o lado da mensagem, em vez de comparar nomes, que podem se repetir. O campo é calculado pela sessão, e a resposta não traz identificadores de usuário. Cada mensagem também traz `edited_at`, vazio enquanto não for editada.
 
 Regras:
 
@@ -169,7 +175,7 @@ Regras:
 - **Status visível só para participantes:** `donation_status` aparece nos endpoints do chat para as duas pessoas da conversa. É o mesmo status já público no detalhe da doação. A resposta de um envio recusado continua com o 404 genérico, sem dizer o status.
 - **Tamanho:** de 1 a 1000 caracteres depois de tirar espaços das pontas; fora disso, HTTP 400. O tamanho é validado antes do limite de envio. O texto é guardado e devolvido como texto, e a interface precisa mostrá-lo como texto, sem interpretar HTML.
 - **Limite de envio:** 10 mensagens por pessoa em 60 segundos, somando todas as conversas; acima disso, HTTP 429 com “Limite de mensagens atingido. Tente novamente em instantes.”. É de melhor esforço: sob envios simultâneos pode passar uma ou duas a mais.
-- **Logs:** só `chat_started` (conversa nova) e `chat_message_sent` (envio aceito), com `user_id`, ação e data. Leituras (inclusive a marcação de lida), repetições e erros não geram evento.
+- **Logs:** só `chat_started` (conversa nova), `chat_message_sent` (envio aceito) e `chat_message_edited` (edição que mudou o texto), com `user_id`, ação e data. Leituras (inclusive a marcação de lida), repetições, edições sem mudança e erros não geram evento.
 - **Apagar a doação apaga as conversas:** `DELETE /catalog/donations` remove as mensagens, as conversas e a doação na mesma transação. Depois disso, quem tentar ler a conversa recebe o 404 genérico. As linhas de `donation_photo` não são apagadas (pendência registrada na seção 7).
 
 > **Atenção ao limite da plataforma:** o plano gratuito do Xano limita a **instância inteira** a 10 requisições a cada 20 segundos, somando todos os endpoints e todas as pessoas. Acima disso, o próprio Xano responde HTTP 429 com uma mensagem diferente da do chat. Telas com atualização automática (por exemplo, buscar mensagens novas) precisam de intervalo longo entre as consultas, senão derrubam o resto do site.
@@ -178,9 +184,27 @@ Mensagens não lidas:
 
 - **O que conta:** mensagens enviadas pela **outra** pessoa com id maior que a última lida por quem consulta. As mensagens da própria pessoa nunca contam.
 - **Quando marca como lida:** dentro do `GET /catalog/chat/messages`, em qualquer modo, sem requisição a mais. O campo de quem lê só avança: carregar mensagens anteriores ou uma consulta sem nada novo não grava nada, e o campo da outra pessoa não muda.
-- **Sem “visto”:** nenhuma resposta revela até onde a outra pessoa leu. Os campos de leitura não aparecem nas respostas.
+- **“Visto” (decisão aprovada pelo Higor na `chat-visto-edicao`):** a leitura de mensagens revela até onde a outra pessoa leu, com `other_last_read_message_id`. É só o id da última mensagem lida, sem horário, e só dentro da conversa. A lista de conversas, o total, o envio e a edição continuam sem nenhum dado de leitura da outra pessoa. A regra antiga, “nenhuma resposta revela até onde a outra pessoa leu”, deixou de valer.
 - **Campo vazio vale 0:** depois do pull, a tabela aparece sem o padrão (`int donor_last_read_message_id?`). Os endpoints leem esses campos com `?? 0`, então uma conversa sem leitura gravada conta todas as mensagens da outra pessoa como não lidas. As conversas anteriores a esta mudança começaram assim.
 - **Custo:** o `GET conversations` faz uma contagem por item da página, e o `unread_total` faz uma por conversa da pessoa. São consultas no banco, não requisições HTTP a mais.
+
+Edição de mensagens (`PATCH /catalog/chat/messages`):
+
+- **Quem e quando:** só quem enviou, até 15 minutos depois do envio, com a doação disponível ou reservada. O texto novo segue as regras do envio: de 1 a 1000 caracteres depois do trim, sempre como texto simples.
+- **Ordem das checagens e respostas:**
+
+  | Ordem | Situação | Resposta |
+  |---|---|---|
+  | 1 | Tamanho inválido | 400 |
+  | 2 | Mensagem inexistente, de outra pessoa ou de conversa de que a pessoa não participa | 404 genérico “Conversa não encontrada.” |
+  | 3 | Doação concluída | 404 genérico, como no envio |
+  | 4 | Mais de 15 minutos | 400 “O prazo para editar esta mensagem terminou.” |
+
+  Uma mensagem de outra pessoa recebe sempre o 404, mesmo fora do prazo, então o 400 do prazo não revela nada.
+- **Texto igual ao atual:** responde 200 com a mensagem, sem gravar, sem mudar `edited_at` e sem log.
+- **Sem limite próprio de edições:** valem o prazo de 15 minutos e o limite da plataforma.
+- **Resposta:** a mensagem no mesmo formato da leitura, com `edited_at` preenchido.
+- **Como a edição chega à outra pessoa:** pela atualização automática que já existe. O frontend manda `edited_since` (o `server_time` da resposta anterior), e as editadas vêm em `edited_messages`. Não há requisição a mais, e o horário vem só do servidor.
 
 Publicar mudanças no chat segue a seção 11: validar no MCP, dry-run revisado, aviso ao grupo e só então o push.
 
@@ -243,7 +267,16 @@ O script pede e-mail e senha de cada conta e depois o ID da doação. **A senha 
 
 Cuidados:
 
-- **O script cria dados reais:** uma conversa e cerca de 14 mensagens na doação informada, incluindo uma resposta da dona.
+- **O script cria dados reais:** uma conversa e cerca de 15 mensagens na doação informada, incluindo uma resposta da dona e uma mensagem editada.
+- **“Visto” e edição (cenários VE1 a VE11):** rodam também no modo rápido.
+  - A interessada envia uma mensagem: o envio devolve `edited_at` vazio.
+  - Antes de a dona ler, `other_last_read_message_id` é menor que essa mensagem (✓); depois, é maior ou igual (✓✓).
+  - A interessada edita a mensagem (200, com `edited_at`), e a dona recebe a edição em `edited_messages` ao consultar com `after_message_id` e `edited_since`. Sem `edited_since`, a lista vem vazia.
+  - Texto igual não muda `edited_at`.
+  - A dona editando a mensagem da interessada e um id inexistente dão 404.
+  - Texto vazio ou com 1001 caracteres dá 400, e a edição sem token, 401.
+  - **VE11, fora do prazo:** só roda se houver, entre as últimas 100 da conversa, uma mensagem própria da interessada com mais de 15 minutos (de uma execução anterior). Senão, é pulado com aviso; rode de novo mais tarde com a mesma doação.
+  - **9f, doação concluída:** dentro do cenário 9, que é opcional; editar a mensagem da 9b depois de concluir a doação dá 404.
 - **Não lidas (cenários NL1 a NL8):** rodam também no modo rápido (`TESTE_CHAT_RAPIDO=1`).
   - A interessada envia 2 mensagens.
   - A dona deve ver `unread_count` 2 na conversa e o `unread_total` subir 2; depois de ler, os dois voltam.

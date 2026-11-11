@@ -68,7 +68,7 @@
 - **Ao abrir a conversa, nada se perde:** a consulta sem cursor já traz o texto atual de todas as mensagens, com `edited_at`.
 - **As consultas no XanoScript:**
   - a busca das editadas fica num `conditional` (`$input.edited_since != null`), sem `$input` nulo no `where`, como nos outros endpoints;
-  - o nome do remetente das editadas é montado no mesmo laço que já existe, passando por ele as duas listas.
+  - o nome do remetente das editadas é montado num segundo laço, igual ao das mensagens.
 
 **A5. `messages_POST`** passa a pedir `edited_at` no `output` do `db.add` e a devolver esse campo, vazio, na resposta. A regra de envio não muda.
 
@@ -79,6 +79,13 @@
   - a comparação de `edited_at` com um inteiro em milissegundos;
   - o `db.edit` com dois campos;
   - um `where` com um campo que pode estar vazio.
+- **Confirmado no MCP** (tópicos `tables`, `types`, `apis` e `database`, e filtro `add_secs_to_timestamp`), e os 4 arquivos passaram na validação:
+  - timestamp opcional: `timestamp edited_at?`, igual ao `timestamp updated_at?` da documentação;
+  - timestamps são epoch em milissegundos, então `$input.edited_since - 5000` e a comparação com `edited_at` usam a mesma unidade;
+  - prazo: `now|add_secs_to_timestamp:(-900|to_int)`, mesma forma da janela do limite no `messages_POST`; o filtro aceita segundos negativos;
+  - `db.edit chat_message` com `data = {text: …, edited_at: "now"}` e `output`, como o `last_message_at: "now"` do envio e o `output` do `status_PATCH`;
+  - `verb=PATCH` no mesmo caminho da rota, como o `donations_PATCH.xs`;
+  - `edited_at >= $edited_floor` no `where`: o limite fica numa variável, sem `$input` nulo; linhas com `edited_at` vazio não entram.
 - **GUID:** o endpoint novo só ganha GUID depois do push e do pull.
 - **Schema:** depois do push, conferir no painel que `chat_message` tem `edited_at`, vazio nas linhas antigas.
 
@@ -150,10 +157,11 @@
 - **Lápis um pouco atrasado:** `editable` é recalculado a cada resposta da consulta automática (15 s) e na abertura. Perto do fim do prazo, o lápis pode aparecer alguns segundos a mais; o backend recusa com 400 e a tela esconde o lápis.
 - **“Visto” lido pela pessoa errada:** a dona com várias pessoas interessadas vê o ✓✓ de cada conversa separadamente, pelo campo daquela conversa.
 
-## Dúvidas em aberto
+## Dúvidas respondidas pelo Higor
 
-1. **Doação concluída na edição:** 404 genérico, como no envio (proposto), ou 400?
-2. **Limite de edições:** não há limite próprio (proposto), confiando no prazo de 15 minutos e no limite da plataforma. A alternativa é contar edições, o que exigiria guardar cada uma.
-3. **Onde se edita:** no campo de baixo (proposto, mais simples) ou dentro da própria bolha?
-4. **Posição do “visto”:** na linha do horário, fora da bolha (proposto), ou dentro da bolha, como no WhatsApp?
-5. **Texto igual:** não grava, não marca “(editada)” e não gera log (proposto).
+1. **Doação concluída na edição:** 404 genérico, como no envio.
+2. **Limite de edições:** sem limite próprio.
+3. **Onde se edita:** no campo de baixo.
+4. **Posição do “visto”:** na linha do horário, fora da bolha, por causa do contraste.
+5. **Texto igual ao atual:** não grava, não marca “(editada)” e não gera log.
+6. **Cenários do teste real sem dado:** o de fora do prazo e o de doação concluída são pulados com aviso.
