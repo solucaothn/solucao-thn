@@ -247,6 +247,36 @@ Textos de erro do envio:
 
 Em todos os casos o texto digitado continua no campo. Numa doação concluída, o campo e o botão “Enviar” ficam desativados, com aviso de somente leitura. O texto das mensagens é sempre mostrado como texto simples, nunca como HTML.
 
+“Visto” nas próprias mensagens:
+
+- **Onde fica:** na linha do horário, embaixo da bolha, nas mensagens de quem está logado. ✓ cinza `#6b6b6b` quando a outra pessoa ainda não leu (“Enviada”) e ✓✓ verde `#007A42` quando ela já leu (“Lida”). Nas mensagens da outra pessoa não aparece nada.
+- **De onde vem:** do `other_last_read_message_id` de cada resposta do `GET messages`. Uma mensagem própria com `id` menor ou igual a ele foi lida. O valor guardado em `other_last_read_id` só aumenta, para não piscar com duas abas, e volta a zero ao trocar de conversa.
+- **Atualização:** junto com a atualização automática da conversa (15 s). Não há requisição a mais.
+
+Edição de mensagem:
+
+- **Lápis:** aparece nas próprias mensagens enviadas há até 15 minutos, fora de conversa somente leitura.
+  - Quando aparece: no computador, ao passar o mouse; no celular, ao tocar na bolha; também ao receber foco pelo teclado. Essa visibilidade fica em `assets/chat.css`.
+  - O prazo é recalculado a cada resposta da atualização automática, então o lápis some sozinho perto do fim. O backend é quem decide: um 400 esconde o lápis daquela mensagem na hora.
+- **Editar:**
+  - o lápis leva o texto para o campo de baixo, com a faixa “Editando mensagem”;
+  - “Enviar” vira “Salvar” e aparece “Cancelar”;
+  - Enter salva; Esc ou “Cancelar” saem sem chamar o backend;
+  - trocar de conversa ou a doação ser concluída também encerram a edição.
+- **Depois de salvar:** a bolha troca o texto e mostra “(editada)” na linha do horário.
+- **A edição chegando à outra pessoa:** a consulta automática manda `edited_since` (o `server_time` da resposta anterior) e aplica `edited_messages` pelo id. O “Carregar anteriores” não muda esse horário, para não perder edições. Nenhuma requisição a mais.
+
+Textos de erro da edição (o texto digitado continua no campo):
+
+| Situação | Texto |
+|---|---|
+| 400 (o tamanho já foi conferido antes, então é o prazo) | “Não foi possível editar. O prazo de 15 minutos terminou.”, e o campo volta ao modo de envio com o texto |
+| 404 | “Não foi possível editar esta mensagem.”, e o campo volta ao modo de envio |
+| 429, vazio ou acima de 1000 caracteres | os mesmos textos e regras do envio |
+| outro erro | “Não foi possível salvar a edição. Tente novamente.” |
+
+**Carga no Xano:** o “visto” e a chegada das edições não somam requisições; cada edição salva é 1 requisição, como um envio. Cada tecla no campo manda um evento ao servidor do Reflex, para o Esc, mas nenhuma requisição ao Xano.
+
 #### Testar o chat contra o Xano real
 
 O script `scripts/teste_chat_real.py` roda os cenários do chat contra o Xano publicado. Ele fica fora de `tests/`, então o `unittest` não o executa.

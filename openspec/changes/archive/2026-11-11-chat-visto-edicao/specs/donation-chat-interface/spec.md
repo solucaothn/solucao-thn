@@ -44,7 +44,7 @@ Nas próprias mensagens enviadas há até 15 minutos, fora de conversa somente l
 - **THEN** a página MUST enviar a edição, trocar o texto da bolha pelo novo, mostrar “(editada)” e voltar o campo ao modo de envio, vazio
 
 #### Scenario: Cancelar a edição
-- **WHEN** a pessoa aciona “Cancelar”
+- **WHEN** a pessoa aciona “Cancelar” ou aperta Esc no campo durante a edição
 - **THEN** a página MUST voltar o campo ao modo de envio, vazio, sem chamar o backend e sem alterar a mensagem
 
 #### Scenario: Edição recusada fora do prazo

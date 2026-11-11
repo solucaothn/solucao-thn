@@ -1,0 +1,22 @@
+/* Chat: lápis de edição das próprias mensagens.
+   Escondido por padrão (sem receber cliques); aparece ao passar o mouse
+   (só em aparelhos com hover), ao receber foco pelo teclado ou quando a bolha
+   foi selecionada por toque (data-selected="true"). Sem transição, então não
+   há animação a desligar com prefers-reduced-motion. */
+.chat-edit-btn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .chat-bubble-row:hover .chat-edit-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.chat-edit-btn:focus-visible,
+.chat-bubble-row[data-selected="true"] .chat-edit-btn {
+  opacity: 1;
+  pointer-events: auto;
+}

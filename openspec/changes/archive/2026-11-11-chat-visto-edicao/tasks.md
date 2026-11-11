@@ -27,7 +27,7 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 ## 3. Parte A: teste real e documentação do backend
 
 - [x] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, nos dois modos, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem textos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
-- [ ] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK, com os opcionais pulados com aviso quando faltar dado.
+- [x] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK, com os opcionais pulados com aviso quando faltar dado.
 - [x] 3.3 Atualizar a seção do chat em `docs/guia-do-colaborador.md` com:
   - `edited_at`, o `PATCH catalog/chat/messages` e as regras de edição;
   - `other_last_read_message_id`, `edited_since`, `edited_messages` e `server_time`;
@@ -38,25 +38,25 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 
 ## 4. Parte B: cliente e estado (`doafacil/chat.py`)
 
-- [ ] 4.1 Fazer o parsing da decisão 1 do frontend: `edited_at` em cada mensagem, `other_last_read_message_id`, `server_time` e `edited_messages`. Criar `edit_message` e o parâmetro `edited_since` em `fetch_messages`. Verificação: `tests/test_chat.py` cobre respostas válidas e malformadas, a requisição do PATCH e a classificação de erros.
-- [ ] 4.2 Calcular `is_read`, `edited` e `editable` em `_decorate_messages`, com `other_last_read_id` que só aumenta e volta a zero ao trocar de conversa. Verificação: testes com uma mensagem própria lida e outra não lida, uma da outra pessoa, uma editada, uma com 14 e outra com 16 minutos, e com a conversa somente leitura.
-- [ ] 4.3 Na consulta automática, mandar `edited_since`, aplicar `edited_messages` pelo id, atualizar `other_last_read_id` e `last_server_time` e recalcular as marcas. Verificação: testes da primeira consulta sem `edited_since`, de uma edição recebida, de uma repetida, do ✓✓ atualizado e de nenhuma requisição a mais.
-- [ ] 4.4 Implementar `start_edit`, `cancel_edit` e o caminho de edição no `send_message` com os textos de erro da decisão 5. Implementar também `toggle_message_selection`, para o toque no celular. Verificação: testes de salvar, cancelar sem requisição, texto igual, 400 com o lápis escondido, 404, 429, texto vazio ou longo sem requisição e troca de conversa durante a edição.
+- [x] 4.1 Fazer o parsing da decisão 1 do frontend: `edited_at` em cada mensagem, `other_last_read_message_id`, `server_time` e `edited_messages`. Criar `edit_message` e o parâmetro `edited_since` em `fetch_messages`. Verificação: `tests/test_chat.py` cobre respostas válidas e malformadas, a requisição do PATCH e a classificação de erros.
+- [x] 4.2 Calcular `is_read`, `edited` e `editable` em `_decorate_messages`, com `other_last_read_id` que só aumenta e volta a zero ao trocar de conversa. Verificação: testes com uma mensagem própria lida e outra não lida, uma da outra pessoa, uma editada, uma com 14 e outra com 16 minutos, e com a conversa somente leitura.
+- [x] 4.3 Na consulta automática, mandar `edited_since`, aplicar `edited_messages` pelo id, atualizar `other_last_read_id` e `last_server_time` e recalcular as marcas. Verificação: testes da primeira consulta sem `edited_since`, de uma edição recebida, de uma repetida, do ✓✓ atualizado e de nenhuma requisição a mais.
+- [x] 4.4 Implementar `start_edit`, `cancel_edit` e o caminho de edição no `send_message` com os textos de erro da decisão 5. Implementar também `toggle_message_selection`, para o toque no celular. Verificação: testes de salvar, cancelar sem requisição, texto igual, 400 com o lápis escondido, 404, 429, texto vazio ou longo sem requisição e troca de conversa durante a edição.
 
 ## 5. Parte B: interface
 
-- [ ] 5.1 Na bolha, implementar o “visto” da decisão 4 e o “(editada)” na linha do horário. Verificação: testes de componente.
-- [ ] 5.2 Implementar o lápis da decisão 6: classes, `aria-label`, `data-selected`, `assets/chat.css` registrado em `stylesheets` e o lápis só nas mensagens editáveis. Implementar também o modo de edição do campo, com “Editando mensagem”, “Salvar” e “Cancelar”. Verificação: testes de componente e do CSS (hover, foco e seleção).
-- [ ] 5.3 Atualizar `docs/design/README.md` (seção “Chat”) com o “visto”, as cores, o lápis no hover e no toque, o modo de edição e o “(editada)”. Verificação: o texto bate com a spec `donation-chat-interface`.
+- [x] 5.1 Na bolha, implementar o “visto” da decisão 4 e o “(editada)” na linha do horário. Verificação: testes de componente.
+- [x] 5.2 Implementar o lápis da decisão 6: classes, `aria-label`, `data-selected`, `assets/chat.css` registrado em `stylesheets` e o lápis só nas mensagens editáveis. Implementar também o modo de edição do campo, com “Editando mensagem”, “Salvar” e “Cancelar”. Verificação: testes de componente e do CSS (hover, foco e seleção).
+- [x] 5.3 Atualizar `docs/design/README.md` (seção “Chat”) com o “visto”, as cores, o lápis no hover e no toque, o modo de edição e o “(editada)”. Verificação: o texto bate com a spec `donation-chat-interface`.
 
 ## 6. Parte B: guia
 
-- [ ] 6.1 Atualizar “Tela do chat” no guia: o “visto”, a edição, como as edições chegam à outra pessoa sem requisição a mais e os textos de erro. Verificação: o texto bate com o `design.md`.
+- [x] 6.1 Atualizar “Tela do chat” no guia: o “visto”, a edição, como as edições chegam à outra pessoa sem requisição a mais e os textos de erro. Verificação: o texto bate com o `design.md`.
 
 ## 7. Verificação final
 
-- [ ] 7.1 Rodar `python -m unittest discover -s tests -v` e mostrar `git status` e `git diff --stat`. Verificação: todos os testes passam e, na parte B, nada muda em `xano/`.
-- [ ] 7.2 (manual) No navegador, com duas contas:
+- [x] 7.1 Rodar `python -m unittest discover -s tests -v` e mostrar `git status` e `git diff --stat`. Verificação: todos os testes passam e, na parte B, nada muda em `xano/`.
+- [x] 7.2 (manual) No navegador, com duas contas:
   - a interessada envia uma mensagem e vê ✓ cinza;
   - a dona abre a conversa e, em até cerca de 15 s, a interessada vê ✓✓ verde;
   - a interessada edita a mensagem pelo lápis (hover no computador, toque no celular) e vê “(editada)”;
@@ -65,3 +65,11 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
   - o lápis não aparece em mensagem da outra pessoa nem depois de 15 minutos.
 
   Verificação: todos os itens conferidos e anotados.
+
+  Anotação do Higor no navegador:
+  - ✓ e ✓✓ corretos;
+  - o lápis edita, com “Salvar” e “Cancelar”;
+  - “(editada)” aparece para as duas contas;
+  - o lápis não aparece em mensagem antiga nem em mensagem da outra pessoa.
+
+  O Esc e o toque no celular estão cobertos pelos testes automáticos da 7.1.
