@@ -226,4 +226,18 @@ Diferenças aprovadas em relação ao Figma:
   - Acima de 99, mostra “99+”. Com zero não aparece, e a conversa aberta nunca mostra contador.
   - O rótulo acessível diz o número real (“1 mensagem não lida”, “150 mensagens não lidas”).
 - **Contador no link “Mensagens” da home:** é o mesmo círculo, ao lado do ícone, também no celular, onde aparece só o ícone com o número. Aparece só para quem está logado e com total maior que zero. O rótulo do link vira “Mensagens, N não lidas”, e o círculo fica oculto do leitor de tela para não ler o número duas vezes.
+- **“Visto” nas próprias mensagens:** não está no Figma. Fica na linha do horário, embaixo da bolha e fora dela, como `12:41 (editada) ✓✓`. Dentro da bolha verde, um ícone cinza ou verde não teria contraste.
+  - **✓ (enviada):** ícone `check` em `#6b6b6b`, a cor do horário, com rótulo acessível “Enviada”.
+  - **✓✓ (lida):** ícone `check-check` em `#007A42`, com rótulo acessível “Lida”. Sobre o creme `#FFF6E8`, fica em torno de 5:1.
+  - Nas mensagens da outra pessoa não aparece nada.
+- **“(editada)”:** na mesma linha, depois do horário, em `#6b6b6b` e 0,7 rem, para as duas pessoas.
+- **Lápis de edição:** botão fantasma com o ícone `pencil`, à esquerda da própria bolha, com rótulo acessível “Editar mensagem”.
+  - Só aparece nas próprias mensagens enviadas há até 15 minutos, fora de conversa somente leitura.
+  - No computador, aparece ao passar o mouse na linha da mensagem; no celular, ao tocar na bolha (outro toque esconde). Também aparece ao receber foco pelo teclado.
+  - Escondido, ele não recebe cliques. A regra está em `assets/chat.css`, sem transição.
+- **Modo de edição no campo de baixo:**
+  - Acima do campo aparece a faixa “Editando mensagem”, em `#E8F5EC` com texto `#166B3B`. No computador, ela também mostra “(Esc cancela)”.
+  - O campo recebe o texto atual e o foco.
+  - “Enviar” vira “Salvar”, com o ícone `check`, e aparece “Cancelar” com contorno verde.
+  - Enter salva, e Esc ou “Cancelar” saem sem salvar.
 - **Por que `#007A42` e não `#00A859`:** o verde do avatar (`#00A859`) não chega a 4,5:1 com texto branco em fonte pequena. O `#007A42`, o mesmo das bolhas enviadas e da pílula do dia, chega a esse contraste (AA).

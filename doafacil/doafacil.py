@@ -1249,6 +1249,7 @@ app = rx.App(
     },
     stylesheets=[
         "/auth-card.css",
+        "/chat.css",
         "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
     ]
 )

@@ -10,6 +10,11 @@ import httpx
 from doafacil.chat import (
     CHAT_RATE_LIMIT_MESSAGE,
     CONVERSATION_NOT_FOUND_MESSAGE,
+    EDIT_ERROR_MESSAGE,
+    EDIT_EXPIRED_MESSAGE,
+    EDIT_NOT_FOUND_MESSAGE,
+    _decorate_messages,
+    edit_message,
     LIST_ERROR_MESSAGE,
     MESSAGE_INPUT_ID,
     PLATFORM_RATE_LIMIT_MESSAGE,
@@ -83,9 +88,13 @@ def _message(message_id: int, *, mine: bool = False, **overrides: Any) -> dict[s
         "sent_by_me": mine,
         "text": f"Mensagem {message_id}",
         "created_at": 1_762_800_000_000 + message_id * 1000,
+        "edited_at": None,
     }
     item.update(overrides)
     return item
+
+
+SERVER_TIME = 1_762_800_500_000
 
 
 def _messages_page(
@@ -94,6 +103,9 @@ def _messages_page(
     status: str = "disponível",
     has_older: bool = False,
     has_newer: bool = False,
+    other_last_read: int = 0,
+    edited: list[dict[str, Any]] | None = None,
+    server_time: int = SERVER_TIME,
 ) -> dict[str, Any]:
     return {
         "messages": messages,
@@ -101,6 +113,9 @@ def _messages_page(
         "donation_status": status,
         "has_older": has_older,
         "has_newer": has_newer,
+        "other_last_read_message_id": other_last_read,
+        "edited_messages": edited or [],
+        "server_time": server_time,
     }
 
 
@@ -159,6 +174,11 @@ def _state(**overrides: Any) -> SimpleNamespace:
         "unread_total": 0,
         "unread_total_text": "",
         "unread_link_label": "Mensagens",
+        "other_last_read_id": 0,
+        "last_server_time": 0,
+        "editing_message_id": 0,
+        "selected_message_id": 0,
+        "expired_edit_ids": [],
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -379,6 +399,403 @@ class ChatClientTests(unittest.TestCase):
             with self.assertRaises(ChatServiceError):
                 _run(bad_url())
             self.assertEqual(recorder.requests, [])
+
+
+def _created_ms(message_id: int) -> int:
+    return _message(message_id)["created_at"]
+
+
+class ChatReadEditClientTests(unittest.TestCase):
+    """4.1: “visto”, edited_at, edited_messages, server_time e o PATCH."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _fetch(self, body: object, **kwargs: Any) -> tuple[dict[str, Any], _Recorder]:
+        recorder = _Recorder(_json(200, body))
+
+        async def call() -> dict[str, Any]:
+            async with recorder.client() as client:
+                return await fetch_messages(client, "t", 7, **kwargs)
+
+        return _run(call()), recorder
+
+    def test_page_carries_read_marker_server_time_and_edited_messages(self) -> None:
+        edited = _message(2, text="Corrigida", edited_at=1_762_800_400_000)
+        page, _ = self._fetch(
+            _messages_page([_message(3)], other_last_read=2, edited=[edited])
+        )
+        self.assertEqual(page["other_last_read_message_id"], 2)
+        self.assertEqual(page["server_time"], SERVER_TIME)
+        self.assertEqual(page["edited_messages"][0]["text"], "Corrigida")
+        self.assertEqual(page["edited_messages"][0]["edited_at"], 1_762_800_400_000)
+        # Sem edição, edited_at vazio vira 0.
+        self.assertEqual(page["messages"][0]["edited_at"], 0)
+        self.assertNotIn("sender_id", page["edited_messages"][0])
+
+    def test_malformed_read_and_edit_fields_raise_service_error(self) -> None:
+        sem_edited_at = {k: v for k, v in _message(1).items() if k != "edited_at"}
+        cases = {
+            "sem other_last_read": {
+                k: v for k, v in _messages_page([]).items() if k != "other_last_read_message_id"
+            },
+            "other_last_read negativo": _messages_page([], other_last_read=-1),
+            "sem server_time": {k: v for k, v in _messages_page([]).items() if k != "server_time"},
+            "server_time texto": {**_messages_page([]), "server_time": "agora"},
+            "edited_messages não é lista": {**_messages_page([]), "edited_messages": {}},
+            "mensagem sem edited_at": _messages_page([sem_edited_at]),
+            "edited_at texto": _messages_page([_message(1, edited_at="ontem")]),
+        }
+        for name, body in cases.items():
+            with self.subTest(name=name):
+                recorder = _Recorder(_json(200, body))
+
+                async def call() -> None:
+                    async with recorder.client() as client:
+                        await fetch_messages(client, "t", 7)
+
+                with self.assertRaises(ChatServiceError):
+                    _run(call())
+
+    def test_edited_since_goes_only_with_after_cursor(self) -> None:
+        _, recorder = self._fetch(_messages_page([]), after_message_id=5, edited_since=SERVER_TIME)
+        self.assertEqual(recorder.requests[0].url.params["edited_since"], str(SERVER_TIME))
+        _, recorder = self._fetch(_messages_page([]), edited_since=SERVER_TIME)
+        self.assertNotIn("edited_since", recorder.requests[0].url.params)
+        _, recorder = self._fetch(_messages_page([]), after_message_id=5)
+        self.assertNotIn("edited_since", recorder.requests[0].url.params)
+
+    def test_edit_message_sends_patch_with_bearer_and_parses_message(self) -> None:
+        body = _message(9, mine=True, text="Novo texto", edited_at=1_762_800_400_000)
+        recorder = _Recorder(_json(200, body))
+
+        async def call() -> dict[str, Any]:
+            async with recorder.client() as client:
+                return await edit_message(client, "token-teste", 9, "Novo texto")
+
+        result = _run(call())
+        request = recorder.requests[0]
+        self.assertEqual(request.method, "PATCH")
+        self.assertEqual(request.url.path, "/api:catalog/catalog/chat/messages")
+        self.assertEqual(request.headers["Authorization"], "Bearer token-teste")
+        self.assertEqual(request.read(), b'{"message_id":9,"message_text":"Novo texto"}')
+        self.assertEqual(result["text"], "Novo texto")
+        self.assertEqual(result["edited_at"], 1_762_800_400_000)
+        self.assertIs(result["sent_by_me"], True)
+
+    def test_edit_message_classifies_errors(self) -> None:
+        cases = [
+            (400, {"code": "ERROR_CODE_INPUT_ERROR", "message": "x"}, ChatInvalidMessageError),
+            (401, {"message": "x"}, ChatUnauthorizedError),
+            (404, GENERIC_404, ChatNotFoundError),
+            (429, PLATFORM_429, ChatRateLimitError),
+            (500, {"message": "x"}, ChatServiceError),
+        ]
+        for status, body, error in cases:
+            with self.subTest(status=status):
+                recorder = _Recorder(_json(status, body))
+
+                async def call() -> None:
+                    async with recorder.client() as client:
+                        await edit_message(client, "t", 9, "oi")
+
+                with self.assertRaises(error):
+                    _run(call())
+
+
+class ChatReadEditStateTests(unittest.TestCase):
+    """4.2 a 4.4: marcas da mensagem, consulta automática e edição."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _patch_client(self, recorder: _Recorder) -> Any:
+        return patch("doafacil.chat._new_client", side_effect=lambda: recorder.client())
+
+    def _now_after(self, message_id: int, minutes: float) -> Any:
+        """Relógio do navegador `minutes` minutos depois do envio da mensagem."""
+        return patch(
+            "doafacil.chat._now",
+            return_value=(_created_ms(message_id) + minutes * 60_000) / 1000,
+        )
+
+    def _mine_decorated(self, *ids: int, **kwargs: Any) -> list[dict[str, Any]]:
+        with self._now_after(max(ids), 1):
+            return _decorate_messages([_message(i, mine=True) for i in ids], **kwargs)
+
+    # 4.2 ------------------------------------------------------------------
+
+    def test_read_status_only_on_own_messages(self) -> None:
+        messages = [_message(1, mine=True), _message(2, mine=True), _message(3)]
+        with self._now_after(3, 1):
+            decorated = _decorate_messages(messages, other_last_read=3)
+        self.assertEqual([m["is_read"] for m in decorated], [True, True, False])
+        with self._now_after(3, 1):
+            decorated = _decorate_messages(messages, other_last_read=1)
+        self.assertEqual([m["is_read"] for m in decorated], [True, False, False])
+
+    def test_edited_flag_follows_edited_at(self) -> None:
+        with self._now_after(2, 1):
+            decorated = _decorate_messages(
+                [_message(1, edited_at=1_762_800_400_000), _message(2)]
+            )
+        self.assertEqual([m["edited"] for m in decorated], [True, False])
+
+    def test_editable_only_own_within_15_minutes_and_not_read_only(self) -> None:
+        own = [_message(1, mine=True)]
+        with self._now_after(1, 14):
+            self.assertTrue(_decorate_messages(own)[0]["editable"])
+            self.assertFalse(_decorate_messages(own, read_only=True)[0]["editable"])
+            self.assertFalse(_decorate_messages(own, expired_ids=[1])[0]["editable"])
+            self.assertFalse(_decorate_messages([_message(1)])[0]["editable"])
+        with self._now_after(1, 16):
+            self.assertFalse(_decorate_messages(own)[0]["editable"])
+
+    def test_open_conversation_resets_and_takes_read_marker_and_server_time(self) -> None:
+        state = _state(
+            chat_conversations=[_conversation(7), _conversation(8)],
+            active_conversation_id=7,
+            other_last_read_id=50,
+            last_server_time=123,
+            editing_message_id=5,
+        )
+        recorder = _Recorder(_json(200, _messages_page([_message(1, mine=True)], other_last_read=1)))
+        with self._patch_client(recorder), patch("doafacil.chat.rx.set_value", return_value="clear") as set_value:
+            result = _run(ChatState.select_conversation.fn(state, 8))
+        self.assertEqual(state.other_last_read_id, 1)
+        self.assertEqual(state.last_server_time, SERVER_TIME)
+        self.assertTrue(state.chat_messages[0]["is_read"])
+        # Trocar de conversa durante a edição encerra a edição e limpa o campo.
+        self.assertEqual(state.editing_message_id, 0)
+        self.assertEqual(result, "clear")
+        set_value.assert_called_once_with(MESSAGE_INPUT_ID, "")
+
+    def test_read_marker_never_goes_back(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=self._mine_decorated(5, 6), other_last_read_id=6)
+        recorder = _Recorder(_json(200, _messages_page([], other_last_read=5)))
+        with self._patch_client(recorder):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+        self.assertEqual(state.other_last_read_id, 6)
+        self.assertTrue(all(m["is_read"] for m in state.chat_messages))
+
+    # 4.3 ------------------------------------------------------------------
+
+    def test_first_poll_without_server_time_sends_no_edited_since(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=self._mine_decorated(5))
+        recorder = _Recorder(_json(200, _messages_page([])))
+        with self._patch_client(recorder):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+        self.assertNotIn("edited_since", recorder.requests[0].url.params)
+        self.assertEqual(state.last_server_time, SERVER_TIME)
+
+    def test_poll_applies_edits_read_marker_and_new_messages_in_one_request(self) -> None:
+        state = _state(
+            active_conversation_id=7,
+            chat_messages=self._mine_decorated(5, 6),
+            last_server_time=1_762_800_100_000,
+        )
+        edited = _message(5, text="Mensagem 5 corrigida", edited_at=1_762_800_200_000)
+        body = _messages_page(
+            [_message(7)],
+            other_last_read=6,
+            # A folga de 5 s pode repetir a mesma edição: é aplicada pelo id.
+            edited=[edited, edited],
+            server_time=1_762_800_300_000,
+        )
+        recorder = _Recorder(_json(200, body))
+        with self._patch_client(recorder), self._now_after(7, 1):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+        self.assertEqual(len(recorder.requests), 1)
+        params = recorder.requests[0].url.params
+        self.assertEqual(params["after_message_id"], "6")
+        self.assertEqual(params["edited_since"], "1762800100000")
+        by_id = {m["id"]: m for m in state.chat_messages}
+        self.assertEqual(list(by_id), [5, 6, 7])
+        self.assertEqual(by_id[5]["text"], "Mensagem 5 corrigida")
+        self.assertTrue(by_id[5]["edited"])
+        self.assertFalse(by_id[6]["edited"])
+        self.assertTrue(by_id[5]["is_read"] and by_id[6]["is_read"])
+        self.assertFalse(by_id[7]["is_read"])
+        self.assertEqual(state.last_server_time, 1_762_800_300_000)
+
+    def test_poll_recomputes_pencil_as_time_passes(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=self._mine_decorated(5))
+        self.assertTrue(state.chat_messages[0]["editable"])
+        with self._patch_client(_Recorder(_json(200, _messages_page([])))), self._now_after(5, 16):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+        self.assertFalse(state.chat_messages[0]["editable"])
+
+    def test_poll_ends_edit_when_donation_becomes_completed(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=self._mine_decorated(5), editing_message_id=5)
+        recorder = _Recorder(_json(200, _messages_page([], status="concluída")))
+        with self._patch_client(recorder), patch("doafacil.chat.rx.set_value", return_value="clear"):
+            result = _run(ChatState.poll_if_visible.fn(state, "visible"))
+        self.assertEqual(result, "clear")
+        self.assertEqual(state.editing_message_id, 0)
+        self.assertFalse(state.chat_messages[0]["editable"])
+
+    def test_load_older_keeps_server_time(self) -> None:
+        state = _state(
+            active_conversation_id=7,
+            chat_messages=self._mine_decorated(5),
+            has_older=True,
+            last_server_time=111,
+        )
+        recorder = _Recorder(_json(200, _messages_page([_message(4)], other_last_read=5, server_time=999)))
+        with self._patch_client(recorder):
+            _run(ChatState.load_older_messages.fn(state))
+        self.assertEqual(state.last_server_time, 111)
+        self.assertEqual(state.other_last_read_id, 5)
+
+    # 4.4 ------------------------------------------------------------------
+
+    def _editing_state(self, **overrides: Any) -> SimpleNamespace:
+        values = {"active_conversation_id": 7, "chat_messages": self._mine_decorated(5, 6)}
+        values.update(overrides)
+        return _state(**values)
+
+    def test_start_edit_fills_the_field_and_focuses_it(self) -> None:
+        state = self._editing_state(selected_message_id=6)
+        with (
+            patch("doafacil.chat.rx.set_value", return_value="fill") as set_value,
+            patch("doafacil.chat.rx.set_focus", return_value="focus") as set_focus,
+        ):
+            result = ChatState.start_edit.fn(state, 6)
+        self.assertEqual(result, ["fill", "focus"])
+        set_value.assert_called_once_with(MESSAGE_INPUT_ID, "Mensagem 6")
+        set_focus.assert_called_once_with(MESSAGE_INPUT_ID)
+        self.assertEqual(state.editing_message_id, 6)
+        self.assertEqual(state.selected_message_id, 0)
+
+    def test_start_edit_ignores_messages_that_are_not_editable(self) -> None:
+        with self._now_after(5, 1):
+            messages = _decorate_messages([_message(5), _message(6, mine=True)], read_only=False)
+        state = _state(active_conversation_id=7, chat_messages=messages)
+        with patch("doafacil.chat.rx.set_value") as set_value:
+            self.assertIsNone(ChatState.start_edit.fn(state, 5))
+            self.assertIsNone(ChatState.start_edit.fn(state, 99))
+        set_value.assert_not_called()
+        self.assertEqual(state.editing_message_id, 0)
+
+    def test_save_edit_replaces_bubble_marks_edited_and_clears_field(self) -> None:
+        state = self._editing_state(editing_message_id=5)
+        body = _message(5, mine=True, text="Corrigido", edited_at=1_762_800_400_000)
+        recorder = _Recorder(_json(200, body))
+        with (
+            self._patch_client(recorder),
+            self._now_after(6, 1),
+            patch("doafacil.chat.rx.set_value", return_value="clear") as set_value,
+        ):
+            result = _run(ChatState.send_message.fn(state, {"message_text": "  Corrigido  "}))
+        request = recorder.requests[0]
+        self.assertEqual(request.method, "PATCH")
+        self.assertEqual(request.read(), b'{"message_id":5,"message_text":"Corrigido"}')
+        self.assertEqual(result, "clear")
+        set_value.assert_called_once_with(MESSAGE_INPUT_ID, "")
+        first = state.chat_messages[0]
+        self.assertEqual((first["text"], first["edited"]), ("Corrigido", True))
+        self.assertEqual([m["id"] for m in state.chat_messages], [5, 6])
+        self.assertEqual(state.editing_message_id, 0)
+        self.assertFalse(state.is_sending)
+
+    def test_save_same_text_keeps_message_not_edited(self) -> None:
+        state = self._editing_state(editing_message_id=5)
+        recorder = _Recorder(_json(200, _message(5, mine=True)))
+        with self._patch_client(recorder), self._now_after(6, 1), patch("doafacil.chat.rx.set_value"):
+            _run(ChatState.send_message.fn(state, {"message_text": "Mensagem 5"}))
+        self.assertFalse(state.chat_messages[0]["edited"])
+        self.assertEqual(state.editing_message_id, 0)
+
+    def test_cancel_and_escape_end_edit_without_request(self) -> None:
+        for trigger in ("cancelar", "esc"):
+            with self.subTest(trigger=trigger):
+                state = self._editing_state(editing_message_id=5)
+                recorder = _Recorder(_json(200, _message(5, mine=True)))
+                with self._patch_client(recorder), patch("doafacil.chat.rx.set_value", return_value="clear") as set_value:
+                    if trigger == "cancelar":
+                        result = ChatState.cancel_edit.fn(state)
+                    else:
+                        result = ChatState.composer_key_down.fn(state, "Escape")
+                self.assertEqual(result, "clear")
+                set_value.assert_called_once_with(MESSAGE_INPUT_ID, "")
+                self.assertEqual(state.editing_message_id, 0)
+                self.assertEqual(recorder.requests, [])
+                self.assertEqual(state.chat_messages[0]["text"], "Mensagem 5")
+
+    def test_other_keys_and_escape_without_edit_do_nothing(self) -> None:
+        state = self._editing_state(editing_message_id=5)
+        with patch("doafacil.chat.rx.set_value") as set_value:
+            self.assertIsNone(ChatState.composer_key_down.fn(state, "a"))
+            self.assertIsNone(ChatState.composer_key_down.fn(state, "Enter"))
+            self.assertEqual(state.editing_message_id, 5)
+            self.assertIsNone(ChatState.composer_key_down.fn(_state(), "Escape"))
+            self.assertIsNone(ChatState.cancel_edit.fn(_state()))
+        set_value.assert_not_called()
+
+    def test_edit_400_means_expired_hides_pencil_and_keeps_text(self) -> None:
+        state = self._editing_state(editing_message_id=5)
+        with (
+            self._patch_client(_Recorder(_json(400, {"message": "x"}))),
+            self._now_after(6, 1),
+            patch("doafacil.chat.rx.set_value") as set_value,
+        ):
+            result = _run(ChatState.send_message.fn(state, {"message_text": "Novo"}))
+        self.assertIsNone(result)
+        set_value.assert_not_called()
+        self.assertEqual(state.send_error, EDIT_EXPIRED_MESSAGE)
+        self.assertEqual(state.editing_message_id, 0)
+        self.assertEqual(state.expired_edit_ids, [5])
+        self.assertFalse(state.chat_messages[0]["editable"])
+        self.assertTrue(state.chat_messages[1]["editable"])
+
+    def test_edit_404_and_429_messages(self) -> None:
+        cases = [
+            (404, GENERIC_404, EDIT_NOT_FOUND_MESSAGE, 0),
+            (429, CHAT_429, CHAT_RATE_LIMIT_MESSAGE, 5),
+            (429, PLATFORM_429, PLATFORM_RATE_LIMIT_MESSAGE, 5),
+            (500, {"message": "x"}, EDIT_ERROR_MESSAGE, 5),
+        ]
+        for status, body, expected, editing in cases:
+            with self.subTest(status=status, message=expected):
+                state = self._editing_state(editing_message_id=5)
+                with (
+                    self._patch_client(_Recorder(_json(status, body))),
+                    patch("doafacil.chat.rx.set_value") as set_value,
+                ):
+                    result = _run(ChatState.send_message.fn(state, {"message_text": "Novo"}))
+                self.assertIsNone(result)
+                set_value.assert_not_called()
+                self.assertEqual(state.send_error, expected)
+                self.assertEqual(state.editing_message_id, editing)
+                self.assertEqual(state.chat_messages[0]["text"], "Mensagem 5")
+                self.assertFalse(state.is_sending)
+
+    def test_edit_with_empty_or_long_text_makes_no_request(self) -> None:
+        for text, error in (("   ", ""), ("a" * 1001, SEND_INVALID_MESSAGE)):
+            with self.subTest(size=len(text)):
+                state = self._editing_state(editing_message_id=5)
+                recorder = _Recorder(_json(200, _message(5, mine=True)))
+                with self._patch_client(recorder):
+                    _run(ChatState.send_message.fn(state, {"message_text": text}))
+                self.assertEqual(recorder.requests, [])
+                self.assertEqual(state.send_error, error)
+                self.assertEqual(state.editing_message_id, 5)
+
+    def test_toggle_selection_only_for_editable_messages(self) -> None:
+        with self._now_after(6, 1):
+            messages = _decorate_messages([_message(5), _message(6, mine=True)])
+        state = _state(active_conversation_id=7, chat_messages=messages)
+        ChatState.toggle_message_selection.fn(state, 6)
+        self.assertEqual(state.selected_message_id, 6)
+        ChatState.toggle_message_selection.fn(state, 6)
+        self.assertEqual(state.selected_message_id, 0)
+        ChatState.toggle_message_selection.fn(state, 6)
+        ChatState.toggle_message_selection.fn(state, 5)
+        self.assertEqual(state.selected_message_id, 0)
 
 
 class ChatUnreadClientTests(unittest.TestCase):
@@ -1174,6 +1591,101 @@ class ChatPageTests(unittest.TestCase):
         # O contador fica à direita: depois do nome e do título.
         row = str(item)
         self.assertLess(row.index("donation_title"), row.index("chat-unread-badge"))
+
+    def _bubble(self) -> object:
+        from doafacil.chat import ChatState, _message_bubble
+
+        return _message_bubble(ChatState.chat_messages[0])
+
+    def test_read_status_on_time_line_only_for_own_messages(self) -> None:
+        bubble = self._bubble()
+        status_conds = [
+            n
+            for n in _nodes(bubble)
+            if type(n).__name__ == "Cond"
+            and "chat-read-status" in str(n)
+            and "sent_by_me" in str(getattr(n, "cond", ""))
+        ]
+        self.assertEqual(len(status_conds), 1)
+        mine, other = status_conds[0].children
+        self.assertNotIn("chat-read-status", str(other))
+        rendered = str(mine)
+        self.assertIn("is_read", rendered)
+        # ✓✓ verde “Lida” e ✓ cinza “Enviada”.
+        self.assertIn("LucideCheckCheck", rendered)
+        self.assertIn('"#007A42"', rendered)
+        self.assertIn('"aria-label":"Lida"', rendered)
+        self.assertIn("LucideCheck,", rendered)
+        self.assertIn('"#6b6b6b"', rendered)
+        self.assertIn('"aria-label":"Enviada"', rendered)
+        self.assertIn('role:"img"', rendered)
+
+    def test_time_line_holds_time_edited_label_and_status_outside_bubble(self) -> None:
+        bubble = self._bubble()
+        stacks = [
+            n
+            for n in _nodes(bubble)
+            if type(n).__name__ == "HStack"
+            and "time_label" in str(n)
+            and "chat-read-status" in str(n)
+        ]
+        self.assertEqual(len(stacks), 1)
+        line = str(stacks[0])
+        self.assertIn("(editada)", line)
+        self.assertIn('["edited"]', line)
+        # A linha não fica dentro da bolha (o texto da mensagem não está nela).
+        self.assertNotIn('["text"]', line)
+
+    def test_pencil_only_on_editable_messages_with_hover_and_tap_hooks(self) -> None:
+        bubble = self._bubble()
+        pencil_conds = [
+            n
+            for n in _nodes(bubble)
+            if type(n).__name__ == "Cond"
+            and "chat-edit-btn" in str(n)
+            and "editable" in str(getattr(n, "cond", ""))
+        ]
+        self.assertEqual(len(pencil_conds), 1)
+        pencil = str(pencil_conds[0].children[0])
+        self.assertIn('"aria-label":"Editar mensagem"', pencil)
+        self.assertIn('type:"button"', pencil)
+        self.assertIn("start_edit", pencil)
+        self.assertNotIn("chat-edit-btn", str(pencil_conds[0].children[1]))
+        rendered = str(bubble)
+        self.assertIn("chat-bubble-row", rendered)
+        self.assertIn('"data-selected"', rendered)
+        self.assertIn("selected_message_id", rendered)
+        self.assertIn("toggle_message_selection", rendered)
+
+    def test_composer_edit_mode_with_save_cancel_and_escape(self) -> None:
+        from doafacil.chat import _composer
+
+        rendered = str(_composer())
+        for text in ("Editando mensagem", "Salvar", "Cancelar", "Enviar", "(Esc cancela)"):
+            with self.subTest(text=text):
+                self.assertIn(text, rendered)
+        self.assertIn("editing_message_id", rendered)
+        self.assertIn("cancel_edit", rendered)
+        self.assertIn("composer_key_down", rendered)
+        self.assertIn("onKeyDown", rendered)
+        # Salvar continua sendo o submit do mesmo formulário (Enter salva).
+        forms = [n for n in _nodes(_composer()) if type(n).__name__ == "Form"]
+        self.assertEqual(len(forms), 1)
+        self.assertIn('type:"submit"', str(forms[0]))
+
+    def test_chat_css_shows_pencil_on_hover_focus_and_selection(self) -> None:
+        from pathlib import Path
+
+        from doafacil.doafacil import app
+
+        css = (Path(__file__).resolve().parents[1] / "assets" / "chat.css").read_text(encoding="utf-8")
+        self.assertIn(".chat-edit-btn {\n  opacity: 0;\n  pointer-events: none;", css)
+        self.assertIn("@media (hover: hover)", css)
+        self.assertIn(".chat-bubble-row:hover .chat-edit-btn", css)
+        self.assertIn(".chat-edit-btn:focus-visible", css)
+        self.assertIn('.chat-bubble-row[data-selected="true"] .chat-edit-btn', css)
+        self.assertNotIn("transition", css)
+        self.assertIn("/chat.css", app.stylesheets)
 
     def test_chat_content_is_never_rendered_as_html(self) -> None:
         kinds = {type(n).__name__ for n in _nodes(self.page)}

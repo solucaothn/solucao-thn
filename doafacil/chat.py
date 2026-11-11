@@ -67,6 +67,17 @@ POLL_INTERVAL_MS = 15000
 LIST_POLL_INTERVAL_MS = 30000
 UNREAD_DISPLAY_MAX = 99
 
+# Edição e “visto”.
+EDIT_WINDOW_SECONDS = 15 * 60
+EDITING_LABEL = "Editando mensagem"
+EDITED_LABEL = "(editada)"
+SENT_STATUS_LABEL = "Enviada"
+READ_STATUS_LABEL = "Lida"
+EDIT_BUTTON_LABEL = "Editar mensagem"
+EDIT_EXPIRED_MESSAGE = "Não foi possível editar. O prazo de 15 minutos terminou."
+EDIT_NOT_FOUND_MESSAGE = "Não foi possível editar esta mensagem."
+EDIT_ERROR_MESSAGE = "Não foi possível salvar a edição. Tente novamente."
+
 # Cores (contraste AA sobre os fundos usados).
 GREEN_TEXT = "#166B3B"
 GREEN_BUTTON = "#007A42"
@@ -285,12 +296,15 @@ def _parse_message(payload: object) -> dict[str, Any]:
     sent_by_me = payload.get("sent_by_me")
     text = payload.get("text")
     created_at = payload.get("created_at")
+    # edited_at é obrigatório na resposta, mas vazio (nulo ou 0) sem edição.
+    edited_at = payload.get("edited_at", False)
     if (
         not _is_int(message_id)
         or not isinstance(sender, str)
         or not isinstance(sent_by_me, bool)
         or not isinstance(text, str)
         or not _is_int(created_at)
+        or not (edited_at is None or _is_int(edited_at))
     ):
         raise ChatServiceError
     return {
@@ -299,6 +313,7 @@ def _parse_message(payload: object) -> dict[str, Any]:
         "sent_by_me": sent_by_me,
         "text": text,
         "created_at": created_at,
+        "edited_at": edited_at or 0,
     }
 
 
@@ -310,12 +325,19 @@ def _parse_messages_page(payload: object) -> dict[str, Any]:
     status = payload.get("donation_status")
     has_older = payload.get("has_older")
     has_newer = payload.get("has_newer")
+    other_last_read = payload.get("other_last_read_message_id")
+    server_time = payload.get("server_time")
+    edited = payload.get("edited_messages")
     if (
         not isinstance(messages, list)
         or not isinstance(title, str)
         or not isinstance(status, str)
         or not isinstance(has_older, bool)
         or not isinstance(has_newer, bool)
+        or not _is_int(other_last_read)
+        or other_last_read < 0
+        or not _is_int(server_time)
+        or not isinstance(edited, list)
     ):
         raise ChatServiceError
     return {
@@ -324,6 +346,9 @@ def _parse_messages_page(payload: object) -> dict[str, Any]:
         "donation_status": status,
         "has_older": has_older,
         "has_newer": has_newer,
+        "other_last_read_message_id": other_last_read,
+        "server_time": server_time,
+        "edited_messages": [_parse_message(item) for item in edited],
     }
 
 
@@ -405,6 +430,7 @@ async def fetch_messages(
     *,
     before_message_id: int | None = None,
     after_message_id: int | None = None,
+    edited_since: int | None = None,
     limit: int = MESSAGES_PAGE_LIMIT,
 ) -> dict[str, Any]:
     if before_message_id is not None and after_message_id is not None:
@@ -414,6 +440,9 @@ async def fetch_messages(
         params["before_message_id"] = before_message_id
     if after_message_id is not None:
         params["after_message_id"] = after_message_id
+        # edited_since só tem efeito junto com after_message_id.
+        if edited_since is not None:
+            params["edited_since"] = edited_since
     endpoint = _chat_endpoint(MESSAGES_PATH)
     try:
         response = await client.get(
@@ -444,6 +473,26 @@ async def send_message(
     return _parse_message(_json(response))
 
 
+async def edit_message(
+    client: httpx.AsyncClient,
+    auth_token: str,
+    message_id: int,
+    text: str,
+) -> dict[str, Any]:
+    """PATCH da mensagem própria; 400 com texto válido é o prazo encerrado."""
+    endpoint = _chat_endpoint(MESSAGES_PATH)
+    try:
+        response = await client.patch(
+            endpoint,
+            json={"message_id": message_id, "message_text": text},
+            headers=_bearer(auth_token),
+        )
+    except httpx.HTTPError:
+        raise ChatServiceError from None
+    _raise_for_chat_status(response)
+    return _parse_message(_json(response))
+
+
 # ---------------------------------------------------------------------------
 # Lógica de estado (funções do módulo, testáveis com SimpleNamespace)
 # ---------------------------------------------------------------------------
@@ -457,12 +506,21 @@ def _new_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=15.0)
 
 
-def _decorate_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Ordena por id, remove repetidas e marca o primeiro de cada dia."""
+def _decorate_messages(
+    messages: list[dict[str, Any]],
+    *,
+    other_last_read: int = 0,
+    read_only: bool = False,
+    expired_ids: list[int] | tuple[int, ...] = (),
+) -> list[dict[str, Any]]:
+    """Ordena por id, remove repetidas, marca o primeiro de cada dia e calcula
+    o “visto” (is_read), a edição (edited) e se o lápis aparece (editable)."""
     unique: dict[int, dict[str, Any]] = {}
     for message in messages:
         unique[message["id"]] = message
     now_ms = _now() * 1000
+    edit_floor_ms = now_ms - EDIT_WINDOW_SECONDS * 1000
+    expired = set(expired_ids)
     decorated: list[dict[str, Any]] = []
     previous_label = None
     for message_id in sorted(unique):
@@ -471,9 +529,96 @@ def _decorate_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         message["day_label"] = label
         message["show_day"] = label != previous_label
         message["time_label"] = time_label(message["created_at"])
+        mine = bool(message.get("sent_by_me"))
+        # “Visto” só nas próprias mensagens.
+        message["is_read"] = mine and message_id <= other_last_read
+        message["edited"] = bool(message.get("edited_at"))
+        # O backend decide; aqui só se esconde o lápis quando não faz sentido.
+        message["editable"] = (
+            mine
+            and not read_only
+            and message_id not in expired
+            and message["created_at"] >= edit_floor_ms
+        )
         previous_label = label
         decorated.append(message)
     return decorated
+
+
+def _redecorate(state: Any, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return _decorate_messages(
+        messages,
+        other_last_read=state.other_last_read_id,
+        read_only=state.read_only,
+        expired_ids=state.expired_edit_ids,
+    )
+
+
+def _apply_read_marker(state: Any, page: dict[str, Any]) -> None:
+    """O “visto” só avança (duas abas lendo ao mesmo tempo não fazem piscar)."""
+    state.other_last_read_id = max(
+        state.other_last_read_id, page["other_last_read_message_id"]
+    )
+
+
+def _apply_edits(
+    messages: list[dict[str, Any]], edited: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Troca texto e edited_at das mensagens já exibidas, pelo id."""
+    by_id = {item["id"]: item for item in edited}
+    updated: list[dict[str, Any]] = []
+    for message in messages:
+        change = by_id.get(message["id"])
+        if change is None:
+            updated.append(message)
+        else:
+            updated.append(
+                {**message, "text": change["text"], "edited_at": change["edited_at"]}
+            )
+    return updated
+
+
+def _end_edit(state: Any) -> None:
+    state.editing_message_id = 0
+    state.selected_message_id = 0
+
+
+async def _save_edit(state: Any, text: str) -> rx.event.EventSpec | None:
+    """Caminho de edição do formulário (o mesmo campo e o mesmo Enter)."""
+    message_id = state.editing_message_id
+    state.is_sending = True
+    try:
+        async with _new_client() as client:
+            message = await edit_message(client, state.auth_token, message_id, text)
+    except ChatUnauthorizedError:
+        _clear_session(state)
+        return rx.redirect("/login")
+    except ChatInvalidMessageError:
+        # O tamanho já foi validado antes: o 400 é o prazo encerrado.
+        # O texto fica no campo, agora como rascunho de mensagem nova.
+        state.send_error = EDIT_EXPIRED_MESSAGE
+        state.expired_edit_ids = [*state.expired_edit_ids, message_id]
+        _end_edit(state)
+        state.chat_messages = _redecorate(state, state.chat_messages)
+        return None
+    except ChatNotFoundError:
+        state.send_error = EDIT_NOT_FOUND_MESSAGE
+        _end_edit(state)
+        return None
+    except ChatRateLimitError as error:
+        state.send_error = rate_limit_message(error.kind)
+        return None
+    except ChatServiceError:
+        state.send_error = EDIT_ERROR_MESSAGE
+        return None
+    finally:
+        state.is_sending = False
+
+    state.chat_messages = _redecorate(
+        state, _apply_edits(state.chat_messages, [message])
+    )
+    _end_edit(state)
+    return rx.set_value(MESSAGE_INPUT_ID, "")
 
 
 def _clear_session(state: Any) -> None:
@@ -494,6 +639,10 @@ def _reset_conversation(state: Any) -> None:
     state.send_error = ""
     state.is_sending = False
     state.poll_paused_until = 0.0
+    state.other_last_read_id = 0
+    state.last_server_time = 0
+    state.expired_edit_ids = []
+    _end_edit(state)
 
 
 def _merge_conversations(
@@ -594,7 +743,9 @@ async def _open_conversation(
         state.conversation_error = MESSAGES_ERROR_MESSAGE
         return
     _apply_page_metadata(state, page)
-    state.chat_messages = _decorate_messages(page["messages"])
+    _apply_read_marker(state, page)
+    state.last_server_time = page["server_time"]
+    state.chat_messages = _redecorate(state, page["messages"])
     state.has_older = page["has_older"]
     state.active_other_name = _other_name_for(state, conversation_id, page["messages"])
     state.mobile_view = "conversation"
@@ -645,6 +796,13 @@ class ChatState(LoginState):
     # Pausa compartilhada pelas consultas automáticas de mensagens e da lista.
     poll_paused_until: float = 0.0
     mobile_view: str = "list"
+
+    # “Visto” e edição da conversa aberta.
+    other_last_read_id: int = 0
+    last_server_time: int = 0
+    editing_message_id: int = 0
+    selected_message_id: int = 0
+    expired_edit_ids: list[int] = []
 
     # Total de não lidas do link “Mensagens” da home.
     unread_total: int = 0
@@ -719,12 +877,16 @@ class ChatState(LoginState):
     ) -> rx.event.EventSpec | None:
         if not self.auth_token:
             return rx.redirect("/login")
+        was_editing = bool(self.editing_message_id)
         try:
             async with _new_client() as client:
                 await _open_conversation(self, client, int(conversation_id))
         except ChatUnauthorizedError:
             _clear_session(self)
             return rx.redirect("/login")
+        # A edição em andamento termina ao trocar de conversa.
+        if was_editing:
+            return rx.set_value(MESSAGE_INPUT_ID, "")
         return None
 
     @rx.event
@@ -760,9 +922,10 @@ class ChatState(LoginState):
         finally:
             self.is_loading_older = False
         _apply_page_metadata(self, page)
-        self.chat_messages = _decorate_messages(
-            [*page["messages"], *self.chat_messages]
-        )
+        # last_server_time não muda aqui: as editadas vêm só da consulta
+        # automática, e trocar o horário faria perder edições entre as duas.
+        _apply_read_marker(self, page)
+        self.chat_messages = _redecorate(self, [*page["messages"], *self.chat_messages])
         self.has_older = page["has_older"]
         return None
 
@@ -821,6 +984,8 @@ class ChatState(LoginState):
         if len(text) > MAX_MESSAGE_LENGTH:
             self.send_error = SEND_INVALID_MESSAGE
             return None
+        if self.editing_message_id:
+            return await _save_edit(self, text)
 
         self.is_sending = True
         try:
@@ -847,12 +1012,54 @@ class ChatState(LoginState):
         finally:
             self.is_sending = False
 
-        self.chat_messages = _decorate_messages([*self.chat_messages, message])
+        self.chat_messages = _redecorate(self, [*self.chat_messages, message])
         _move_conversation_to_top(
             self, self.active_conversation_id, message["created_at"]
         )
         # Limpa o campo só depois do sucesso.
         return rx.set_value(MESSAGE_INPUT_ID, "")
+
+    @rx.event
+    def start_edit(self, message_id: int) -> list[rx.event.EventSpec] | None:
+        message = next(
+            (m for m in self.chat_messages if m["id"] == int(message_id)), None
+        )
+        if message is None or not message.get("editable") or self.is_sending:
+            return None
+        self.editing_message_id = message["id"]
+        self.selected_message_id = 0
+        self.send_error = ""
+        return [
+            rx.set_value(MESSAGE_INPUT_ID, message["text"]),
+            rx.set_focus(MESSAGE_INPUT_ID),
+        ]
+
+    @rx.event
+    def cancel_edit(self) -> rx.event.EventSpec | None:
+        if not self.editing_message_id:
+            return None
+        _end_edit(self)
+        self.send_error = ""
+        return rx.set_value(MESSAGE_INPUT_ID, "")
+
+    @rx.event
+    def composer_key_down(self, key: str) -> rx.event.EventSpec | None:
+        # Esc cancela a edição; as outras teclas não fazem nada aqui.
+        if key == "Escape" and self.editing_message_id:
+            return ChatState.cancel_edit.fn(self)
+        return None
+
+    @rx.event
+    def toggle_message_selection(self, message_id: int) -> None:
+        """Toque na bolha (celular): mostra ou esconde o lápis dela."""
+        message_id = int(message_id)
+        message = next((m for m in self.chat_messages if m["id"] == message_id), None)
+        if message is None or not message.get("editable"):
+            self.selected_message_id = 0
+            return
+        self.selected_message_id = (
+            0 if self.selected_message_id == message_id else message_id
+        )
 
     @rx.event
     def poll_tick(self, _value: Any = None) -> rx.event.EventSpec | None:
@@ -892,6 +1099,7 @@ class ChatState(LoginState):
                         self.auth_token,
                         conversation_id,
                         after_message_id=last_id,
+                        edited_since=self.last_server_time or None,
                         limit=POLL_MESSAGES_LIMIT,
                     )
         except ChatUnauthorizedError:
@@ -906,12 +1114,18 @@ class ChatState(LoginState):
         if conversation_id != self.active_conversation_id:
             return None
         _apply_page_metadata(self, page)
-        if page["messages"]:
-            self.chat_messages = _decorate_messages(
-                [*self.chat_messages, *page["messages"]]
-            )
-            if last_id is None:
-                self.has_older = page["has_older"]
+        _apply_read_marker(self, page)
+        self.last_server_time = page["server_time"]
+        # Edições das já exibidas, mensagens novas, ✓✓ e lápis: tudo desta
+        # mesma resposta, sem requisição a mais.
+        messages = _apply_edits(self.chat_messages, page["edited_messages"])
+        self.chat_messages = _redecorate(self, [*messages, *page["messages"]])
+        if page["messages"] and last_id is None:
+            self.has_older = page["has_older"]
+        # A doação foi concluída durante a edição: a edição termina.
+        if self.read_only and self.editing_message_id:
+            _end_edit(self)
+            return rx.set_value(MESSAGE_INPUT_ID, "")
         return None
 
     @rx.event
@@ -1218,38 +1432,111 @@ def _day_separator(message: rx.Var) -> rx.Component:
     )
 
 
+def _read_status(message: rx.Var) -> rx.Component:
+    """✓ cinza (enviada) ou ✓✓ verde (lida), só nas próprias mensagens."""
+    return rx.cond(
+        message["sent_by_me"],
+        rx.cond(
+            message["is_read"],
+            rx.el.span(
+                rx.icon("check-check", size=14, color=GREEN_BUTTON, aria_hidden="true"),
+                role="img",
+                aria_label=READ_STATUS_LABEL,
+                class_name="chat-read-status",
+                display="inline-flex",
+            ),
+            rx.el.span(
+                rx.icon("check", size=14, color=TEXT_TIME, aria_hidden="true"),
+                role="img",
+                aria_label=SENT_STATUS_LABEL,
+                class_name="chat-read-status",
+                display="inline-flex",
+            ),
+        ),
+        rx.fragment(),
+    )
+
+
+def _edit_button(message: rx.Var) -> rx.Component:
+    """Lápis: aparece no hover (computador), no foco do teclado ou com a bolha
+    selecionada por toque (celular); a visibilidade fica no assets/chat.css."""
+    return rx.cond(
+        message["editable"],
+        rx.icon_button(
+            rx.icon("pencil", size=14),
+            type="button",
+            on_click=ChatState.start_edit(message["id"]),
+            class_name="chat-edit-btn",
+            aria_label=EDIT_BUTTON_LABEL,
+            title=EDIT_BUTTON_LABEL,
+            variant="ghost",
+            size="1",
+            color=GREEN_TEXT,
+        ),
+        rx.fragment(),
+    )
+
+
 def _message_bubble(message: rx.Var) -> rx.Component:
     mine = message["sent_by_me"]
+    selected = ChatState.selected_message_id == message["id"]
     return rx.fragment(
         _day_separator(message),
         rx.flex(
-            rx.box(
-                rx.text(
-                    message["text"],
-                    color=rx.cond(mine, "white", TEXT_DARK),
-                    font_weight="700",
-                    font_size="1rem",
-                    white_space="pre-wrap",
-                    word_break="break-word",
+            rx.hstack(
+                _edit_button(message),
+                rx.box(
+                    rx.text(
+                        message["text"],
+                        color=rx.cond(mine, "white", TEXT_DARK),
+                        font_weight="700",
+                        font_size="1rem",
+                        white_space="pre-wrap",
+                        word_break="break-word",
+                    ),
+                    # Toque na bolha (celular) mostra ou esconde o lápis.
+                    on_click=ChatState.toggle_message_selection(message["id"]),
+                    background=rx.cond(mine, GREEN_BUTTON, BUBBLE_OTHER),
+                    padding="10px",
+                    border_radius="8px",
+                    max_width="100%",
+                    box_shadow=rx.cond(
+                        mine,
+                        "2px 2px 1px rgba(0, 0, 0, 0.25)",
+                        "-2px 2px 1px rgba(0, 0, 0, 0.25)",
+                    ),
                 ),
-                background=rx.cond(mine, GREEN_BUTTON, BUBBLE_OTHER),
-                padding="10px",
-                border_radius="8px",
+                spacing="1",
+                align="center",
+                justify=rx.cond(mine, "end", "start"),
                 max_width="min(450px, 85%)",
-                box_shadow=rx.cond(
-                    mine,
-                    "2px 2px 1px rgba(0, 0, 0, 0.25)",
-                    "-2px 2px 1px rgba(0, 0, 0, 0.25)",
-                ),
             ),
-            # Horário de envio embaixo da bolha, do mesmo lado dela.
-            rx.text(
-                message["time_label"],
-                class_name="chat-message-time",
-                color=TEXT_TIME,
-                font_size="0.7rem",
+            # Linha do horário, fora da bolha e do mesmo lado dela:
+            # horário, “(editada)” e o “visto” nas próprias mensagens.
+            rx.hstack(
+                rx.text(
+                    message["time_label"],
+                    class_name="chat-message-time",
+                    color=TEXT_TIME,
+                    font_size="0.7rem",
+                ),
+                rx.cond(
+                    message["edited"],
+                    rx.text(
+                        EDITED_LABEL,
+                        class_name="chat-message-edited",
+                        color=TEXT_TIME,
+                        font_size="0.7rem",
+                    ),
+                    rx.fragment(),
+                ),
+                _read_status(message),
+                spacing="1",
+                align="center",
                 margin_top="2px",
             ),
+            class_name="chat-bubble-row",
+            custom_attrs={"data-selected": rx.cond(selected, "true", "false")},
             direction="column",
             align=rx.cond(mine, "end", "start"),
             width="100%",
@@ -1398,6 +1685,29 @@ def _composer() -> rx.Component:
             ),
             rx.fragment(),
         ),
+        rx.cond(
+            ChatState.editing_message_id > 0,
+            rx.hstack(
+                rx.icon("pencil", size=14, aria_hidden="true"),
+                rx.text(EDITING_LABEL, font_weight="700", font_size="0.85rem"),
+                rx.text(
+                    "(Esc cancela)",
+                    color=TEXT_MUTED,
+                    font_size="0.75rem",
+                    display=rx.breakpoints(initial="none", md="inline"),
+                ),
+                role="status",
+                class_name="chat-editing-banner",
+                color=GREEN_TEXT,
+                background="#E8F5EC",
+                padding="0.35rem 0.75rem",
+                border_radius="6px",
+                spacing="2",
+                align="center",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
         rx.form(
             rx.hstack(
                 rx.input(
@@ -1406,7 +1716,11 @@ def _composer() -> rx.Component:
                     placeholder=MESSAGE_PLACEHOLDER,
                     max_length=MAX_MESSAGE_LENGTH,
                     disabled=ChatState.read_only,
-                    aria_label="Mensagem",
+                    # Esc cancela a edição (nenhuma requisição ao Xano).
+                    on_key_down=ChatState.composer_key_down,
+                    aria_label=rx.cond(
+                        ChatState.editing_message_id > 0, EDITING_LABEL, "Mensagem"
+                    ),
                     # O prop auto_complete só aceita booleano e não gera
                     # autocomplete="off"; o atributo vai direto no campo.
                     custom_attrs={"autoComplete": "off"},
@@ -1417,9 +1731,26 @@ def _composer() -> rx.Component:
                     border=f"1px solid {GREEN_BORDER}",
                     border_radius="4px",
                 ),
+                rx.cond(
+                    ChatState.editing_message_id > 0,
+                    rx.button(
+                        "Cancelar",
+                        type="button",
+                        on_click=ChatState.cancel_edit,
+                        variant="outline",
+                        color=GREEN_TEXT,
+                        background="white",
+                        height="40px",
+                    ),
+                    rx.fragment(),
+                ),
                 rx.button(
-                    rx.icon("send", size=16),
-                    "Enviar",
+                    rx.cond(
+                        ChatState.editing_message_id > 0,
+                        rx.icon("check", size=16),
+                        rx.icon("send", size=16),
+                    ),
+                    rx.cond(ChatState.editing_message_id > 0, "Salvar", "Enviar"),
                     type="submit",
                     disabled=ChatState.is_sending | ChatState.read_only,
                     background=GREEN_BUTTON,
