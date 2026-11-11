@@ -12,6 +12,9 @@ grava nada em arquivo e não imprime tokens, e-mails nem corpos de resposta.
 
 Atenção: o script cria dados reais (conversa e mensagens) na doação informada.
 A paginação (8c-8h) usa as mensagens já criadas pela própria execução.
+Os cenários de não lidas (NL1-NL8) rodam nos dois modos, inclusive no rápido
+(TESTE_CHAT_RAPIDO=1); o unread_total é comparado com uma base medida antes
+dos envios, porque soma todas as conversas da conta.
 Os cenários 9 (status) e 10 (exclusão) são opcionais e pedem confirmação:
 o 9 deixa a doação concluída, o que não tem volta.
 """
@@ -169,7 +172,7 @@ def main() -> None:
 
     rapido = os.getenv("TESTE_CHAT_RAPIDO", "").strip() == "1"
     if rapido:
-        print("Modo rápido (TESTE_CHAT_RAPIDO=1): login, 2a, 3, 3c e duas leituras.")
+        print("Modo rápido (TESTE_CHAT_RAPIDO=1): login, 2a, 3, 3c, duas leituras e não lidas (NL).")
 
     with httpx.Client(timeout=TIMEOUT) as cliente:
         dona = login(cliente, auth, "dona da doação")
@@ -279,9 +282,17 @@ def main() -> None:
                 f"{api}/catalog/chat/conversations", headers=conta.headers
             )
 
+        def total(conta: Conta | None) -> httpx.Response:
+            # Sem conta: chamada sem token, para o cenário do 401.
+            time.sleep(PAUSA_SEGUNDOS)
+            return cliente.get(
+                f"{api}/catalog/chat/unread_total",
+                headers=conta.headers if conta else {},
+            )
+
         if rapido:
             modo_rapido(
-                iniciar, enviar, ler_com, lista_de_mensagens, dona, interessada
+                iniciar, enviar, ler_com, lista_de_mensagens, listar, total, dona, interessada
             )
             return
 
@@ -461,6 +472,11 @@ def main() -> None:
             ri,
         )
 
+        # NL. Mensagens não lidas (antes do cenário 8, que esgota o limite de envio).
+        cenarios_nao_lidas(
+            conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, listar, total
+        )
+
         # 5. Não participante tenta ler e enviar.
         r = ler(estranha, conversa_id)
         registrar("5a. Não participante lê a conversa → 404", r.status_code == 404, f"HTTP {r.status_code}", r)
@@ -489,7 +505,7 @@ def main() -> None:
         # 8. Rate limit: envia até o primeiro 429.
         print(
             f"\nCenário 8: enviando mensagens a cada {PAUSA_RATE_LIMIT_SEGUNDOS} s "
-            "(envios aceitos antes nesta execução: até 3)..."
+            "(envios aceitos antes nesta execução: até 6)..."
         )
         primeiro_429 = None
         r = None
@@ -711,8 +727,138 @@ def main() -> None:
     resumo()
 
 
-def modo_rapido(iniciar, enviar, ler_com, lista_de_mensagens, dona, interessada) -> None:
-    """Checagem rápida da leitura: 2a, 3, 3c e duas leituras, sem status nem exclusão.
+def contador_da_conversa(resposta: httpx.Response, conversa_id: int) -> object:
+    """unread_count do item da conversa na lista, ou None se não aparecer."""
+    dados = json_ou_none(resposta)
+    conversas = dados.get("conversations") if isinstance(dados, dict) else None
+    for item in conversas if isinstance(conversas, list) else []:
+        if isinstance(item, dict) and item.get("conversation_id") == conversa_id:
+            return item.get("unread_count")
+    return None
+
+
+def valor_total(resposta: httpx.Response) -> int | None:
+    """unread_total, só se a resposta for exatamente {unread_total: int}."""
+    dados = json_ou_none(resposta)
+    if resposta.status_code != 200 or not isinstance(dados, dict) or set(dados) != {"unread_total"}:
+        return None
+    valor = dados["unread_total"]
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) else None
+
+
+def cenarios_nao_lidas(
+    conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, listar, total
+) -> None:
+    """Contador de não lidas (chat-nao-lidas): unread_count, unread_total e leitura.
+
+    O unread_total soma todas as conversas da conta, inclusive de testes
+    anteriores; por isso é comparado com uma base medida antes dos envios.
+    Imprime só status HTTP e números.
+    """
+    print("\n--- Não lidas ---")
+    # Preparação: as duas leem a conversa inteira, o que zera a leitura de ambas.
+    for conta in (dona, interessada):
+        r = ler_com(conta, conversa_id, limit=100)
+        if r.status_code != 200:
+            registrar(f"NL0. {conta.papel} lê a conversa antes dos envios", False, f"HTTP {r.status_code}", r)
+            return
+
+    r_base_dona = total(dona)
+    r_base_interessada = total(interessada)
+    base_dona = valor_total(r_base_dona)
+    base_interessada = valor_total(r_base_interessada)
+    registrar(
+        "NL1. unread_total responde só {unread_total: int} para as duas contas",
+        base_dona is not None and base_interessada is not None,
+        f"HTTP {r_base_dona.status_code} / {r_base_interessada.status_code}, "
+        f"base da dona: {base_dona}, base da interessada: {base_interessada}",
+        r_base_dona if base_dona is None else r_base_interessada,
+    )
+    if base_dona is None or base_interessada is None:
+        return
+
+    # A interessada envia 2 mensagens.
+    envios = [enviar(interessada, conversa_id, f"Teste de não lidas {n}") for n in (1, 2)]
+    enviou = all(r.status_code == 200 for r in envios)
+    registrar(
+        "NL2. Interessada envia 2 mensagens → sucesso",
+        enviou,
+        "HTTP " + " / ".join(str(r.status_code) for r in envios),
+        next((r for r in envios if r.status_code != 200), None),
+    )
+    if not enviou:
+        return
+
+    # A dona vê 2 não lidas na conversa e no total.
+    rl = listar(dona)
+    contador = contador_da_conversa(rl, conversa_id)
+    registrar(
+        "NL3. Dona: unread_count da conversa = 2",
+        rl.status_code == 200 and contador == 2,
+        f"HTTP {rl.status_code}, unread_count: {contador}",
+        rl,
+    )
+    rt = total(dona)
+    valor = valor_total(rt)
+    registrar(
+        "NL4. Dona: unread_total = base + 2",
+        valor == base_dona + 2,
+        f"HTTP {rt.status_code}, total: {valor} (base {base_dona})",
+        rt,
+    )
+
+    # Mensagens da própria pessoa não contam para quem enviou.
+    rl = listar(interessada)
+    contador = contador_da_conversa(rl, conversa_id)
+    rt = total(interessada)
+    valor = valor_total(rt)
+    registrar(
+        "NL5. Mensagens próprias não contam: interessada com unread_count 0 e total = base",
+        rl.status_code == 200 and contador == 0 and valor == base_interessada,
+        f"HTTP {rl.status_code} / {rt.status_code}, unread_count: {contador}, "
+        f"total: {valor} (base {base_interessada})",
+        rl if contador != 0 else rt,
+    )
+
+    # A dona lê: a conversa volta a 0 e o total volta à base.
+    rm = ler_com(dona, conversa_id, limit=100)
+    ids_lidos = [m.get("id") for m in lista_de_mensagens(rm)]
+    rl = listar(dona)
+    contador = contador_da_conversa(rl, conversa_id)
+    rt = total(dona)
+    valor = valor_total(rt)
+    registrar(
+        "NL6. Dona lê: unread_count 0 e unread_total = base",
+        rm.status_code == 200 and contador == 0 and valor == base_dona,
+        f"HTTP {rm.status_code} / {rl.status_code} / {rt.status_code}, "
+        f"unread_count: {contador}, total: {valor} (base {base_dona})",
+        rl if contador != 0 else rt,
+    )
+
+    # Carregar anteriores não volta a leitura: se voltasse para a penúltima,
+    # a última mensagem (da interessada) voltaria a contar.
+    if len(ids_lidos) >= 2 and isinstance(ids_lidos[-1], int):
+        ra = ler_com(dona, conversa_id, before_message_id=ids_lidos[-1], limit=1)
+        rl = listar(dona)
+        contador = contador_da_conversa(rl, conversa_id)
+        registrar(
+            "NL7. Carregar anteriores não volta a leitura: unread_count continua 0",
+            ra.status_code == 200 and rl.status_code == 200 and contador == 0,
+            f"HTTP {ra.status_code} / {rl.status_code}, unread_count: {contador}",
+            rl,
+        )
+    else:
+        print("Cenário NL7 pulado: a leitura não trouxe ao menos 2 mensagens.")
+
+    # Total sem sessão.
+    r = total(None)
+    registrar("NL8. unread_total sem token → 401", r.status_code == 401, f"HTTP {r.status_code}", r)
+
+
+def modo_rapido(
+    iniciar, enviar, ler_com, lista_de_mensagens, listar, total, dona, interessada
+) -> None:
+    """Checagem rápida: 2a, 3, 3c, duas leituras e não lidas, sem status nem exclusão.
 
     Imprime só status HTTP e tamanho da lista.
     Pode ser repetido com a mesma doação (respeitando 1 minuto entre execuções).
@@ -746,6 +892,9 @@ def modo_rapido(iniciar, enviar, ler_com, lista_de_mensagens, dona, interessada)
             f"HTTP {r.status_code}, {tamanho} mensagem(ns)",
             r,
         )
+    cenarios_nao_lidas(
+        conversa_id, dona, interessada, enviar, ler_com, lista_de_mensagens, listar, total
+    )
     resumo()
 
 

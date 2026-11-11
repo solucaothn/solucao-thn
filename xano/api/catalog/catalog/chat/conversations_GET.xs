@@ -68,23 +68,25 @@ query "catalog/chat/conversations" verb=GET {
         "donor_id"
         "interested_user_id"
         "last_message_at"
+        "donor_last_read_message_id"
+        "interested_last_read_message_id"
       ]
     } as $conversations
   
     var $other_user_ids {
       value = []
     }
-
+  
     var $donation_ids {
       value = []
     }
-
+  
     foreach ($conversations) {
       each as $conversation {
         var.update $donation_ids {
           value = $donation_ids|push:$conversation.donation_id
         }
-
+      
         conditional {
           if ($conversation.donor_id == $auth.id) {
             var.update $other_user_ids {
@@ -119,11 +121,11 @@ query "catalog/chat/conversations" verb=GET {
         }
       }
     }
-
+  
     var $donations {
       value = []
     }
-
+  
     conditional {
       if (($donation_ids|count) > 0) {
         db.query donation {
@@ -131,13 +133,13 @@ query "catalog/chat/conversations" verb=GET {
           return = {type: "list"}
           output = ["id", "title", "status"]
         } as $found_donations
-
+      
         var.update $donations {
           value = $found_donations
         }
       }
     }
-
+  
     var $conversation_items {
       value = []
     }
@@ -148,13 +150,28 @@ query "catalog/chat/conversations" verb=GET {
           value = $conversation.donor_id
         }
       
+        // Última mensagem lida por quem consulta (nunca a da outra pessoa).
+        var $my_last_read {
+          value = $conversation.interested_last_read_message_id ?? 0
+        }
+      
         conditional {
           if ($conversation.donor_id == $auth.id) {
             var.update $other_user_id {
               value = $conversation.interested_user_id
             }
+          
+            var.update $my_last_read {
+              value = $conversation.donor_last_read_message_id ?? 0
+            }
           }
         }
+      
+        // Não lidas: mensagens da outra pessoa posteriores à última lida.
+        db.query chat_message {
+          where = ($db.chat_message.conversation_id == $conversation.id && $db.chat_message.sender_id != $auth.id && $db.chat_message.id > $my_last_read)
+          return = {type: "count"}
+        } as $unread_count
       
         var $other_user {
           value = $other_users|find:$$.id == $other_user_id
@@ -175,27 +192,27 @@ query "catalog/chat/conversations" verb=GET {
         var $donation {
           value = $donations|find:$$.id == $conversation.donation_id
         }
-
+      
         var $donation_title {
           value = "Doação"
         }
-
+      
         var $donation_status {
           value = ""
         }
-
+      
         conditional {
           if ($donation != null) {
             var.update $donation_title {
               value = $donation.title
             }
-
+          
             var.update $donation_status {
               value = $donation.status
             }
           }
         }
-
+      
         var.update $conversation_items {
           value = $conversation_items
             |push:```
@@ -205,7 +222,8 @@ query "catalog/chat/conversations" verb=GET {
                 last_message_at: $conversation.last_message_at,
                 other_user_first_name: $other_user_first_name,
                 donation_title: $donation_title,
-                donation_status: $donation_status
+                donation_status: $donation_status,
+                unread_count: $unread_count
               }
               ```
         }

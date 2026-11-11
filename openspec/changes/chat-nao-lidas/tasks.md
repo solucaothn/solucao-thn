@@ -4,25 +4,25 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 
 ## 1. Parte A: preparar o workspace do Xano
 
-- [ ] 1.1 (manual) Mostrar `git status --short --branch` e pedir a confirmação explícita do Higor antes de `xano workspace pull -d ./xano`. Depois do pull, rodar `git diff --ignore-all-space --ignore-cr-at-eol` nos endpoints do chat e em `xano/table/chat_conversation.xs` e confirmar que só há diferença de formatação. Verificação: nenhuma mudança de conteúdo feita fora do repositório.
+- [x] 1.1 (manual) Mostrar `git status --short --branch` e pedir a confirmação explícita do Higor antes de `xano workspace pull -d ./xano`. Depois do pull, rodar `git diff --ignore-all-space --ignore-cr-at-eol` nos endpoints do chat e em `xano/table/chat_conversation.xs` e confirmar que só há diferença de formatação. Verificação: nenhuma mudança de conteúdo feita fora do repositório.
 
 ## 2. Parte A: tabela e endpoints
 
-- [ ] 2.1 Consultar no Xano Developer MCP a declaração de campo inteiro com padrão numa tabela e o `db.edit` de um campo só. Registrar a forma no `design.md` (decisão A5). Verificação: a decisão A5 aponta a construção validada.
-- [ ] 2.2 Em `xano/table/chat_conversation.xs`, acrescentar `donor_last_read_message_id` e `interested_last_read_message_id` (inteiros, padrão 0), sem mudar campos, índices nem o GUID. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
-- [ ] 2.3 Em `messages_GET.xs`, pedir os dois campos no `db.get chat_conversation` e, depois de montar `$messages`, avançar só o campo de leitura de quem lê até `($messages|last).id`, quando ele for maior que o atual (decisão A2), sem log e sem mudar a resposta. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
-- [ ] 2.4 Em `conversations_GET.xs`, pedir os dois campos e acrescentar `unread_count` em cada item, com a contagem da decisão A3. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
-- [ ] 2.5 Criar `xano/api/catalog/catalog/chat/unread_total_GET.xs` (`auth = "user"`, sem inputs), que devolve só `{unread_total}` (decisão A4). Verificação: o arquivo passa na validação do MCP.
-- [ ] 2.6 (manual) Rodar `xano workspace push -d ./xano --dry-run` e revisar. Verificação: aparecem só os dois endpoints alterados e o novo. **A mudança na tabela não aparece no dry-run**, e isso é esperado; ela é conferida na 2.8.
-- [ ] 2.7 (manual) O Higor faz o push real e avisa o grupo. Verificação: o push conclui sem erros.
-- [ ] 2.8 (manual) No painel do Xano, abrir a tabela `chat_conversation` e conferir que `donor_last_read_message_id` e `interested_last_read_message_id` existem, são inteiros com padrão 0 e que as linhas existentes ficaram com 0. Se os campos não aparecerem, criá-los pelo painel com esses nomes e tipos, e depois rodar `xano workspace pull -d ./xano` para alinhar o arquivo. Verificação: os dois campos aparecem no painel.
-- [ ] 2.9 (manual) Depois do push, rodar `xano workspace pull -d ./xano` para trazer o GUID do `unread_total_GET.xs` e conferir com `Select-String` que o arquivo agora tem `guid`. Verificação: o GUID está no arquivo e não há outras mudanças de conteúdo.
+- [x] 2.1 Consultar no Xano Developer MCP a declaração de campo inteiro com padrão numa tabela e o `db.edit` de um campo só. Registrar a forma no `design.md` (decisão A5). Verificação: a decisão A5 aponta a construção validada.
+- [x] 2.2 Em `xano/table/chat_conversation.xs`, acrescentar `donor_last_read_message_id` e `interested_last_read_message_id` (inteiros, padrão 0), sem mudar campos, índices nem o GUID. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
+- [x] 2.3 Em `messages_GET.xs`, pedir os dois campos no `db.get chat_conversation` e, depois de montar `$messages`, avançar só o campo de leitura de quem lê até `($messages|last).id`, quando ele for maior que o atual (decisão A2), sem log e sem mudar a resposta. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
+- [x] 2.4 Em `conversations_GET.xs`, pedir os dois campos e acrescentar `unread_count` em cada item, com a contagem da decisão A3. Verificação: o arquivo passa na validação do MCP e o GUID é o mesmo.
+- [x] 2.5 Criar `xano/api/catalog/catalog/chat/unread_total_GET.xs` (`auth = "user"`, sem inputs), que devolve só `{unread_total}` (decisão A4). Verificação: o arquivo passa na validação do MCP.
+- [x] 2.6 (manual) Rodar `xano workspace push -d ./xano --dry-run` e revisar. Verificação: aparecem só os dois endpoints alterados e o novo. **A mudança na tabela não aparece no dry-run**, e isso é esperado; ela é conferida na 2.8.
+- [x] 2.7 (manual) O Higor faz o push real e avisa o grupo. Verificação: o push conclui sem erros.
+- [x] 2.8 (manual) No painel do Xano, abrir a tabela `chat_conversation` e conferir que `donor_last_read_message_id` e `interested_last_read_message_id` existem, são inteiros com padrão 0 e que as linhas existentes ficaram com 0. Se os campos não aparecerem, criá-los pelo painel com esses nomes e tipos, e depois rodar `xano workspace pull -d ./xano` para alinhar o arquivo. Verificação: os dois campos aparecem no painel.
+- [x] 2.9 (manual) Depois do push, rodar `xano workspace pull -d ./xano` para trazer o GUID do `unread_total_GET.xs` e conferir com `Select-String` que o arquivo agora tem `guid`. Verificação: o GUID está no arquivo e não há outras mudanças de conteúdo.
 
 ## 3. Parte A: teste real e documentação do backend
 
-- [ ] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem corpos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
+- [x] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem corpos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
 - [ ] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK.
-- [ ] 3.3 Atualizar a seção do chat em `docs/guia-do-colaborador.md`: campos de leitura, `unread_count`, `GET catalog/chat/unread_total`, a marcação de leitura dentro do `GET messages`, a ausência de “visto” e a conferência manual de schema no painel após mudanças em tabela existente. Verificação: o texto bate com a spec delta `donation-chat`.
+- [x] 3.3 Atualizar a seção do chat em `docs/guia-do-colaborador.md`: campos de leitura, `unread_count`, `GET catalog/chat/unread_total`, a marcação de leitura dentro do `GET messages`, a ausência de “visto” e a conferência manual de schema no painel após mudanças em tabela existente. Verificação: o texto bate com a spec delta `donation-chat`.
 
 ## 4. Parte B: cliente e estado (`doafacil/chat.py`)
 

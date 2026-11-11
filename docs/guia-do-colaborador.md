@@ -141,19 +141,22 @@ O chat entre quem doa e quem tem interesse tem o backend no Xano (abaixo) e a te
 
 Tabelas:
 
-- `chat_conversation`: uma conversa por par doação + interessado (índice único), com `donor_id`, `interested_user_id` e `last_message_at`.
+- `chat_conversation`: uma conversa por par doação + interessado (índice único), com `donor_id`, `interested_user_id` e `last_message_at`. Os campos `donor_last_read_message_id` e `interested_last_read_message_id` guardam o id da última mensagem lida por cada participante (0, ou vazio, quando ainda não leu nada).
 - `chat_message`: mensagens da conversa, com `sender_id`, `text` e `created_at`.
 
 Endpoints (grupo Catalog, todos exigem login; sem login, HTTP 401):
 
 - `POST /catalog/chat/conversations/start` (`donation_id`): inicia a conversa ou devolve a que já existe para essa pessoa e doação. A resposta traz `donation_title` e `donation_status`.
-- `GET /catalog/chat/conversations` (`page` e `limit` opcionais; padrão 20, máximo 50): lista as conversas em que a pessoa participa, da mais recente para a mais antiga. Cada item traz `donation_title` e `donation_status`.
+- `GET /catalog/chat/conversations` (`page` e `limit` opcionais; padrão 20, máximo 50): lista as conversas em que a pessoa participa, da mais recente para a mais antiga. Cada item traz `donation_title`, `donation_status` e `unread_count`, o número de mensagens não lidas pela pessoa logada naquela conversa.
+- `GET /catalog/chat/unread_total` (sem parâmetros): devolve só `{unread_total}`, a soma das não lidas de todas as conversas da pessoa. Serve para o contador do link “Mensagens” da home e não traz mensagens, nomes nem ids de conversa.
 - `GET /catalog/chat/messages` (`conversation_id`; `limit` opcional, padrão 50, máximo 100): lê as mensagens da conversa. A resposta vem sempre em ordem de envio e traz `donation_title`, `donation_status`, `has_older` e `has_newer`. Há três modos:
   - **sem cursor:** as últimas N mensagens; `has_older` diz se há mensagens mais antigas;
   - **`before_message_id`:** as N anteriores a essa mensagem, para o “Carregar anteriores”; `has_older` diz se ainda há mais;
   - **`after_message_id`:** só as posteriores a essa mensagem, para a atualização automática; `has_newer` diz se há mais do que o limite.
 
   Mandar os dois cursores juntos dá HTTP 400.
+
+  Esse `GET` também **marca a conversa como lida** para quem lê, até a mensagem mais nova devolvida (veja “Mensagens não lidas” abaixo).
 - `POST /catalog/chat/messages` (`conversation_id`, `message_text`): envia uma mensagem.
 
 Cada mensagem (na leitura e na resposta do envio) traz `sent_by_me`, verdadeiro quando foi a pessoa logada que enviou. É assim que a tela decide o lado da mensagem, em vez de comparar nomes, que podem se repetir. O campo é calculado pela sessão, e a resposta não traz identificadores de usuário.
@@ -166,12 +169,22 @@ Regras:
 - **Status visível só para participantes:** `donation_status` aparece nos endpoints do chat para as duas pessoas da conversa. É o mesmo status já público no detalhe da doação. A resposta de um envio recusado continua com o 404 genérico, sem dizer o status.
 - **Tamanho:** de 1 a 1000 caracteres depois de tirar espaços das pontas; fora disso, HTTP 400. O tamanho é validado antes do limite de envio. O texto é guardado e devolvido como texto, e a interface precisa mostrá-lo como texto, sem interpretar HTML.
 - **Limite de envio:** 10 mensagens por pessoa em 60 segundos, somando todas as conversas; acima disso, HTTP 429 com “Limite de mensagens atingido. Tente novamente em instantes.”. É de melhor esforço: sob envios simultâneos pode passar uma ou duas a mais.
-- **Logs:** só `chat_started` (conversa nova) e `chat_message_sent` (envio aceito), com `user_id`, ação e data. Leituras, repetições e erros não geram evento.
+- **Logs:** só `chat_started` (conversa nova) e `chat_message_sent` (envio aceito), com `user_id`, ação e data. Leituras (inclusive a marcação de lida), repetições e erros não geram evento.
 - **Apagar a doação apaga as conversas:** `DELETE /catalog/donations` remove as mensagens, as conversas e a doação na mesma transação. Depois disso, quem tentar ler a conversa recebe o 404 genérico. As linhas de `donation_photo` não são apagadas (pendência registrada na seção 7).
 
 > **Atenção ao limite da plataforma:** o plano gratuito do Xano limita a **instância inteira** a 10 requisições a cada 20 segundos, somando todos os endpoints e todas as pessoas. Acima disso, o próprio Xano responde HTTP 429 com uma mensagem diferente da do chat. Telas com atualização automática (por exemplo, buscar mensagens novas) precisam de intervalo longo entre as consultas, senão derrubam o resto do site.
 
+Mensagens não lidas:
+
+- **O que conta:** mensagens enviadas pela **outra** pessoa com id maior que a última lida por quem consulta. As mensagens da própria pessoa nunca contam.
+- **Quando marca como lida:** dentro do `GET /catalog/chat/messages`, em qualquer modo, sem requisição a mais. O campo de quem lê só avança: carregar mensagens anteriores ou uma consulta sem nada novo não grava nada, e o campo da outra pessoa não muda.
+- **Sem “visto”:** nenhuma resposta revela até onde a outra pessoa leu. Os campos de leitura não aparecem nas respostas.
+- **Campo vazio vale 0:** depois do pull, a tabela aparece sem o padrão (`int donor_last_read_message_id?`). Os endpoints leem esses campos com `?? 0`, então uma conversa sem leitura gravada conta todas as mensagens da outra pessoa como não lidas. As conversas anteriores a esta mudança começaram assim.
+- **Custo:** o `GET conversations` faz uma contagem por item da página, e o `unread_total` faz uma por conversa da pessoa. São consultas no banco, não requisições HTTP a mais.
+
 Publicar mudanças no chat segue a seção 11: validar no MCP, dry-run revisado, aviso ao grupo e só então o push.
+
+> **Mudança de schema em tabela existente:** o dry-run não mostra campos novos numa tabela que já existe. Depois do push, abra a tabela no painel do Xano e confira se os campos existem, com o tipo certo e o valor esperado nas linhas antigas. Se não aparecerem, crie-os pelo painel com o mesmo nome e tipo e rode um pull para alinhar o arquivo.
 
 #### Tela do chat
 
@@ -221,7 +234,14 @@ O script pede e-mail e senha de cada conta e depois o ID da doação. **A senha 
 
 Cuidados:
 
-- **O script cria dados reais:** uma conversa e cerca de 12 mensagens na doação informada, incluindo uma resposta da dona.
+- **O script cria dados reais:** uma conversa e cerca de 14 mensagens na doação informada, incluindo uma resposta da dona.
+- **Não lidas (cenários NL1 a NL8):** rodam também no modo rápido (`TESTE_CHAT_RAPIDO=1`).
+  - A interessada envia 2 mensagens.
+  - A dona deve ver `unread_count` 2 na conversa e o `unread_total` subir 2; depois de ler, os dois voltam.
+  - As mensagens da própria interessada não contam para ela.
+  - Carregar mensagens anteriores não faz a leitura voltar atrás.
+  - O total sem token dá 401.
+  - O `unread_total` soma todas as conversas da conta, então o script o compara com o valor medido antes dos envios, e não com 2.
 - **Paginação (cenários 8c a 8h):** usa as próprias mensagens da execução, sem envios extras. Precisa de pelo menos 7 mensagens na conversa (3 últimas, 3 anteriores e 1 a mais para `has_older`). Se houver menos, os cenários 8d a 8g são pulados com um aviso.
 - **Espere pelo menos 1 minuto entre execuções.** As mensagens da execução anterior ainda contam no limite de 10 por 60 segundos e fazem os cenários falharem.
 - O script tem pausas entre as requisições por causa do limite da plataforma, então leva alguns minutos. Não rode outros testes no Xano ao mesmo tempo.
