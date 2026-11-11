@@ -20,3 +20,31 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Botão flutuante “Mensagens”: realce ao passar o mouse ou focar pelo
+   teclado; sem transição nem deslocamento com prefers-reduced-motion. */
+.chat-fab {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.chat-fab:hover,
+.chat-fab:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28) !important;
+}
+
+.chat-fab:focus-visible {
+  outline: 2px solid #1F1F1F;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-fab {
+    transition: none;
+  }
+
+  .chat-fab:hover,
+  .chat-fab:focus-visible {
+    transform: none;
+  }
+}

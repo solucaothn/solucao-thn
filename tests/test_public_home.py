@@ -727,13 +727,12 @@ class PublicHomeTests(unittest.TestCase):
             and _component_contents(node) == ["Quero Doar"]
         )
         self.assertIn('/cadastro-doacao', str(donate_link))
-        messages_link = next(
-            node
-            for node in _component_nodes(page)
-            if type(node).__name__ == "Link"
-            and "Mensagens" in _component_contents(node)
-        )
-        self.assertIn('to:"/chat"', str(messages_link))
+        # A entrada no chat é o botão flutuante, último filho da página.
+        messages_link = content[-1]
+        self.assertEqual(type(messages_link).__name__, "Link")
+        self.assertIn("chat-fab", str(messages_link.class_name))
+        self.assertIn('"/chat"', str(messages_link))
+        self.assertIn('"/login"', str(messages_link))
 
         detail_links = [
             node

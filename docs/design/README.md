@@ -264,7 +264,15 @@ Diferenças aprovadas em relação ao Figma:
   - O círculo tem fundo `#007A42`, número branco em negrito de 0,7 rem, altura de 20 px e cantos totalmente arredondados.
   - Acima de 99, mostra “99+”. Com zero não aparece, e a conversa aberta nunca mostra contador.
   - O rótulo acessível diz o número real (“1 mensagem não lida”, “150 mensagens não lidas”).
-- **Contador no link “Mensagens” da home:** é o mesmo círculo, ao lado do ícone, também no celular, onde aparece só o ícone com o número. Aparece só para quem está logado e com total maior que zero. O rótulo do link vira “Mensagens, N não lidas”, e o círculo fica oculto do leitor de tela para não ler o número duas vezes.
+- **Botão flutuante “Mensagens”** (como no Figma da home), no lugar do antigo link “Mensagens” do cabeçalho, que saiu:
+  - **Aparência:** círculo `#007A42` de 56 px com o ícone `message-circle` branco e sombra leve, fixo no canto inferior direito, a 24 px das bordas no computador e a 16 px no celular.
+  - **Contador:** círculo vermelho `#C62828` com número branco (5,6:1, AA) e borda branca, no canto superior direito do botão. Mostra “99+” acima de 99 e não aparece com zero, sem login ou se a consulta falhar. Usa a mesma consulta única de não lidas por carregamento, sem atualização automática.
+  - **Rótulo e destino:** com login, “Mensagens” ou “Mensagens, N não lidas”, e abre `/chat`. Sem login, “Mensagens”, vai para `/login` e não consulta o Xano. O contador fica oculto do leitor de tela, porque o total já está no rótulo.
+  - **Onde aparece:** só na home, por enquanto. É o componente `chat_fab()`, para reutilizar nas próximas telas que forem pedidas.
+    - Não aparece no detalhe da doação, que já tem o botão “Chat” da própria doação; dois botões de chat confundiriam.
+    - Também não aparece em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha` e `/cadastro-doacao`.
+  - **Espaço no fim:** a home reserva no fim do rodapé 88 px no celular e 104 px no computador (o botão mais as margens). Com a página rolada até o fim, nenhum botão de ação fica coberto.
+  - **Realce:** ao passar o mouse ou focar, o botão sobe 2 px e a sombra aumenta; o foco tem contorno `#1F1F1F`. Com `prefers-reduced-motion`, não há transição nem deslocamento (`assets/chat.css`). Não tem animação de entrada.
 - **“Visto” nas próprias mensagens:** não está no Figma. Fica na linha do horário, embaixo da bolha e fora dela, como `12:41 (editada) ✓✓`. Dentro da bolha verde, um ícone cinza ou verde não teria contraste.
   - **✓ (enviada):** ícone `check` em `#6b6b6b`, a cor do horário, com rótulo acessível “Enviada”.
   - **✓✓ (lida):** ícone `check-check` em `#007A42`, com rótulo acessível “Lida”. Sobre o creme `#FFF6E8`, fica em torno de 5:1.
