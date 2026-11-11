@@ -89,7 +89,7 @@ A página MUST carregar o detalhe pela rota `/doacao/<id>`, validar o identifica
 - **AND** o cabeçalho e os dados carregados do Xano MUST NOT ser animados
 
 ### Requirement: Fluxo de contato do doador
-O sistema MUST permitir iniciar contato com quem doa somente de acordo com a preferência de contato e a autenticação da pessoa interessada, sem expor o e-mail na página.
+O sistema MUST permitir iniciar contato com quem doa somente de acordo com a preferência de contato e a autenticação da pessoa interessada, sem expor o e-mail na página. O botão “Chat” MUST iniciar ou reabrir a conversa pelo endpoint do chat e levar a pessoa a `/chat`, sem revelar por que uma doação não aceita conversa.
 
 #### Scenario: Pessoa sem login solicita outros meios de comunicação
 - **WHEN** uma pessoa sem sessão válida clica em “Outros meios de comunicação”
@@ -115,9 +115,25 @@ O sistema MUST permitir iniciar contato com quem doa somente de acordo com a pre
 - **AND** MUST NOT chamar o endpoint autenticado de e-mail
 
 #### Scenario: Botão Chat
-- **WHEN** uma pessoa clica em “Chat” no topo do detalhe da doação
-- **THEN** a página MUST mostrar “O chat ainda não está disponível.”
-- **AND** MUST NOT navegar para outra rota
+- **WHEN** uma pessoa autenticada clica em “Chat” no topo do detalhe de uma doação que aceita conversa
+- **THEN** a página MUST chamar o endpoint de iniciar conversa com o token da sessão e o identificador da doação
+- **AND** MUST navegar para `/chat?conversa=<id>` com o identificador devolvido, abrindo essa conversa
+- **AND** se a conversa já existir, MUST abrir a mesma conversa, sem criar outra
+
+#### Scenario: Botão Chat sem login
+- **WHEN** uma pessoa sem sessão válida clica em “Chat”
+- **THEN** o sistema MUST redirecionar para `/login`
+- **AND** MUST NOT chamar o endpoint de iniciar conversa
+
+#### Scenario: Botão Chat em doação que não aceita conversa
+- **WHEN** o endpoint de iniciar conversa responde HTTP 404, seja porque a preferência é “E-mail”, porque a doação é da própria pessoa ou porque ela não está mais disponível
+- **THEN** a página MUST mostrar a mensagem neutra “Não é possível conversar sobre esta doação pelo chat.”
+- **AND** MUST NOT navegar para outra rota nem revelar qual condição impediu a conversa
+
+#### Scenario: Falha ao iniciar conversa
+- **WHEN** ocorre falha de rede ou o endpoint de iniciar conversa responde com erro diferente de 401 e 404
+- **THEN** a página MUST mostrar uma mensagem de erro simples e manter o restante da página funcional
+- **AND** quando a resposta for HTTP 401, MUST limpar a sessão transitória e redirecionar para `/login`
 
 #### Scenario: Endpoint sem e-mail disponível
 - **WHEN** o endpoint autenticado é chamado sem sessão válida

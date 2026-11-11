@@ -216,5 +216,7 @@ Diferenças aprovadas em relação ao Figma:
 - **Controles acrescentados:** “Conversas” com o botão “Atualizar conversas” no topo da lista, “Carregar mais conversas”, “Carregar anteriores” no topo das mensagens, “Tentar novamente” em erro e, em telas estreitas, “Voltar às conversas”.
 - **Telas estreitas:** a lista e a conversa aparecem uma de cada vez.
 - **Textos neutros:** “Você ainda não tem conversas.”, “Escolha uma conversa para ver as mensagens.” e “Ainda não há mensagens. Escreva a primeira.”. As mensagens do mockup não são usadas.
+- **Horário de envio:** embaixo de cada bolha, do mesmo lado dela, em HH:MM no fuso de Brasília, fonte pequena e cor `#6b6b6b`. Não está no Figma.
+- **Campo sem autocompletar:** o campo “Digite aqui...” tem `autocomplete="off"`, para o navegador não sugerir textos anteriores.
 - **Somente leitura:** numa doação concluída, o campo e o botão ficam desativados, com o aviso “Esta doação foi concluída. A conversa fica disponível somente para leitura.”.
 - **Animação:** o conteúdo principal usa `page-fade-enter`, que respeita `prefers-reduced-motion`; o cabeçalho e as mensagens carregadas depois não ganham animação própria.

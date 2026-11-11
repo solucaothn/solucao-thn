@@ -52,8 +52,8 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 
 ## 8. Verificação final
 
-- [ ] 8.1 Rodar `python -m unittest discover -s tests -v` e mostrar `git status` e `git diff --stat`. Verificação: todos os testes passam e, na parte B, nada muda em `xano/`.
-- [ ] 8.2 (manual) No navegador, com duas contas:
+- [x] 8.1 Rodar `python -m unittest discover -s tests -v` e mostrar `git status` e `git diff --stat`. Verificação: todos os testes passam e, na parte B, nada muda em `xano/`.
+- [x] 8.2 (manual) No navegador, com duas contas:
   - iniciar a conversa pelo “Chat” do detalhe;
   - enviar com o botão e com Enter;
   - ver a mensagem chegar na outra aba em até cerca de 15 s;
