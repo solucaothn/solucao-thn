@@ -185,11 +185,50 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 - O conteúdo aprovado inclui título, condição, descrição, categoria, cidade/UF, modalidade de entrega e preferência de contato escrita como texto. O cartão de quem doa mostra somente o primeiro nome e a cidade/UF da doação.
 - A página é pública e exibe somente doações disponíveis. Um identificador inválido, uma doação inexistente ou uma doação indisponível apresenta “Doação não encontrada”. Falhas de rede ou respostas inválidas apresentam uma mensagem de erro.
 - O conteúdo estático usa `page-fade-enter`, respeitando `prefers-reduced-motion`; cabeçalho e dados carregados do Xano não são animados.
-- O link com seta verde “Voltar”, abaixo do cabeçalho e com destino à home (`/`), é um acréscimo que não está no Figma; sua seta tem o rótulo acessível “Voltar”.
+
+### Frames `detalhes-doacao-inteira` e `detalhes-doacao-1` do Figma — layout atual
+
+A referência de layout são esses dois frames do Figma, que só diferem no cartão do anunciante. Esta seção prevalece sobre eles e sobre as imagens 14 e 15.
+
+O que segue o Figma:
+
+- **Cabeçalho:** branco, com o logotipo centralizado e “Voltar ao início” à esquerda na mesma linha. É o mesmo cabeçalho do chat (`back_home_header()`), com seta verde `#166B3B` e rótulo acessível “Voltar ao início”. Em telas estreitas aparece só a seta, numa área de toque de 44 px.
+- **Galeria:** a capa grande (470 px de altura no computador) e, ao lado, até 4 miniaturas em grade 2×2, com 16 px entre as fotos e cantos de 8 px.
+- **Uma foto só:** a capa ocupa toda a largura da galeria e mostra a imagem inteira (`contain`), centralizada, com fundo neutro `#EEEEEE` nas sobras e a mesma altura. Nada é cortado.
+- **Cartão de resumo, à direita da galeria:**
+  - branco, com borda `#D9D9D9`, cantos de 8 px e sombra `0 8px 13px rgba(0,0,0,0.15)`;
+  - o título grande (2,4 rem) e “Condição: …”;
+  - o botão em pílula “Outros meios de comunicação” e o botão “Chat” branco com borda `#85858D`.
+- **Título e descrição logo abaixo da galeria:** o título em negrito, em caixa alta e preto; a descrição em texto corrido, mantendo as quebras de linha. O título aparece nos dois lugares, como no Figma.
+- **“Detalhes”:** uma grade em que cada item tem o ícone verde do Figma (`assets/detalhe-atributo.svg`), um rótulo pequeno e o valor logo abaixo. Os itens são Categoria, Condição, Forma de entrega e Preferência de contato. A grade tem 4 colunas em telas largas, 2 em médias e 1 no celular.
+- **“Localização”:** a ilustração de edifícios do Figma (`assets/detalhe-localizacao.svg`, 56 px) e “Cidade, UF”.
+- **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, o primeiro nome e o ícone de local com “Cidade, UF”.
+- **No celular:** uma coluna, na ordem galeria → resumo → título e descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
+
+Diferenças aprovadas em relação ao Figma:
+
+- **Botão principal em `#007A42`** (o verde AA do projeto, hover `#006B39`), no lugar do `#007D32` do Figma e do `#00A859` antigo, que tinha cerca de 2,9:1 com o texto branco.
+- **Fonte LINE Seed JP** em tudo, como no resto do site, no lugar da Roboto do Figma.
+- **Rótulos da grade com 0,75 rem** (12 px), e não 10 px, para ficarem legíveis. O texto usa `#2A2A2A` e `#555555`, e o cartão de quem doa `#001C3C`, todos com contraste AA.
+- **Fundo creme `#FFF6E8`**, como no resto do site, no lugar do `#FFF9ED`.
+- **“Condição”** no lugar do “Estado” do Figma, como pede a spec.
+- **Caixa alta do título só no visual** (`text-transform: uppercase`); o texto lido continua o original.
+- **“Localização” num cartão branco** com borda, no lugar das divisórias do Figma, e com uma só linha: “Cidade, UF”.
+- **Sem “NOVO” e sem status:** o detalhe não recebe a data de criação e só mostra doações disponíveis (decisão do grupo).
+- **Ícones decorativos:** os dois SVGs do Figma têm `alt=""` e `aria-hidden`.
+- **Visualizador de fotos (não está no Figma):** cada foto da galeria é um botão, com rótulo como “Ampliar foto 2 de 5” e cursor de lupa.
+  - **Abrir:** clicar, Enter ou Espaço abre um modal em tela cheia com fundo creme semitransparente (`rgba(255, 246, 232, 0.85)`) e desfoque de 6 px, sem o véu escuro padrão do diálogo. Textos e ícones em `#1F1F1F`.
+  - **Foto em 1x:** inteira (`contain`), cabendo abaixo do cabeçalho de 80 px, sem passar da borda de baixo nem das laterais.
+  - **Controles:**
+    - no alto, o contador “N de M” e o botão X (“Fechar”);
+    - nas laterais, ‹ (“Foto anterior”) e › (“Próxima foto”), que dão a volta e só existem com mais de uma foto;
+    - todos com 48 px, fundo branco, sombra leve e ícone escuro, a 16 px das bordas visíveis em qualquer largura.
+  - **Zoom:** clicar na foto alterna entre 1x e 2x (“Ampliar foto” / “Reduzir foto”); em 2x, a rolagem move a imagem. No celular vale a pinça do navegador.
+  - **Teclado e fechamento:** ← e → trocam a foto; Esc, o X ou um clique no fundo fecham. O foco fica preso no modal e volta à página ao fechar (diálogo do Radix).
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo não fazem parte dos dados aprovados para exibição. Bairro, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade. Avaliações, histórico de doações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O botão Acessar perfil do doador continua oculto porque o perfil público não foi implementado, e não é apresentado como “Em breve”.
+Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações, histórico de doações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O botão Acessar perfil do doador continua oculto porque o perfil público não foi implementado, e não é apresentado como “Em breve”.
 ## Chat
 
 ### Frame `chat-1` do Figma — página `/chat`

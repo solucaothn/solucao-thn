@@ -12,6 +12,7 @@ from doafacil.chat import (
     ChatNotFoundError,
     ChatRateLimitError,
     ChatUnauthorizedError,
+    back_home_header,
     rate_limit_message,
     start_conversation,
 )
@@ -201,6 +202,55 @@ class DonationDetailState(LoginState):
     contact_message: str = ""
     contact_message_is_error: bool = False
     is_starting_chat: bool = False
+    # Visualizador de fotos (modal).
+    viewer_open: bool = False
+    viewer_index: int = 0
+    viewer_zoomed: bool = False
+
+    @rx.event
+    def open_viewer(self, index: int) -> None:
+        if not self.photos:
+            return
+        self.viewer_index = min(max(int(index), 0), len(self.photos) - 1)
+        self.viewer_zoomed = False
+        self.viewer_open = True
+
+    @rx.event
+    def close_viewer(self) -> None:
+        self.viewer_open = False
+        self.viewer_zoomed = False
+
+    @rx.event
+    def set_viewer_open(self, is_open: bool) -> None:
+        # on_open_change do diálogo: Esc e clique fora chegam aqui com False.
+        if not is_open:
+            DonationDetailState.close_viewer.fn(self)
+
+    @rx.event
+    def next_photo(self) -> None:
+        if len(self.photos) <= 1:
+            return
+        self.viewer_index = (self.viewer_index + 1) % len(self.photos)
+        self.viewer_zoomed = False
+
+    @rx.event
+    def prev_photo(self) -> None:
+        if len(self.photos) <= 1:
+            return
+        self.viewer_index = (self.viewer_index - 1) % len(self.photos)
+        self.viewer_zoomed = False
+
+    @rx.event
+    def toggle_zoom(self) -> None:
+        self.viewer_zoomed = not self.viewer_zoomed
+
+    @rx.event
+    def viewer_key_down(self, key: str) -> None:
+        # Esc fica com o diálogo (fecha e devolve o foco).
+        if key == "ArrowRight":
+            DonationDetailState.next_photo.fn(self)
+        elif key == "ArrowLeft":
+            DonationDetailState.prev_photo.fn(self)
 
     @rx.event
     async def load_donation(self) -> None:
@@ -219,6 +269,9 @@ class DonationDetailState(LoginState):
         self.contact_message = ""
         self.contact_message_is_error = False
         self.is_starting_chat = False
+        self.viewer_open = False
+        self.viewer_index = 0
+        self.viewer_zoomed = False
         donation_id = self.router.page.params.get("id", "")
 
         try:
@@ -321,277 +374,699 @@ class DonationDetailState(LoginState):
         return rx.redirect(f"/chat?conversa={conversation['conversation_id']}")
 
 
-def _gallery_thumbnail(photo: rx.Var[str]) -> rx.Component:
-    return rx.image(
-        src=photo,
-        alt="Foto da doação",
+# Layout da página, segundo os frames detalhes-doacao-inteira e
+# detalhes-doacao-1 do Figma (veja docs/design/README.md, que prevalece).
+# Todo dado vindo do Xano é renderizado com componentes de texto, sem HTML.
+
+TEXT_STRONG = "#2A2A2A"
+TEXT_LABEL = "#555555"
+TEXT_DONOR = "#001C3C"
+BORDER_SOFT = "#D9D9D9"
+PRIMARY_GREEN = "#007A42"
+PRIMARY_GREEN_HOVER = "#006B39"
+CREAM = "#FFF6E8"
+PHOTO_PLACEHOLDER = "#EEEEEE"
+DETAIL_ICON = "/detalhe-atributo.svg"
+LOCATION_ICON = "/detalhe-localizacao.svg"
+MAX_THUMBNAILS = 4
+
+
+VIEWER_BACKDROP = "rgba(255, 246, 232, 0.85)"
+VIEWER_BLUR = "blur(6px)"
+# #1F1F1F sobre o creme (mesmo a 85%) passa de 15:1, acima do AA.
+VIEWER_TEXT = "#1F1F1F"
+VIEWER_CONTROL_BACKGROUND = "#FFFFFF"
+VIEWER_CONTROL_HOVER = "#F2F2F2"
+VIEWER_CONTROL_SHADOW = "0 2px 8px rgba(0, 0, 0, 0.18)"
+VIEWER_CONTROL_SIZE = "48px"
+# Margem dos botões e da foto até a borda da tela, em qualquer largura.
+VIEWER_EDGE = "16px"
+# Cabeçalho do modal: 16 px + botão de 48 px + 16 px.
+VIEWER_HEADER_HEIGHT = "80px"
+# Foto em 1x: cabe na altura que sobra abaixo do cabeçalho, com 16 px embaixo.
+VIEWER_IMAGE_MAX_HEIGHT = "calc(100dvh - 80px - 16px)"
+# Largura: 16 px de cada lado no celular (as setas ficam sobre a foto); no
+# computador, espaço das setas (16 + 48 + 16) dos dois lados.
+VIEWER_IMAGE_MAX_WIDTH_MOBILE = "calc(100vw - 32px)"
+VIEWER_IMAGE_MAX_WIDTH_DESKTOP = "calc(100vw - 160px)"
+# 2x: o dobro dessas larguras, com rolagem para mover a foto.
+VIEWER_IMAGE_ZOOM_WIDTH_MOBILE = "calc(200vw - 64px)"
+VIEWER_IMAGE_ZOOM_WIDTH_DESKTOP = "calc(200vw - 320px)"
+# O Radix pinta um véu escuro (::before do overlay) atrás de todo diálogo;
+# só no visualizador ele fica transparente, para valer o creme com desfoque.
+VIEWER_OVERLAY_CSS = (
+    ".rt-BaseDialogOverlay:has(.detail-viewer)::before"
+    "{background-color:transparent}"
+)
+
+
+def _photo_open_button(
+    child: rx.Component, index: rx.Var | int, label: rx.Var | str
+) -> rx.Component:
+    """Botão sem estilo próprio em volta da foto: clique, Enter ou Espaço
+    abrem o visualizador nessa foto."""
+    return rx.el.button(
+        child,
+        type="button",
+        on_click=DonationDetailState.open_viewer(index),
+        aria_label=label,
+        class_name="detail-photo-button",
+        display="block",
         width="100%",
-        height="150px",
-        object_fit="cover",
-        border_radius="10px",
-        background="#EEEEEE",
+        height="100%",
+        padding="0",
+        border="none",
+        background="transparent",
+        border_radius="8px",
+        cursor="zoom-in",
     )
 
 
-def _header() -> rx.Component:
-    return rx.box(
-        rx.image(
-            src="/logo.svg",
-            alt="DoaFácil",
-            width="190px",
-            height="72px",
-            object_fit="contain",
-        ),
-        display="flex",
-        justify_content="center",
+def _photo_label(position: rx.Var | int) -> rx.Var:
+    return (
+        rx.Var.create("Ampliar foto ")
+        + rx.Var.create(position).to_string()
+        + " de "
+        + DonationDetailState.photos.length().to_string()
+    )
+
+
+def _viewer_control(
+    icon: str, label: str, on_click: rx.EventHandler, **props: Any
+) -> rx.Component:
+    """Botão branco com sombra leve e ícone escuro, com área de toque de 48 px."""
+    return rx.el.button(
+        rx.icon(icon, size=28, aria_hidden="true"),
+        type="button",
+        # stop_propagation: o clique no botão não chega ao fundo (que fecha).
+        on_click=on_click.stop_propagation,
+        aria_label=label,
+        title=label,
+        class_name="detail-viewer-control",
+        display="inline-flex",
         align_items="center",
-        width="100%",
-        background="white",
-        padding="8px 24px",
+        justify_content="center",
+        flex_shrink="0",
+        width=VIEWER_CONTROL_SIZE,
+        height=VIEWER_CONTROL_SIZE,
+        min_width=VIEWER_CONTROL_SIZE,
+        min_height=VIEWER_CONTROL_SIZE,
+        padding="0",
+        color=VIEWER_TEXT,
+        background=VIEWER_CONTROL_BACKGROUND,
+        box_shadow=VIEWER_CONTROL_SHADOW,
+        border="none",
+        border_radius="999px",
+        cursor="pointer",
+        _hover={"background": VIEWER_CONTROL_HOVER},
+        _focus_visible={
+            "outline": f"2px solid {VIEWER_TEXT}",
+            "outlineOffset": "2px",
+        },
+        **props,
     )
 
 
-def _back_link() -> rx.Component:
-    return rx.box(
-        rx.link(
-            rx.icon("chevron-left", size=24),
-            href="/",
-            color="#166B3B",
-            font_weight="600",
-            aria_label="Voltar",
+def _photo_viewer() -> rx.Component:
+    """Visualizador modal: foto inteira, ‹ ›, setas, “N de M”, zoom 1x/2x e
+    fechar por X, Esc ou clique fora. O rx.dialog (Radix) prende o foco,
+    fecha com Esc e devolve o foco ao fechar.
+
+    Fundo creme semitransparente com desfoque; textos e ícones escuros. O
+    conteúdo ocupa a tela com position fixed + inset 0, então o X e as setas
+    ficam sempre a 16 px das bordas visíveis, em qualquer largura."""
+    zoomed = DonationDetailState.viewer_zoomed
+    has_many = DonationDetailState.photos.length() > 1
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.el.style(VIEWER_OVERLAY_CSS),
+            # ← e →: ouvinte da janela, que só existe com o modal aberto (o
+            # Radix desmonta o conteúdo fechado), então nenhuma tecla vai ao
+            # servidor fora do visualizador. Esc fica com o próprio diálogo.
+            rx.window_event_listener(
+                on_key_down=DonationDetailState.viewer_key_down,
+            ),
+            # Fundo: clicar nele (fora da foto e dos botões) fecha.
+            rx.box(
+                # Cabeçalho de altura fixa: contador, dica e o X.
+                rx.hstack(
+                    rx.box(
+                        rx.dialog.title(
+                            DonationDetailState.viewer_index + 1,
+                            " de ",
+                            DonationDetailState.photos.length(),
+                            class_name="detail-viewer-counter",
+                            color=VIEWER_TEXT,
+                            font_size="1rem",
+                            font_weight="600",
+                            line_height="1.4",
+                            margin="0",
+                        ),
+                        rx.dialog.description(
+                            "Use as setas para trocar de foto. Clique na foto "
+                            "para ampliar ou reduzir.",
+                            color=VIEWER_TEXT,
+                            font_size="0.8rem",
+                            line_height="1.3",
+                            margin="0",
+                            display=rx.breakpoints(initial="none", md="block"),
+                        ),
+                        on_click=rx.stop_propagation,
+                        min_width="0",
+                    ),
+                    rx.spacer(),
+                    _viewer_control("x", "Fechar", DonationDetailState.close_viewer),
+                    class_name="detail-viewer-header",
+                    align="center",
+                    width="100%",
+                    height=VIEWER_HEADER_HEIGHT,
+                    padding=f"0 {VIEWER_EDGE}",
+                    box_sizing="border-box",
+                    flex_shrink="0",
+                ),
+                rx.box(
+                    # Área da foto: em 2x, a rolagem move a imagem; no
+                    # celular vale a pinça do navegador (touch-action).
+                    rx.el.button(
+                        rx.image(
+                            src=DonationDetailState.photos[
+                                DonationDetailState.viewer_index
+                            ],
+                            alt=DonationDetailState.title,
+                            class_name="detail-viewer-image",
+                            object_fit="contain",
+                            display="block",
+                            margin="auto",
+                            # 1x: a foto inteira cabe abaixo do cabeçalho.
+                            max_width=rx.cond(
+                                zoomed,
+                                "none",
+                                rx.breakpoints(
+                                    initial=VIEWER_IMAGE_MAX_WIDTH_MOBILE,
+                                    md=VIEWER_IMAGE_MAX_WIDTH_DESKTOP,
+                                ),
+                            ),
+                            max_height=rx.cond(zoomed, "none", VIEWER_IMAGE_MAX_HEIGHT),
+                            # 2x: o dobro da largura disponível, com rolagem.
+                            width=rx.cond(
+                                zoomed,
+                                rx.breakpoints(
+                                    initial=VIEWER_IMAGE_ZOOM_WIDTH_MOBILE,
+                                    md=VIEWER_IMAGE_ZOOM_WIDTH_DESKTOP,
+                                ),
+                                "auto",
+                            ),
+                            height="auto",
+                        ),
+                        type="button",
+                        on_click=DonationDetailState.toggle_zoom.stop_propagation,
+                        aria_label=rx.cond(zoomed, "Reduzir foto", "Ampliar foto"),
+                        class_name="detail-viewer-zoom",
+                        display="block",
+                        margin="auto",
+                        padding="0",
+                        border="none",
+                        background="transparent",
+                        min_width=VIEWER_CONTROL_SIZE,
+                        min_height=VIEWER_CONTROL_SIZE,
+                        cursor=rx.cond(zoomed, "zoom-out", "zoom-in"),
+                    ),
+                    class_name="detail-viewer-stage",
+                    display="flex",
+                    align_items=rx.cond(zoomed, "flex-start", "center"),
+                    justify_content=rx.cond(zoomed, "flex-start", "center"),
+                    overflow="auto",
+                    flex="1",
+                    width="100%",
+                    min_height="0",
+                    box_sizing="border-box",
+                    padding=rx.breakpoints(
+                        initial=f"0 {VIEWER_EDGE} {VIEWER_EDGE}",
+                        md=f"0 80px {VIEWER_EDGE}",
+                    ),
+                    style={"touchAction": "pan-x pan-y pinch-zoom"},
+                ),
+                rx.cond(
+                    has_many,
+                    rx.fragment(
+                        # Centro vertical da área da foto (abaixo dos 80 px do
+                        # cabeçalho), a 16 px das bordas laterais.
+                        _viewer_control(
+                            "chevron-left",
+                            "Foto anterior",
+                            DonationDetailState.prev_photo,
+                            position="absolute",
+                            left=VIEWER_EDGE,
+                            top="calc(50% + 40px)",
+                            transform="translateY(-50%)",
+                            z_index="1",
+                        ),
+                        _viewer_control(
+                            "chevron-right",
+                            "Próxima foto",
+                            DonationDetailState.next_photo,
+                            position="absolute",
+                            right=VIEWER_EDGE,
+                            top="calc(50% + 40px)",
+                            transform="translateY(-50%)",
+                            z_index="1",
+                        ),
+                    ),
+                    rx.fragment(),
+                ),
+                on_click=DonationDetailState.close_viewer,
+                class_name="detail-viewer-backdrop",
+                position="relative",
+                display="flex",
+                flex_direction="column",
+                width="100%",
+                height="100%",
+                overflow="hidden",
+            ),
+            class_name="detail-viewer",
+            # Tela cheia presa às bordas visíveis, sem o cartão do Radix.
+            position="fixed",
+            inset="0",
+            top="0",
+            left="0",
+            # 100% do viewport sem a barra de rolagem: nada passa da borda.
+            width="100%",
+            height="100%",
+            max_width="none",
+            max_height="none",
+            padding="0",
+            margin="0",
+            border_radius="0",
+            overflow="hidden",
+            box_sizing="border-box",
+            color=VIEWER_TEXT,
+            background=VIEWER_BACKDROP,
+            box_shadow="none",
+            style={
+                "backdropFilter": VIEWER_BLUR,
+                "WebkitBackdropFilter": VIEWER_BLUR,
+            },
         ),
+        open=DonationDetailState.viewer_open,
+        on_open_change=DonationDetailState.set_viewer_open,
+    )
+
+
+def _gallery_thumbnail(photo: rx.Var[str], index: rx.Var[int]) -> rx.Component:
+    # As miniaturas são as fotos 2 a 5: posição no visualizador = index + 1.
+    return _photo_open_button(
+        rx.image(
+            src=photo,
+            alt="Foto da doação",
+            width="100%",
+            height=rx.breakpoints(initial="140px", md="100%"),
+            min_height="0",
+            object_fit="cover",
+            border_radius="8px",
+            background=PHOTO_PLACEHOLDER,
+        ),
+        index + 1,
+        _photo_label(index + 2),
+    )
+
+
+def _gallery() -> rx.Component:
+    """Capa grande e, ao lado, até 4 miniaturas em 2 colunas (Figma).
+
+    No celular, a capa vem em cima e as miniaturas abaixo, em 2 colunas.
+    Com uma foto só, a capa ocupa toda a largura da galeria e aparece inteira
+    (contain), centralizada, com fundo neutro nas sobras.
+    """
+    has_thumbnails = DonationDetailState.photos.length() > 1
+    return rx.box(
+        _photo_open_button(
+            rx.image(
+                src=DonationDetailState.photos[0],
+                alt=DonationDetailState.title,
+                width="100%",
+                height=rx.breakpoints(initial="300px", md="470px"),
+                object_fit=rx.cond(has_thumbnails, "cover", "contain"),
+                object_position="center",
+                border_radius="8px",
+                background=PHOTO_PLACEHOLDER,
+            ),
+            0,
+            _photo_label(1),
+        ),
+        rx.cond(
+            has_thumbnails,
+            rx.box(
+                rx.foreach(
+                    DonationDetailState.photos[1 : MAX_THUMBNAILS + 1],
+                    _gallery_thumbnail,
+                ),
+                class_name="detail-gallery-thumbnails",
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                    "gridAutoRows": rx.breakpoints(
+                        initial="140px", md="minmax(0, 1fr)"
+                    ),
+                },
+                gap="16px",
+                width="100%",
+                height=rx.breakpoints(initial="auto", md="470px"),
+            ),
+            rx.fragment(),
+        ),
+        class_name="detail-gallery",
+        style={
+            "display": "grid",
+            # Com uma foto só, a capa ocupa toda a largura da galeria.
+            "gridTemplateColumns": rx.breakpoints(
+                initial="minmax(0, 1fr)",
+                md=rx.cond(
+                    has_thumbnails,
+                    "minmax(0, 1fr) minmax(0, 1fr)",
+                    "minmax(0, 1fr)",
+                ),
+            ),
+        },
+        gap="16px",
         width="100%",
-        max_width="1200px",
-        margin="0 auto",
-        padding="8px 24px 0",
+    )
+
+
+def _summary_card() -> rx.Component:
+    """Cartão de resumo à direita: título, condição e contato (Figma)."""
+    return rx.vstack(
+        rx.heading(
+            DonationDetailState.title,
+            as_="h1",
+            font_size=rx.breakpoints(initial="1.8rem", md="2.4rem"),
+            font_weight="500",
+            color=TEXT_STRONG,
+            line_height="1.2",
+            overflow_wrap="anywhere",
+        ),
+        rx.text(
+            "Condição: ",
+            DonationDetailState.condition,
+            color=TEXT_STRONG,
+            font_size="0.95rem",
+        ),
+        rx.vstack(
+            rx.button(
+                "Outros meios de comunicação",
+                on_click=DonationDetailState.request_donor_contact,
+                class_name="detail-primary-button",
+                width="100%",
+                min_height="56px",
+                background=PRIMARY_GREEN,
+                color="white",
+                font_weight="700",
+                font_size="1rem",
+                border_radius="999px",
+                white_space="normal",
+                _hover={"background": PRIMARY_GREEN_HOVER},
+            ),
+            rx.button(
+                rx.hstack(
+                    rx.icon("message-circle", size=20),
+                    rx.text("Chat"),
+                    spacing="2",
+                    align="center",
+                ),
+                on_click=DonationDetailState.start_chat,
+                disabled=DonationDetailState.is_starting_chat,
+                width="100%",
+                min_height="52px",
+                background="white",
+                color=TEXT_STRONG,
+                font_weight="500",
+                font_size="1rem",
+                border="1px solid #85858D",
+                border_radius="999px",
+                _hover={"background": "#F7F8F7"},
+            ),
+            rx.cond(
+                DonationDetailState.contact_message != "",
+                rx.text(
+                    DonationDetailState.contact_message,
+                    role="status",
+                    color=rx.cond(
+                        DonationDetailState.contact_message_is_error,
+                        "#9B2C2C",
+                        "#166B3B",
+                    ),
+                    font_size="0.9rem",
+                    width="100%",
+                ),
+                rx.fragment(),
+            ),
+            align="stretch",
+            spacing="4",
+            width="100%",
+            padding_top="24px",
+        ),
+        class_name="detail-summary-card",
+        align="stretch",
+        spacing="2",
+        width="100%",
+        padding="40px 20px 32px",
+        background="white",
+        border=f"1px solid {BORDER_SOFT}",
+        border_radius="8px",
+        box_shadow="0 8px 13px rgba(0, 0, 0, 0.15)",
+    )
+
+
+def _title_and_description() -> rx.Component:
+    """Título (caixa alta só no visual) e descrição logo abaixo da galeria."""
+    return rx.vstack(
+        rx.heading(
+            DonationDetailState.title,
+            as_="h2",
+            class_name="detail-title",
+            font_size="1.5rem",
+            font_weight="700",
+            color="#000000",
+            text_transform="uppercase",
+            line_height="1.25",
+            overflow_wrap="anywhere",
+        ),
+        rx.text(
+            DonationDetailState.description,
+            class_name="detail-description",
+            color="#222222",
+            font_size=rx.breakpoints(initial="1rem", md="1.1rem"),
+            line_height="1.5",
+            white_space="pre-wrap",
+            overflow_wrap="anywhere",
+        ),
+        align="stretch",
+        spacing="3",
+        width="100%",
+    )
+
+
+def _decorative_icon(src: str, size: str) -> rx.Component:
+    return rx.image(
+        src=src,
+        alt="",
+        width=size,
+        height=size,
+        min_width=size,
+        aria_hidden="true",
+    )
+
+
+def _detail_item(label: str, value: rx.Var) -> rx.Component:
+    """Ícone verde, rótulo pequeno e o valor logo abaixo (Figma)."""
+    return rx.hstack(
+        _decorative_icon(DETAIL_ICON, "18px"),
+        rx.vstack(
+            rx.text(
+                label,
+                class_name="detail-item-label",
+                color=TEXT_LABEL,
+                font_size="0.75rem",
+                line_height="1.2",
+            ),
+            rx.text(
+                value,
+                class_name="detail-item-value",
+                color=TEXT_STRONG,
+                font_size="0.95rem",
+                font_weight="600",
+                line_height="1.3",
+                overflow_wrap="anywhere",
+            ),
+            spacing="1",
+            align="start",
+            min_width="0",
+        ),
+        class_name="detail-item",
+        spacing="3",
+        align="start",
+        min_width="0",
+    )
+
+
+def _details_section() -> rx.Component:
+    return rx.vstack(
+        rx.heading(
+            "Detalhes",
+            as_="h2",
+            font_size="1.5rem",
+            font_weight="500",
+            color=TEXT_STRONG,
+            class_name="page-fade-enter",
+        ),
+        rx.box(
+            _detail_item("Categoria", DonationDetailState.category),
+            _detail_item("Condição", DonationDetailState.condition),
+            _detail_item("Forma de entrega", DonationDetailState.delivery_method),
+            _detail_item(
+                "Preferência de contato", DonationDetailState.contact_preference
+            ),
+            class_name="detail-grid",
+            style={
+                "display": "grid",
+                "gridTemplateColumns": rx.breakpoints(
+                    initial="minmax(0, 1fr)",
+                    sm="repeat(2, minmax(0, 1fr))",
+                    lg="repeat(4, minmax(0, 1fr))",
+                ),
+            },
+            column_gap="24px",
+            row_gap="24px",
+            width="100%",
+        ),
+        align="stretch",
+        spacing="5",
+        width="100%",
+    )
+
+
+def _location_card() -> rx.Component:
+    """Só “Cidade, UF”: bairro, zona e CEP não aparecem (privacidade)."""
+    return rx.vstack(
+        rx.heading(
+            "Localização",
+            as_="h2",
+            font_size="1.5rem",
+            font_weight="500",
+            color=TEXT_STRONG,
+            class_name="page-fade-enter",
+        ),
+        rx.hstack(
+            _decorative_icon(LOCATION_ICON, "56px"),
+            rx.text(
+                DonationDetailState.city,
+                ", ",
+                DonationDetailState.state,
+                class_name="detail-location-text",
+                color=TEXT_STRONG,
+                font_size="1rem",
+                font_weight="600",
+            ),
+            class_name="detail-location-card",
+            spacing="5",
+            align="center",
+            width="100%",
+            padding="20px",
+            background="white",
+            border=f"1px solid {BORDER_SOFT}",
+            border_radius="8px",
+        ),
+        align="stretch",
+        spacing="4",
+        width="100%",
+    )
+
+
+def _donor_card() -> rx.Component:
+    """Cartão mínimo de quem doa: primeiro nome e “Cidade, UF”."""
+    return rx.vstack(
+        rx.heading(
+            "Quem doa",
+            as_="h2",
+            font_size="1.1rem",
+            font_weight="500",
+            color=TEXT_DONOR,
+            class_name="page-fade-enter",
+        ),
+        rx.text(
+            DonationDetailState.donor_first_name,
+            color=TEXT_DONOR,
+            font_size="1.2rem",
+            font_weight="600",
+        ),
+        rx.hstack(
+            rx.icon("map-pin", size=18, color=TEXT_DONOR, aria_hidden="true"),
+            rx.text(
+                DonationDetailState.city,
+                ", ",
+                DonationDetailState.state,
+                color=TEXT_DONOR,
+                font_size="0.9rem",
+            ),
+            spacing="3",
+            align="center",
+        ),
+        class_name="detail-donor-card",
+        align="stretch",
+        spacing="3",
+        width="100%",
+        padding="32px 28px",
+        background="white",
+        border=f"1px solid {BORDER_SOFT}",
+        border_radius="8px",
     )
 
 
 def _donation_content() -> rx.Component:
+    """Duas colunas no computador (como no Figma) e uma no celular.
+
+    Ordem no celular: galeria, resumo, título e descrição, detalhes,
+    localização e quem doa. As áreas da grade fazem a troca de posição.
+    """
     return rx.box(
-        rx.vstack(
-            rx.box(
-                rx.vstack(
-                    rx.image(
-                        src=DonationDetailState.photos[0],
-                        alt=DonationDetailState.title,
-                        width="100%",
-                        height=rx.breakpoints(
-                            initial="280px", md="440px"
-                        ),
-                        object_fit="cover",
-                        border_radius="12px",
-                        background="#EEEEEE",
-                    ),
-                    rx.flex(
-                        rx.foreach(
-                            DonationDetailState.photos[1:],
-                            _gallery_thumbnail,
-                        ),
-                        wrap="wrap",
-                        gap="12px",
-                        width="100%",
-                    ),
-                    align="stretch",
-                    spacing="3",
-                    width="100%",
+        rx.box(
+            rx.box(_gallery(), grid_area="gallery", min_width="0"),
+            rx.box(_summary_card(), grid_area="summary", min_width="0"),
+            rx.box(_title_and_description(), grid_area="title", min_width="0"),
+            rx.box(_details_section(), grid_area="details", min_width="0"),
+            rx.box(_location_card(), grid_area="location", min_width="0"),
+            rx.box(_donor_card(), grid_area="donor", min_width="0"),
+            # Visualizador modal (fora do fluxo da grade).
+            _photo_viewer(),
+            class_name="detail-layout",
+            style={
+                "display": "grid",
+                "gridTemplateColumns": rx.breakpoints(
+                    initial="minmax(0, 1fr)",
+                    md="minmax(0, 2.6fr) minmax(280px, 1fr)",
                 ),
-                rx.vstack(
-                    rx.heading(
-                        DonationDetailState.title,
-                        font_size=rx.breakpoints(
-                            initial="1.6rem", md="2.1rem"
-                        ),
-                        color="#222222",
-                        line_height="1.2",
+                # Aspas simples: o CSS aceita, e o Reflex não escapa as
+                # duplas dentro do valor (geraria JavaScript inválido).
+                "gridTemplateAreas": rx.breakpoints(
+                    initial=(
+                        "'gallery' 'summary' 'title' 'details' 'location' 'donor'"
                     ),
-                    rx.text(
-                        "Condição: ",
-                        DonationDetailState.condition,
-                        color="#333333",
-                        font_size="1rem",
+                    md=(
+                        "'gallery summary' 'title donor' 'details donor' "
+                        "'location donor'"
                     ),
-                    rx.button(
-                        "Outros meios de comunicação",
-                        on_click=DonationDetailState.request_donor_contact,
-                        width="100%",
-                        height="48px",
-                        background="#00A859",
-                        color="white",
-                        font_weight="700",
-                        border_radius="999px",
-                        _hover={"background": "#008F4C"},
-                    ),
-                    rx.button(
-                        rx.hstack(
-                            rx.icon("message-circle", size=20),
-                            rx.text("Chat"),
-                            spacing="2",
-                            align="center",
-                        ),
-                        on_click=DonationDetailState.start_chat,
-                        disabled=DonationDetailState.is_starting_chat,
-                        width="100%",
-                        height="48px",
-                        background="white",
-                        color="#222222",
-                        font_weight="500",
-                        border="1px solid #7D8793",
-                        border_radius="999px",
-                        _hover={"background": "#F7F8F7"},
-                    ),
-                    rx.cond(
-                        DonationDetailState.contact_message != "",
-                        rx.text(
-                            DonationDetailState.contact_message,
-                            role="status",
-                            color=rx.cond(
-                                DonationDetailState.contact_message_is_error,
-                                "#9B2C2C",
-                                "#166B3B",
-                            ),
-                            font_size="0.9rem",
-                            width="100%",
-                        ),
-                        rx.fragment(),
-                    ),
-                    align="stretch",
-                    spacing="4",
-                    width="100%",
-                    padding="24px",
-                    background="white",
-                    border_radius="12px",
-                    box_shadow="0 2px 12px rgba(39, 39, 39, 0.10)",
                 ),
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": rx.breakpoints(
-                        initial="1fr", md="minmax(0, 1.7fr) minmax(280px, 1fr)"
-                    ),
-                },
-                gap="24px",
-                width="100%",
-                align_items="start",
-            ),
-            rx.box(
-                rx.vstack(
-                    rx.vstack(
-                        rx.heading(
-                            "Detalhes",
-                            font_size="1.35rem",
-                            color="#333333",
-                            class_name="page-fade-enter",
-                        ),
-                        rx.text(
-                            "Descrição",
-                            font_weight="700",
-                            color="#333333",
-                        ),
-                        rx.text(
-                            DonationDetailState.description,
-                            color="#555555",
-                            white_space="pre-wrap",
-                        ),
-                        rx.text(
-                            "Categoria",
-                            font_weight="700",
-                            color="#333333",
-                        ),
-                        rx.text(
-                            DonationDetailState.category,
-                            color="#555555",
-                        ),
-                        rx.text(
-                            "Forma de entrega",
-                            font_weight="700",
-                            color="#333333",
-                        ),
-                        rx.text(
-                            DonationDetailState.delivery_method,
-                            color="#555555",
-                        ),
-                        rx.text(
-                            "Preferência de contato",
-                            font_weight="700",
-                            color="#333333",
-                        ),
-                        rx.text(
-                            DonationDetailState.contact_preference,
-                            color="#555555",
-                        ),
-                        align="stretch",
-                        spacing="3",
-                        width="100%",
-                    ),
-                    rx.vstack(
-                        rx.heading(
-                            "Localização",
-                            font_size="1.35rem",
-                            color="#333333",
-                            class_name="page-fade-enter",
-                        ),
-                        rx.text(
-                            DonationDetailState.city,
-                            ", ",
-                            DonationDetailState.state,
-                            color="#555555",
-                        ),
-                        align="stretch",
-                        spacing="3",
-                        width="100%",
-                        padding_top="24px",
-                        border_top="1px solid #D8D0C5",
-                    ),
-                    align="stretch",
-                    spacing="6",
-                    width="100%",
-                ),
-                rx.vstack(
-                    rx.heading(
-                        "Quem doa",
-                        font_size="1.2rem",
-                        color="#333333",
-                        class_name="page-fade-enter",
-                    ),
-                    rx.text(
-                        DonationDetailState.donor_first_name,
-                        font_weight="700",
-                        color="#333333",
-                    ),
-                    rx.text(
-                        DonationDetailState.city,
-                        ", ",
-                        DonationDetailState.state,
-                        color="#555555",
-                    ),
-                    align="stretch",
-                    spacing="2",
-                    width="100%",
-                    padding="24px",
-                    background="white",
-                    border_radius="12px",
-                    box_shadow="0 2px 12px rgba(39, 39, 39, 0.10)",
-                ),
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": rx.breakpoints(
-                        initial="1fr", md="minmax(0, 1.7fr) minmax(280px, 1fr)"
-                    ),
-                },
-                gap="24px",
-                width="100%",
-                align_items="start",
-            ),
-            align="stretch",
-            spacing="6",
+                "alignItems": "start",
+            },
+            column_gap="24px",
+            row_gap="32px",
             width="100%",
-            max_width="1200px",
+            max_width="1440px",
             margin="0 auto",
-            padding="32px 24px 56px",
+            padding=rx.breakpoints(initial="24px 16px 48px", md="28px 24px 56px"),
         ),
         width="100%",
         min_height="calc(100vh - 88px)",
-        background="#FFF6E8",
+        background=CREAM,
     )
 
 
@@ -604,15 +1079,15 @@ def _detail_state_message(message: str, color: str) -> rx.Component:
         width="100%",
         min_height="calc(100vh - 88px)",
         padding="24px",
-        background="#FFF6E8",
+        background=CREAM,
         class_name="page-fade-enter",
     )
 
 
 def donation_detail_page() -> rx.Component:
     return rx.box(
-        _header(),
-        _back_link(),
+        # “Voltar ao início” na linha do logotipo, igual ao chat e ao Figma.
+        back_home_header(),
         rx.cond(
             DonationDetailState.view_state == "loading",
             _detail_state_message("Carregando doação...", "#555555"),
@@ -636,6 +1111,6 @@ def donation_detail_page() -> rx.Component:
         flex_direction="column",
         width="100%",
         min_height="100vh",
-        background="#FFF6E8",
+        background=CREAM,
         font_family="'LINE Seed JP', Arial, sans-serif",
     )

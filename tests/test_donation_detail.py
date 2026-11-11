@@ -603,8 +603,8 @@ class DonationDetailTests(unittest.TestCase):
             DONATION_NOT_FOUND_MESSAGE,
             DONATION_DETAIL_ERROR_MESSAGE,
             "Detalhes",
-            "Descrição",
             "Categoria",
+            "Condição",
             "Localização",
             "Quem doa",
             "Condição: ",
@@ -622,6 +622,11 @@ class DonationDetailTests(unittest.TestCase):
             "Avaliações",
             "Bairro",
             "CEP",
+            "Cor",
+            "Material",
+            "Tipo",
+            "NOVO",
+            "Disponível",
         ):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
@@ -663,23 +668,28 @@ class DonationDetailTests(unittest.TestCase):
     def test_back_link_is_shared_accessible_and_returns_home_in_all_states(
         self,
     ) -> None:
-        page = donation_detail_page()
-        header, back_container, state_content = page.children
-        back_link = back_container.children[0]
-        rendered = str(page)
+        from doafacil.chat import back_home_header
 
-        self.assertEqual(type(header).__name__, "Box")
-        self.assertEqual(type(back_container).__name__, "Box")
+        page = donation_detail_page()
+        header, state_content = page.children
+        rendered_header = str(header)
+
+        # “Voltar ao início” na linha do logotipo, o mesmo cabeçalho do chat.
+        self.assertEqual(type(header).__name__, "Grid")
+        self.assertEqual(rendered_header, str(back_home_header()))
         self.assertEqual(type(state_content).__name__, "Fragment")
-        self.assertEqual(back_link.custom_attrs.get("aria-label"), "Voltar")
-        self.assertEqual(back_link.color, "#166B3B")
-        self.assertEqual(back_container.style["maxWidth"]._var_value, "1200px")
-        self.assertEqual(
-            back_container.style["padding"]._var_value,
-            "8px 24px 0",
-        )
-        self.assertIn('ReactRouterLink,{to:"/"}', rendered)
-        self.assertIn("LucideChevronLeft", rendered)
+        back_link = header.children[0]
+        self.assertEqual(back_link.custom_attrs.get("aria-label"), "Voltar ao início")
+        self.assertIn('"aria-label":"Voltar ao in\\u00edcio"', rendered_header)
+        self.assertIn('to:"/"', rendered_header)
+        self.assertIn("LucideChevronLeft", rendered_header)
+        self.assertIn('"#166B3B"', rendered_header)
+        self.assertIn("/logo.svg", rendered_header)
+        # Área de toque confortável quando só a seta aparece.
+        self.assertIn('"minHeight"] : "44px"', rendered_header)
+        self.assertIn('"minWidth"] : "44px"', rendered_header)
+        # Sem o link antigo abaixo do cabeçalho.
+        self.assertNotIn('"aria-label":"Voltar"', str(page))
 
         contents = _component_contents(state_content)
         for state_message in (
@@ -690,6 +700,323 @@ class DonationDetailTests(unittest.TestCase):
         ):
             with self.subTest(state=state_message):
                 self.assertIn(state_message, contents)
+
+    def test_gallery_shows_cover_and_up_to_four_thumbnails_in_two_columns(self) -> None:
+        from doafacil.detalhe_doacao import MAX_THUMBNAILS, _gallery
+
+        self.assertEqual(MAX_THUMBNAILS, 4)
+        rendered = str(_gallery())
+        # Capa: a primeira foto, com o título como texto alternativo.
+        self.assertIn("photos_rx_state_?.at?.(0)", rendered)
+        self.assertIn('"height"] : "470px"', rendered)
+        # Miniaturas: da 2ª à 5ª foto, em 2 colunas.
+        self.assertIn(".slice(1, 5)", rendered)
+        self.assertIn("repeat(2, minmax(0, 1fr))", rendered)
+        self.assertIn("Foto da doa\\u00e7\\u00e3o", rendered)
+        # Com uma foto só, não há miniaturas e a capa ocupa a largura toda.
+        self.assertIn("photos_rx_state_.length > 1", rendered.replace("?.", "."))
+        self.assertIn('"minmax(0, 1fr) minmax(0, 1fr)"', rendered)
+        self.assertIn('"minmax(0, 1fr)"', rendered)
+
+    def test_gallery_handles_one_and_five_photos_from_parser(self) -> None:
+        one = _parse_donation_detail({**DETAIL_PAYLOAD, "photos": ["https://images.example/a.jpg"]}, 42)
+        five_urls = [f"https://images.example/{n}.jpg" for n in range(5)]
+        five = _parse_donation_detail({**DETAIL_PAYLOAD, "photos": five_urls}, 42)
+        self.assertEqual(one["photos"][1:5], [])
+        self.assertEqual(five["photos"][0], five_urls[0])
+        self.assertEqual(five["photos"][1:5], five_urls[1:])
+
+    def test_summary_card_has_title_condition_and_accessible_primary_button(self) -> None:
+        from doafacil.detalhe_doacao import _summary_card
+
+        card = _summary_card()
+        rendered = str(card)
+        contents = _component_contents(card)
+        self.assertIn("title_rx_state_", rendered)
+        self.assertIn("Condição: ", contents)
+        self.assertIn("Outros meios de comunicação", contents)
+        self.assertIn("Chat", contents)
+        # Verde AA do projeto, e não o #00A859 (cerca de 2,9:1 com branco).
+        self.assertIn('"#007A42"', rendered)
+        self.assertNotIn("#00A859", rendered)
+        self.assertIn('"1px solid #85858D"', rendered)
+        self.assertIn("request_donor_contact", rendered)
+        self.assertIn("start_chat", rendered)
+        self.assertIn("contact_message", rendered)
+        self.assertIn('role:"status"', rendered)
+        self.assertIn("0 8px 13px rgba(0, 0, 0, 0.15)", rendered)
+
+    def test_title_and_description_below_gallery_with_css_uppercase(self) -> None:
+        from doafacil.detalhe_doacao import _title_and_description
+
+        rendered = str(_title_and_description())
+        self.assertIn('"textTransform"] : "uppercase"', rendered)
+        # O texto lido continua o original (sem .toUpperCase no conteúdo).
+        self.assertNotIn("toUpperCase", rendered)
+        self.assertIn("description_rx_state_", rendered)
+        self.assertIn('"whiteSpace"] : "pre-wrap"', rendered)
+
+    def test_layout_order_desktop_and_mobile(self) -> None:
+        from doafacil.detalhe_doacao import _donation_content
+
+        rendered = str(_donation_content())
+        # Celular: uma coluna nesta ordem; computador: duas colunas.
+        self.assertIn(
+            "\"'gallery' 'summary' 'title' 'details' 'location' 'donor'\"",
+            rendered,
+        )
+        self.assertIn(
+            "\"'gallery summary' 'title donor' 'details donor' 'location donor'\"",
+            rendered,
+        )
+        # Nenhuma aspa dupla sem escape dentro do valor (JavaScript válido).
+        self.assertNotIn('""gallery', rendered)
+        self.assertIn("minmax(0, 2.6fr) minmax(280px, 1fr)", rendered)
+        # Celular: 16 px de margem lateral, sem rolagem horizontal.
+        self.assertIn("24px 16px 48px", rendered)
+
+    def test_details_grid_has_four_items_with_icon_label_and_value(self) -> None:
+        from doafacil.detalhe_doacao import _details_section
+
+        section = _details_section()
+        rendered = str(section)
+        labels = [
+            text
+            for text in _component_contents(section)
+            if text not in {"Detalhes"}
+        ]
+        self.assertEqual(
+            labels,
+            ["Categoria", "Condição", "Forma de entrega", "Preferência de contato"],
+        )
+        for state_var in ("category", "condition", "delivery_method", "contact_preference"):
+            with self.subTest(value=state_var):
+                self.assertIn(f"{state_var}_rx_state_", rendered)
+        self.assertEqual(rendered.count("/detalhe-atributo.svg"), 4)
+        self.assertEqual(rendered.count('"aria-hidden":"true"'), 4)
+        self.assertIn('"fontSize"] : "0.75rem"', rendered)
+        # 1 coluna no celular, 2 no sm e 4 no lg.
+        self.assertIn("repeat(2, minmax(0, 1fr))", rendered)
+        self.assertIn("repeat(4, minmax(0, 1fr))", rendered)
+        for excluded in ("Cor", "Material", "Tipo"):
+            with self.subTest(excluded=excluded):
+                self.assertNotIn(excluded, labels)
+
+    def test_location_card_shows_only_city_and_state(self) -> None:
+        from doafacil.detalhe_doacao import _location_card
+
+        card = _location_card()
+        rendered = str(card)
+        self.assertEqual(_component_contents(card), ["Localização", ", "])
+        self.assertIn("city_rx_state_", rendered)
+        self.assertIn("state_rx_state_", rendered)
+        self.assertIn("/detalhe-localizacao.svg", rendered)
+        self.assertIn('"aria-hidden":"true"', rendered)
+        for excluded in ("neighborhood", "zip_code", "bairro", "CEP", "Zona"):
+            with self.subTest(excluded=excluded):
+                self.assertNotIn(excluded, rendered)
+
+    def test_donor_card_shows_only_first_name_and_city(self) -> None:
+        from doafacil.detalhe_doacao import _donor_card
+
+        card = _donor_card()
+        rendered = str(card)
+        self.assertEqual(_component_contents(card), ["Quem doa", ", "])
+        self.assertIn("donor_first_name_rx_state_", rendered)
+        self.assertIn("LucideMapPin", rendered)
+        self.assertNotIn("<img", rendered)
+        self.assertNotIn("Image", [type(n).__name__ for n in _all_component_nodes(card)])
+
+    def test_figma_icons_exist_with_root_size(self) -> None:
+        for name, size in (("detalhe-atributo.svg", "18"), ("detalhe-localizacao.svg", "56")):
+            with self.subTest(icon=name):
+                svg = Path("assets", name).read_text(encoding="utf-8")
+                self.assertTrue(svg.startswith("<svg"))
+                self.assertIn(f'width="{size}"', svg.split(">", 1)[0])
+                self.assertIn(f'height="{size}"', svg.split(">", 1)[0])
+
+    # Foto única e visualizador -------------------------------------------
+
+    def test_single_photo_is_shown_whole_and_many_photos_keep_cover(self) -> None:
+        from doafacil.detalhe_doacao import _gallery
+
+        rendered = str(_gallery())
+        # A capa troca de cover para contain quando há uma foto só.
+        self.assertIn(
+            'photos_rx_state_.length > 1) ? "cover" : "contain"',
+            rendered.replace("?.", "."),
+        )
+        self.assertIn('"objectPosition"] : "center"', rendered)
+        self.assertIn('"background"] : "#EEEEEE"', rendered)
+        # Mesma altura de antes.
+        self.assertIn('"height"] : "300px"', rendered)
+        self.assertIn('"height"] : "470px"', rendered)
+
+    def test_gallery_photos_are_buttons_that_open_the_viewer(self) -> None:
+        from doafacil.detalhe_doacao import _gallery
+
+        rendered = str(_gallery())
+        self.assertEqual(rendered.count('type:"button"'), 2)
+        self.assertEqual(rendered.count("open_viewer"), 2)
+        self.assertIn('"Ampliar foto "+', rendered)
+        self.assertIn('" de "', rendered)
+        self.assertIn('"cursor"] : "zoom-in"', rendered)
+
+    def _viewer_state(self, photos: int = 5, **overrides: object) -> SimpleNamespace:
+        values = {
+            "photos": [f"https://images.example/{n}.jpg" for n in range(photos)],
+            "viewer_open": False,
+            "viewer_index": 0,
+            "viewer_zoomed": False,
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def test_viewer_opens_on_chosen_photo_and_closes(self) -> None:
+        state = self._viewer_state(viewer_zoomed=True)
+        DonationDetailState.open_viewer.fn(state, 3)
+        self.assertEqual((state.viewer_open, state.viewer_index, state.viewer_zoomed), (True, 3, False))
+        DonationDetailState.open_viewer.fn(state, 99)
+        self.assertEqual(state.viewer_index, 4)
+        DonationDetailState.toggle_zoom.fn(state)
+        DonationDetailState.set_viewer_open.fn(state, False)
+        self.assertEqual((state.viewer_open, state.viewer_zoomed), (False, False))
+        DonationDetailState.open_viewer.fn(state, 0)
+        DonationDetailState.set_viewer_open.fn(state, True)
+        self.assertTrue(state.viewer_open)
+        DonationDetailState.close_viewer.fn(state)
+        self.assertFalse(state.viewer_open)
+        empty = self._viewer_state(photos=0)
+        DonationDetailState.open_viewer.fn(empty, 0)
+        self.assertFalse(empty.viewer_open)
+
+    def test_viewer_navigation_wraps_and_resets_zoom(self) -> None:
+        state = self._viewer_state(viewer_open=True, viewer_index=4, viewer_zoomed=True)
+        DonationDetailState.next_photo.fn(state)
+        self.assertEqual((state.viewer_index, state.viewer_zoomed), (0, False))
+        DonationDetailState.prev_photo.fn(state)
+        self.assertEqual(state.viewer_index, 4)
+        DonationDetailState.viewer_key_down.fn(state, "ArrowLeft")
+        self.assertEqual(state.viewer_index, 3)
+        DonationDetailState.viewer_key_down.fn(state, "ArrowRight")
+        self.assertEqual(state.viewer_index, 4)
+        DonationDetailState.viewer_key_down.fn(state, "a")
+        self.assertEqual(state.viewer_index, 4)
+        DonationDetailState.toggle_zoom.fn(state)
+        self.assertTrue(state.viewer_zoomed)
+        DonationDetailState.toggle_zoom.fn(state)
+        self.assertFalse(state.viewer_zoomed)
+
+    def test_viewer_with_one_photo_does_not_navigate(self) -> None:
+        state = self._viewer_state(photos=1, viewer_open=True)
+        for step in (
+            lambda: DonationDetailState.next_photo.fn(state),
+            lambda: DonationDetailState.prev_photo.fn(state),
+            lambda: DonationDetailState.viewer_key_down.fn(state, "ArrowRight"),
+            lambda: DonationDetailState.viewer_key_down.fn(state, "ArrowLeft"),
+        ):
+            step()
+            self.assertEqual(state.viewer_index, 0)
+
+    def test_viewer_component_modal_controls_and_accessibility(self) -> None:
+        from doafacil.detalhe_doacao import _photo_viewer
+
+        viewer = _photo_viewer()
+        rendered = str(viewer)
+        # Diálogo do Radix: foco preso, Esc e devolução do foco.
+        self.assertIn("RadixThemesDialog.Root", rendered)
+        self.assertIn("onOpenChange", rendered)
+        self.assertIn("set_viewer_open", rendered)
+        self.assertIn("viewer_open_rx_state_", rendered)
+        self.assertIn("RadixThemesDialog.Title", rendered)
+        # Contador “N de M”.
+        self.assertIn("viewer_index_rx_state_ + 1", rendered)
+        self.assertIn('" de "', rendered)
+        # Tela cheia; clique no fundo fecha.
+        self.assertIn('"position"] : "fixed"', rendered)
+        self.assertIn('"inset"] : "0"', rendered)
+        self.assertIn("close_viewer", rendered)
+        # Foto inteira (contain) e zoom 1x/2x com rolagem e pinça.
+        self.assertIn('"objectFit"] : "contain"', rendered)
+        self.assertIn("toggle_zoom", rendered)
+        self.assertIn('"calc(200vw - 64px)"', rendered)
+        self.assertIn('"calc(200vw - 320px)"', rendered)
+        self.assertIn('"overflow"] : "auto"', rendered)
+        self.assertIn("pinch-zoom", rendered)
+        self.assertIn('"Ampliar foto"', rendered)
+        self.assertIn('"Reduzir foto"', rendered)
+        # Botões com rótulo e 48 px; cliques não chegam ao fundo.
+        for label in ('"aria-label":"Fechar"', '"aria-label":"Foto anterior"', '"aria-label":"Pr\\u00f3xima foto"'):
+            with self.subTest(label=label):
+                self.assertIn(label, rendered)
+        self.assertGreaterEqual(rendered.count('"minWidth"] : "48px"'), 4)
+        self.assertGreaterEqual(rendered.count('"minHeight"] : "48px"'), 4)
+        self.assertIn("stopPropagation", rendered)
+        # ‹ e › só com mais de uma foto.
+        arrows = [
+            n
+            for n in _all_component_nodes(viewer)
+            if type(n).__name__ == "Cond" and "Foto anterior" in str(n)
+        ]
+        self.assertTrue(arrows)
+        self.assertIn("photos_rx_state_.length > 1", str(arrows[0].cond).replace("?.", "."))
+        self.assertNotIn("Foto anterior", str(arrows[0].children[1]))
+
+    def test_viewer_cream_backdrop_fit_and_controls_inside_the_screen(self) -> None:
+        from doafacil.detalhe_doacao import _photo_viewer
+
+        viewer = _photo_viewer()
+        rendered = str(viewer)
+        # 1. Fundo creme semitransparente com desfoque, sem o véu escuro do
+        # Radix; textos e ícones em #1F1F1F; botões brancos com sombra.
+        self.assertIn('"rgba(255, 246, 232, 0.85)"', rendered)
+        self.assertIn('"backdropFilter"] : "blur(6px)"', rendered)
+        self.assertIn('"WebkitBackdropFilter"] : "blur(6px)"', rendered)
+        self.assertNotIn("rgba(0, 0, 0, 0.92)", rendered)
+        styles = [n for n in _all_component_nodes(viewer) if type(n).__name__ == "StyleEl"]
+        self.assertEqual(len(styles), 1)
+        css = str(styles[0].children[0])
+        self.assertIn(".rt-BaseDialogOverlay:has(.detail-viewer)::before", css)
+        self.assertIn("background-color:transparent", css)
+        self.assertGreaterEqual(rendered.count('"color"] : "#1F1F1F"'), 4)
+        self.assertNotIn('"color"] : "white"', rendered)
+        self.assertGreaterEqual(rendered.count('"background"] : "#FFFFFF"'), 3)
+        self.assertGreaterEqual(rendered.count('"0 2px 8px rgba(0, 0, 0, 0.18)"'), 3)
+        # 2. Em 1x a foto cabe inteira abaixo do cabeçalho de 80 px.
+        self.assertIn('"height"] : "80px"', rendered)
+        self.assertIn('"calc(100dvh - 80px - 16px)"', rendered)
+        self.assertIn('"calc(100vw - 32px)"', rendered)
+        self.assertIn('"calc(100vw - 160px)"', rendered)
+        # 3. X e setas a 16 px das bordas, no viewport (fixed + inset 0,
+        # 100% em vez de 100vw, que soma a barra de rolagem).
+        self.assertNotIn('"100vw"', rendered)
+        self.assertIn('"padding"] : "0 16px"', rendered)
+        self.assertIn('"left"] : "16px"', rendered)
+        self.assertIn('"right"] : "16px"', rendered)
+        self.assertIn('"calc(50% + 40px)"', rendered)
+
+    def test_viewer_listens_to_arrow_keys_only_inside_the_dialog(self) -> None:
+        from doafacil.detalhe_doacao import _photo_viewer
+
+        nodes = _all_component_nodes(_photo_viewer())
+        listeners = [n for n in nodes if type(n).__name__ == "WindowEventListener"]
+        self.assertEqual(len(listeners), 1)
+        # O evento vira um hook do React; o nome aparece no código do hook.
+        self.assertIn("on_key_down", listeners[0].event_triggers)
+        self.assertTrue(any("viewer_key_down" in hook for hook in listeners[0]._get_all_hooks()))
+        contents = [n for n in nodes if type(n).__name__ == "DialogContent"]
+        self.assertEqual(len(contents), 1)
+        self.assertIn(listeners[0], contents[0].children)
+
+    def test_load_donation_closes_the_viewer(self) -> None:
+        state = SimpleNamespace(
+            router=SimpleNamespace(page=SimpleNamespace(params={"id": "abc"})),
+            viewer_open=True,
+            viewer_index=3,
+            viewer_zoomed=True,
+        )
+        asyncio.run(DonationDetailState.load_donation.fn(state))
+        self.assertEqual((state.viewer_open, state.viewer_index, state.viewer_zoomed), (False, 0, False))
 
     def test_recent_donation_cards_link_to_the_detail_route(self) -> None:
         page = recent_donations_view()
