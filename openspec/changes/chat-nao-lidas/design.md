@@ -52,7 +52,11 @@
 - *Alternativa descartada:* a home chamar o `GET conversations` e somar. A resposta é mais pesada e o total sai errado acima de 50 conversas.
 
 **A5. Sintaxe e GUID.**
-- Confirmar no Xano Developer MCP a declaração de campo inteiro com padrão em tabela (por exemplo `int donor_last_read_message_id?=0`, no mesmo estilo de `timestamp created_at?=now`) e o `db.edit` de um campo só.
+- Confirmado no Xano Developer MCP (tópicos `tables` e `database`):
+  - campo inteiro com padrão: `int donor_last_read_message_id?=0`, mesma forma do exemplo `int status?=0` da documentação e do `timestamp created_at?=now` já usado na tabela;
+  - edição de um campo só: `db.edit chat_conversation { field_name = "id", field_value = $conversation.id, data = {donor_last_read_message_id: $last_id} }`, igual ao `db.edit` de `last_message_at` no `messages_POST`;
+  - a documentação lembra que o `workspace push` é aditivo: acrescenta colunas, mas não remove nem relaxa nada.
+- **Depois do push:** as linhas antigas ficaram com 0, conforme conferido no painel, mas o pull devolveu os campos como `int …?`, sem o `=0`. Por isso todo uso dos campos de leitura nos endpoints é feito com `?? 0`, e um valor vazio vale como 0.
 - O endpoint novo não tem GUID antes do primeiro push. Depois do push, um pull traz o GUID, que vai num commit próprio, como foi feito na `chat-backend`.
 
 **A6. Conferência manual do schema.** O dry-run não mostra mudança de schema em tabela existente. Depois do push, conferir no painel do Xano que `chat_conversation` tem os dois campos, do tipo inteiro e com padrão 0, e que as linhas existentes ficaram com 0.
