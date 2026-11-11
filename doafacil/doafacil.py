@@ -8,7 +8,7 @@ import httpx
 import reflex as rx
 
 from doafacil.cadastro import signup_page
-from doafacil.chat import ChatState, chat_page, unread_badge
+from doafacil.chat import CHAT_FAB_CLEARANCE, ChatState, chat_fab, chat_page
 from doafacil.cadastro_doacao import (
     DonationCreateState,
     donation_creation_page,
@@ -897,7 +897,10 @@ def public_home_footer() -> rx.Component:
             width="100%",
             max_width="1200px",
             margin="0 auto",
-            padding="48px 24px 32px",
+            padding_top="48px",
+            padding_x="24px",
+            # Espaço do botão flutuante: nada do rodapé fica sob ele.
+            padding_bottom=CHAT_FAB_CLEARANCE,
         ),
         width="100%",
         background="#252525",
@@ -948,34 +951,8 @@ def index() -> rx.Component:
                         rx.cond(
                             LoginState.auth_token,
                             rx.hstack(
-                                # Entrada no chat; no celular, só o ícone e o
-                                # contador. O rótulo do link já diz o total,
-                                # então o círculo fica oculto do leitor de tela.
-                                rx.link(
-                                    rx.hstack(
-                                        rx.icon("message-circle", size=18),
-                                        rx.text(
-                                            "Mensagens",
-                                            display=rx.breakpoints(
-                                                initial="none", md="inline"
-                                            ),
-                                        ),
-                                        rx.cond(
-                                            ChatState.unread_total > 0,
-                                            unread_badge(
-                                                ChatState.unread_total_text
-                                            ),
-                                            rx.fragment(),
-                                        ),
-                                        spacing="1",
-                                        align="center",
-                                    ),
-                                    href="/chat",
-                                    aria_label=ChatState.unread_link_label,
-                                    color="#168447",
-                                    font_weight="700",
-                                    white_space="nowrap",
-                                ),
+                                # A entrada no chat é o botão flutuante
+                                # (chat_fab), não um link do cabeçalho.
                                 rx.text(
                                     "Olá, ",
                                     LoginState.account_name,
@@ -1097,6 +1074,7 @@ def index() -> rx.Component:
         start_here_section(),
         institutional_section(),
         public_home_footer(),
+        chat_fab(),
         display="flex",
         flex_direction="column",
         width="100%",

@@ -1684,7 +1684,9 @@ class ChatPageTests(unittest.TestCase):
         self.assertIn(".chat-bubble-row:hover .chat-edit-btn", css)
         self.assertIn(".chat-edit-btn:focus-visible", css)
         self.assertIn('.chat-bubble-row[data-selected="true"] .chat-edit-btn', css)
-        self.assertNotIn("transition", css)
+        # O lápis não tem transição (nada a desligar com reduced-motion).
+        pencil_css = css.split("/* Botão flutuante")[0]
+        self.assertNotIn("transition", pencil_css)
         self.assertIn("/chat.css", app.stylesheets)
 
     def test_chat_content_is_never_rendered_as_html(self) -> None:
@@ -1692,6 +1694,116 @@ class ChatPageTests(unittest.TestCase):
         self.assertNotIn("Html", kinds)
         self.assertNotIn("Markdown", kinds)
         self.assertNotIn("dangerouslySetInnerHTML", self.rendered)
+
+
+def _contrast(foreground: str, background: str) -> float:
+    def luminance(hex_color: str) -> float:
+        channels = [int(hex_color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    lighter, darker = sorted((luminance(foreground), luminance(background)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+class ChatFabTests(unittest.TestCase):
+    """Botão flutuante “Mensagens” (change chat-botao-flutuante)."""
+
+    def setUp(self) -> None:
+        from doafacil.chat import chat_fab
+
+        self.fab = chat_fab()
+        self.rendered = str(self.fab)
+
+    def test_destination_and_label_depend_on_login(self) -> None:
+        self.assertEqual(type(self.fab).__name__, "Link")
+        self.assertIn('"/chat"', self.rendered)
+        self.assertIn('"/login"', self.rendered)
+        self.assertIn("auth_token", self.rendered)
+        # Com login: "Mensagens" ou "Mensagens, N não lidas"; sem: "Mensagens".
+        self.assertIn("unread_link_label", self.rendered)
+        self.assertIn('"Mensagens"', self.rendered)
+        self.assertIn('"aria-label":', self.rendered)
+
+    def test_appearance_and_position(self) -> None:
+        self.assertIn("chat-fab", str(self.fab.class_name))
+        self.assertIn("LucideMessageCircle", self.rendered)
+        self.assertIn('"position"] : "fixed"', self.rendered)
+        self.assertIn('"width"] : "56px"', self.rendered)
+        self.assertIn('"height"] : "56px"', self.rendered)
+        self.assertIn('"background"] : "#007A42"', self.rendered)
+        self.assertIn('"0 4px 12px rgba(0, 0, 0, 0.2)"', self.rendered)
+        # 16 px das bordas no celular, 24 px no computador.
+        for side in ("bottom", "right"):
+            with self.subTest(side=side):
+                self.assertIn(f'["{side}"] : "16px"', self.rendered)
+                self.assertIn(f'["{side}"] : "24px"', self.rendered)
+        # Ícone branco sobre o verde: acima de 3:1 (não texto) e até do AA.
+        self.assertGreaterEqual(_contrast("#FFFFFF", "#007A42"), 4.5)
+
+    def test_red_badge_only_with_login_and_unread(self) -> None:
+        badges = [
+            node
+            for node in _nodes(self.fab)
+            if type(node).__name__ == "Cond" and "chat-unread-badge" in str(node)
+        ]
+        self.assertEqual(len(badges), 1)
+        condition = str(badges[0].cond)
+        self.assertIn("auth_token", condition)
+        self.assertIn("unread_total_rx_state_ > 0", condition)
+        self.assertNotIn("chat-unread-badge", str(badges[0].children[1]))
+        badge = str(badges[0].children[0])
+        self.assertIn("unread_total_text", badge)  # já vem com "99+"
+        self.assertIn('"#C62828"', badge)
+        self.assertIn('"position"] : "absolute"', badge)
+        # O total está no rótulo do link: o círculo fica oculto.
+        self.assertIn('"aria-hidden":"true"', badge)
+        self.assertGreaterEqual(_contrast("#FFFFFF", "#C62828"), 4.5)
+
+    def test_badge_keeps_green_by_default(self) -> None:
+        from doafacil.chat import unread_badge
+
+        rendered = str(unread_badge("3"))
+        self.assertIn('"#007A42"', rendered)
+        self.assertNotIn("#C62828", rendered)
+
+    def test_css_highlight_focus_and_reduced_motion(self) -> None:
+        from pathlib import Path
+
+        css = (Path(__file__).resolve().parents[1] / "assets" / "chat.css").read_text(encoding="utf-8")
+        fab_css = css.split("/* Botão flutuante")[1]
+        self.assertIn(".chat-fab {\n  transition:", fab_css)
+        self.assertIn(".chat-fab:hover", fab_css)
+        self.assertIn(".chat-fab:focus-visible {\n  outline: 2px solid #1F1F1F;", fab_css)
+        reduced = fab_css.split("@media (prefers-reduced-motion: reduce)")[1]
+        self.assertIn("transition: none;", reduced)
+        self.assertIn("transform: none;", reduced)
+
+    def test_clearance_reserved_at_the_end_of_the_home(self) -> None:
+        from doafacil.doafacil import public_home_footer
+
+        footer = str(public_home_footer())
+        self.assertIn('["paddingBottom"] : "88px"', footer)
+        self.assertIn('["paddingBottom"] : "104px"', footer)
+
+    def test_button_absent_from_excluded_pages(self) -> None:
+        import doafacil.doafacil as main
+        from doafacil.detalhe_doacao import donation_detail_page
+
+        pages = {
+            # O detalhe já tem o botão “Chat” da doação; dois confundem.
+            "/doacao/<id>": donation_detail_page,
+            "/chat": main.chat_page,
+            "/login": main.login_page,
+            "/cadastro": main.signup_page,
+            "/verificar-email": main.verify_recovery_page,
+            "/recuperar-senha": main.request_recovery_page,
+            "/nova-senha": main.new_password_page,
+            "/cadastro-doacao": main.donation_creation_page,
+        }
+        for route, page in pages.items():
+            with self.subTest(route=route):
+                self.assertNotIn("chat-fab", str(page()))
 
 
 if __name__ == "__main__":

@@ -1203,9 +1203,13 @@ def _avatar(initial: rx.Var, size: str = "38px") -> rx.Component:
 
 
 def unread_badge(
-    text: rx.Var | str, label: rx.Var | str | None = None
+    text: rx.Var | str,
+    label: rx.Var | str | None = None,
+    background: str | None = None,
+    **props: Any,
 ) -> rx.Component:
-    """Círculo de não lidas: #007A42 com número branco (contraste AA).
+    """Círculo de não lidas: #007A42 (ou `background`) com número branco
+    (contraste AA).
 
     Com `label`, o círculo é lido como imagem com esse rótulo; sem ele, fica
     oculto do leitor de tela (o rótulo está no elemento em volta).
@@ -1228,9 +1232,60 @@ def unread_badge(
         height="20px",
         padding="0 6px",
         border_radius="999px",
-        background=GREEN_BUTTON,
+        background=background or GREEN_BUTTON,
         flex_shrink="0",
         **accessibility,
+        **props,
+    )
+
+
+# Botão flutuante “Mensagens” (canto inferior direito).
+CHAT_FAB_SIZE = "56px"
+CHAT_FAB_OFFSET = rx.breakpoints(initial="16px", md="24px")
+# Espaço livre no fim das páginas com o botão: botão + as duas margens, para
+# que nada fique coberto com a página rolada até o fim.
+CHAT_FAB_CLEARANCE = rx.breakpoints(initial="88px", md="104px")
+CHAT_FAB_SHADOW = "0 4px 12px rgba(0, 0, 0, 0.2)"
+# Branco sobre #C62828 dá 5,6:1 (AA).
+CHAT_FAB_BADGE_RED = "#C62828"
+
+
+def chat_fab() -> rx.Component:
+    """Entrada no chat: com login abre /chat; sem login vai para /login (e o
+    load_unread_total não consulta nada). O total fica no rótulo do link, então
+    o contador é oculto do leitor de tela. Realce e prefers-reduced-motion
+    ficam em assets/chat.css (.chat-fab)."""
+    logged_in = LoginState.auth_token != ""
+    return rx.link(
+        rx.icon("message-circle", size=26, color="white", aria_hidden="true"),
+        rx.cond(
+            logged_in & (ChatState.unread_total > 0),
+            unread_badge(
+                ChatState.unread_total_text,
+                background=CHAT_FAB_BADGE_RED,
+                position="absolute",
+                top="-4px",
+                right="-4px",
+                border="2px solid white",
+            ),
+            rx.fragment(),
+        ),
+        href=rx.cond(logged_in, "/chat", "/login"),
+        aria_label=rx.cond(logged_in, ChatState.unread_link_label, "Mensagens"),
+        title="Mensagens",
+        class_name="chat-fab",
+        position="fixed",
+        bottom=CHAT_FAB_OFFSET,
+        right=CHAT_FAB_OFFSET,
+        z_index="20",
+        display="flex",
+        align_items="center",
+        justify_content="center",
+        width=CHAT_FAB_SIZE,
+        height=CHAT_FAB_SIZE,
+        border_radius="999px",
+        background=GREEN_BUTTON,
+        box_shadow=CHAT_FAB_SHADOW,
     )
 
 
