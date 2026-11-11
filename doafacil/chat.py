@@ -74,6 +74,7 @@ LIGHT_BORDER = "#DDEFE4"
 BUBBLE_OTHER = "#E9ECEF"
 TEXT_DARK = "#1F1F1F"
 TEXT_MUTED = "#555555"
+TEXT_TIME = "#6b6b6b"
 CREAM = "#FFF6E8"
 
 # Brasil sem horário de verão desde 2019: fuso fixo evita depender de tzdata.
@@ -157,6 +158,14 @@ def day_label(created_at_ms: object, now_ms: float) -> str:
     if day == today - timedelta(days=1):
         return "Ontem"
     return day.strftime("%d/%m/%Y")
+
+
+def time_label(created_at_ms: object) -> str:
+    """Horário de envio HH:MM, no fuso de Brasília (mesma regra do day_label)."""
+    if not _is_int(created_at_ms) and not isinstance(created_at_ms, float):
+        return ""
+    moment = datetime.fromtimestamp(created_at_ms / 1000, tz=BRASILIA)
+    return moment.strftime("%H:%M")
 
 
 def _chat_endpoint(path: str) -> str:
@@ -397,6 +406,7 @@ def _decorate_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         label = day_label(message["created_at"], now_ms)
         message["day_label"] = label
         message["show_day"] = label != previous_label
+        message["time_label"] = time_label(message["created_at"])
         previous_label = label
         decorated.append(message)
     return decorated
@@ -1023,7 +1033,16 @@ def _message_bubble(message: rx.Var) -> rx.Component:
                     "-2px 2px 1px rgba(0, 0, 0, 0.25)",
                 ),
             ),
-            justify=rx.cond(mine, "end", "start"),
+            # Horário de envio embaixo da bolha, do mesmo lado dela.
+            rx.text(
+                message["time_label"],
+                class_name="chat-message-time",
+                color=TEXT_TIME,
+                font_size="0.7rem",
+                margin_top="2px",
+            ),
+            direction="column",
+            align=rx.cond(mine, "end", "start"),
             width="100%",
         ),
     )
@@ -1179,7 +1198,9 @@ def _composer() -> rx.Component:
                     max_length=MAX_MESSAGE_LENGTH,
                     disabled=ChatState.read_only,
                     aria_label="Mensagem",
-                    auto_complete=False,
+                    # O prop auto_complete só aceita booleano e não gera
+                    # autocomplete="off"; o atributo vai direto no campo.
+                    custom_attrs={"autoComplete": "off"},
                     width="100%",
                     height="40px",
                     background="white",

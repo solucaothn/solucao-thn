@@ -60,6 +60,11 @@ Ao abrir uma conversa, a página MUST mostrar no cabeçalho o primeiro nome da o
 - **WHEN** o identificador da conversa no endereço é inválido ou o backend responde 404
 - **THEN** a página MUST mostrar “Conversa não encontrada.” e manter a lista disponível
 
+#### Scenario: Horário de envio
+- **WHEN** a conversa mostra uma mensagem
+- **THEN** a página MUST mostrar embaixo da bolha, do mesmo lado dela, o horário de envio no formato HH:MM no fuso de Brasília (UTC−3), pela mesma regra dos rótulos de dia
+- **AND** o horário MUST aparecer em fonte pequena, na cor `#6b6b6b`
+
 #### Scenario: Autoria das mensagens
 - **WHEN** o histórico contém mensagens das duas pessoas
 - **THEN** cada mensagem MUST ficar do lado de quem a enviou conforme a indicação de autoria do backend, e não pela comparação de nomes

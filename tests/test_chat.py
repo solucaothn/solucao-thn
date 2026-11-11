@@ -26,6 +26,7 @@ from doafacil.chat import (
     classify_rate_limit,
     day_label,
     fetch_messages,
+    time_label,
     list_conversations,
     send_message,
     start_conversation,
@@ -379,6 +380,24 @@ class ChatHelperTests(unittest.TestCase):
         # 03:30 UTC de 10/11 = 00:30 de 10/11 em Brasília.
         self.assertEqual(day_label(ms("2026-11-10T03:30:00"), now), "Hoje")
         self.assertEqual(day_label(ms("2026-11-07T15:00:00"), now), "07/11/2026")
+
+    def test_time_label_uses_brasilia_with_same_rule_as_day_label(self) -> None:
+        def ms(text: str) -> int:
+            return int(datetime.fromisoformat(text).replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+        # 02:30 UTC de 10/11 = 23:30 de 09/11 em Brasília ("Ontem" no day_label).
+        self.assertEqual(time_label(ms("2026-11-10T02:30:00")), "23:30")
+        # 03:05 UTC = 00:05 em Brasília: zero à esquerda nas horas e minutos.
+        self.assertEqual(time_label(ms("2026-11-10T03:05:00")), "00:05")
+        self.assertEqual(time_label(ms("2026-11-10T15:41:59")), "12:41")
+        self.assertEqual(time_label("x"), "")
+
+    def test_decorated_messages_carry_time_label(self) -> None:
+        from doafacil.chat import _decorate_messages
+
+        created = int(datetime(2026, 11, 10, 15, 41, tzinfo=timezone.utc).timestamp() * 1000)
+        decorated = _decorate_messages([_message(1, created_at=created)])
+        self.assertEqual(decorated[0]["time_label"], "12:41")
 
 
 class ChatStateTests(unittest.TestCase):
@@ -765,6 +784,27 @@ class ChatPageTests(unittest.TestCase):
         self.assertIn('"padding"] : "8px 16px"', str(_conversation_item(ChatState.chat_conversations[0])))
         # Sem a faixa separada da seta abaixo do cabeçalho.
         self.assertEqual(self.rendered.count("Voltar ao in\\u00edcio"), 2)
+
+    def test_bubble_shows_send_time_below_in_small_gray_text(self) -> None:
+        from doafacil.chat import ChatState, _message_bubble
+
+        bubble = _message_bubble(ChatState.chat_messages[0])
+        times = [
+            n
+            for n in _nodes(bubble)
+            if type(n).__name__ == "Text" and "time_label" in str(n)
+        ]
+        self.assertEqual(len(times), 1)
+        rendered_time = str(times[0])
+        self.assertIn('"color"] : "#6b6b6b"', rendered_time)
+        self.assertIn('"fontSize"] : "0.7rem"', rendered_time)
+        # A bolha e o horário ficam numa coluna alinhada ao lado de quem enviou.
+        rendered = str(bubble)
+        self.assertIn('direction:"column"', rendered)
+        self.assertIn("sent_by_me", rendered)
+
+    def test_message_input_disables_browser_autocomplete(self) -> None:
+        self.assertIn('autoComplete:"off"', self.rendered)
 
     def test_poller_only_exists_with_open_conversation(self) -> None:
         moments = [n for n in _nodes(self.page) if type(n).__name__ == "Moment"]
