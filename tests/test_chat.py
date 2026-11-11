@@ -26,7 +26,11 @@ from doafacil.chat import (
     classify_rate_limit,
     day_label,
     fetch_messages,
+    fetch_unread_total,
+    format_unread,
+    messages_link_label,
     time_label,
+    unread_label,
     list_conversations,
     send_message,
     start_conversation,
@@ -65,6 +69,7 @@ def _conversation(conversation_id: int, **overrides: Any) -> dict[str, Any]:
         "other_user_first_name": "Ana",
         "donation_title": "Carrinho de brinquedo",
         "donation_status": "disponível",
+        "unread_count": 0,
     }
     item.update(overrides)
     return item
@@ -151,9 +156,23 @@ def _state(**overrides: Any) -> SimpleNamespace:
         "is_sending": False,
         "poll_paused_until": 0.0,
         "mobile_view": "list",
+        "unread_total": 0,
+        "unread_total_text": "",
+        "unread_link_label": "Mensagens",
     }
     values.update(overrides)
     return SimpleNamespace(**values)
+
+
+def _listed(conversation_id: int, unread: int = 0, **overrides: Any) -> dict[str, Any]:
+    """Item como fica no estado depois do parsing (com os textos do contador)."""
+    return {
+        **_conversation(conversation_id, **overrides),
+        "initial": "A",
+        "unread_count": unread,
+        "unread_text": format_unread(unread),
+        "unread_label": unread_label(unread),
+    }
 
 
 def _decorated(*ids: int) -> list[dict[str, Any]]:
@@ -360,6 +379,308 @@ class ChatClientTests(unittest.TestCase):
             with self.assertRaises(ChatServiceError):
                 _run(bad_url())
             self.assertEqual(recorder.requests, [])
+
+
+class ChatUnreadClientTests(unittest.TestCase):
+    """4.1: unread_count obrigatório na lista, fetch_unread_total e formato."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _list(self, items: list[dict[str, Any]]) -> dict[str, Any]:
+        recorder = _Recorder(_json(200, _list_page(items)))
+
+        async def call() -> dict[str, Any]:
+            async with recorder.client() as client:
+                return await list_conversations(client, "t")
+
+        return _run(call())
+
+    def test_list_item_carries_unread_count_and_texts(self) -> None:
+        result = self._list([_conversation(1, unread_count=3), _conversation(2)])
+        first, second = result["conversations"]
+        self.assertEqual(first["unread_count"], 3)
+        self.assertEqual(first["unread_text"], "3")
+        self.assertEqual(first["unread_label"], "3 mensagens não lidas")
+        self.assertEqual(second["unread_count"], 0)
+        self.assertEqual(second["unread_text"], "")
+
+    def test_list_item_without_or_with_invalid_unread_count_is_malformed(self) -> None:
+        missing = {k: v for k, v in _conversation(1).items() if k != "unread_count"}
+        for name, item in {
+            "ausente": missing,
+            "negativo": _conversation(1, unread_count=-1),
+            "texto": _conversation(1, unread_count="3"),
+            "booleano": _conversation(1, unread_count=True),
+            "nulo": _conversation(1, unread_count=None),
+        }.items():
+            with self.subTest(name=name), self.assertRaises(ChatServiceError):
+                self._list([item])
+
+    def test_start_without_unread_count_still_parses_with_zero(self) -> None:
+        body = {k: v for k, v in _conversation(7).items() if k != "unread_count"}
+        recorder = _Recorder(_json(200, body))
+
+        async def call() -> dict[str, Any]:
+            async with recorder.client() as client:
+                return await start_conversation(client, "t", 107)
+
+        self.assertEqual(_run(call())["unread_count"], 0)
+
+    def test_fetch_unread_total_uses_bearer_and_returns_the_number(self) -> None:
+        recorder = _Recorder(_json(200, {"unread_total": 12}))
+
+        async def call() -> int:
+            async with recorder.client() as client:
+                return await fetch_unread_total(client, "token-teste")
+
+        self.assertEqual(_run(call()), 12)
+        request = recorder.requests[0]
+        self.assertEqual(request.method, "GET")
+        self.assertEqual(request.url.path, "/api:catalog/catalog/chat/unread_total")
+        self.assertEqual(request.headers["Authorization"], "Bearer token-teste")
+        self.assertEqual(dict(request.url.params), {})
+
+    def test_fetch_unread_total_classifies_errors_and_malformed_bodies(self) -> None:
+        cases = [
+            (401, {"message": "x"}, ChatUnauthorizedError),
+            (429, PLATFORM_429, ChatRateLimitError),
+            (500, {"message": "x"}, ChatServiceError),
+            (200, {}, ChatServiceError),
+            (200, {"unread_total": -1}, ChatServiceError),
+            (200, {"unread_total": "2"}, ChatServiceError),
+            (200, [], ChatServiceError),
+        ]
+        for status, body, error in cases:
+            with self.subTest(status=status, body=body):
+                recorder = _Recorder(_json(status, body))
+
+                async def call() -> None:
+                    async with recorder.client() as client:
+                        await fetch_unread_total(client, "t")
+
+                with self.assertRaises(error):
+                    _run(call())
+
+    def test_format_unread(self) -> None:
+        for count, expected in ((0, ""), (1, "1"), (99, "99"), (100, "99+"), (150, "99+"), (-3, "")):
+            with self.subTest(count=count):
+                self.assertEqual(format_unread(count), expected)
+
+    def test_accessible_labels_singular_and_plural(self) -> None:
+        self.assertEqual(unread_label(0), "")
+        self.assertEqual(unread_label(1), "1 mensagem não lida")
+        self.assertEqual(unread_label(3), "3 mensagens não lidas")
+        # O rótulo diz o número real mesmo quando o círculo mostra "99+".
+        self.assertEqual(unread_label(150), "150 mensagens não lidas")
+        self.assertEqual(messages_link_label(0), "Mensagens")
+        self.assertEqual(messages_link_label(1), "Mensagens, 1 não lida")
+        self.assertEqual(messages_link_label(42), "Mensagens, 42 não lidas")
+
+
+class ChatUnreadStateTests(unittest.TestCase):
+    """4.2 a 4.4: contador zerado na conversa aberta, lista a cada 30 s e total."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _patch_client(self, recorder: _Recorder) -> Any:
+        return patch("doafacil.chat._new_client", side_effect=lambda: recorder.client())
+
+    # 4.2 ------------------------------------------------------------------
+
+    def test_opening_a_conversation_clears_its_counter_immediately(self) -> None:
+        state = _state(chat_conversations=[_listed(7, 3), _listed(8, 2)])
+        seen_during_request: list[int] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            seen_during_request.append(state.chat_conversations[0]["unread_count"])
+            return httpx.Response(200, json=_messages_page([_message(1)]), request=request)
+
+        with self._patch_client(_Recorder(respond)):
+            _run(ChatState.select_conversation.fn(state, 7))
+        # Já estava 0 enquanto a leitura ainda estava em andamento.
+        self.assertEqual(seen_during_request, [0])
+        first, second = state.chat_conversations
+        self.assertEqual((first["unread_count"], first["unread_text"], first["unread_label"]), (0, "", ""))
+        self.assertEqual(second["unread_count"], 2)
+
+    def test_list_received_with_open_conversation_forces_zero_for_it(self) -> None:
+        def respond(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/conversations"):
+                items = [_conversation(7, unread_count=4), _conversation(8, unread_count=1)]
+                return httpx.Response(200, json=_list_page(items), request=request)
+            return httpx.Response(200, json=_messages_page([_message(1)]), request=request)
+
+        state = _state(router=SimpleNamespace(page=SimpleNamespace(params={"conversa": "7"})))
+        with self._patch_client(_Recorder(respond)):
+            _run(ChatState.load_chat.fn(state))
+        counts = {c["conversation_id"]: c["unread_count"] for c in state.chat_conversations}
+        self.assertEqual(counts, {7: 0, 8: 1})
+
+        # A atualização da lista chega antes da leitura das mensagens novas.
+        recorder = _Recorder(_json(200, _list_page([_conversation(7, unread_count=2)])))
+        with self._patch_client(recorder):
+            _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertEqual(state.chat_conversations[0]["unread_count"], 0)
+
+        # Na lista vinda de "Carregar mais conversas" também.
+        state.conversations_has_more = True
+        recorder = _Recorder(_json(200, _list_page([_conversation(7, unread_count=5)], page=2)))
+        state.chat_conversations = [_listed(8, 1)]
+        with self._patch_client(recorder):
+            _run(ChatState.load_more_conversations.fn(state))
+        counts = {c["conversation_id"]: c["unread_count"] for c in state.chat_conversations}
+        self.assertEqual(counts, {8: 1, 7: 0})
+
+    # 4.3 ------------------------------------------------------------------
+
+    def test_list_poll_tick_checks_visibility_only_when_allowed(self) -> None:
+        with (
+            patch("doafacil.chat.rx.call_script", return_value="check-visibility") as call_script,
+            patch("doafacil.chat._now", return_value=1000.0),
+        ):
+            self.assertIsNone(ChatState.list_poll_tick.fn(_state(auth_token="")))
+            self.assertIsNone(ChatState.list_poll_tick.fn(_state(poll_paused_until=1030.0)))
+            self.assertIsNone(ChatState.list_poll_tick.fn(_state(is_loading_list=True)))
+            # Sem conversa aberta a lista continua atualizando.
+            self.assertEqual(ChatState.list_poll_tick.fn(_state(active_conversation_id=0)), "check-visibility")
+        self.assertEqual(call_script.call_count, 1)
+        self.assertEqual(call_script.call_args.args[0], "document.visibilityState")
+        self.assertIn("list_poll_if_visible", str(call_script.call_args.kwargs["callback"]))
+
+    def test_list_poll_with_hidden_tab_makes_no_request(self) -> None:
+        state = _state(chat_conversations=[_listed(1)])
+        recorder = _Recorder(_json(200, _list_page([_conversation(1, unread_count=3)])))
+        with self._patch_client(recorder):
+            _run(ChatState.list_poll_if_visible.fn(state, "hidden"))
+        self.assertEqual(recorder.requests, [])
+        self.assertEqual(state.chat_conversations[0]["unread_count"], 0)
+
+    def test_list_poll_with_active_pause_makes_no_request(self) -> None:
+        state = _state(poll_paused_until=1030.0)
+        recorder = _Recorder(_json(200, _list_page([])))
+        with self._patch_client(recorder), patch("doafacil.chat._now", return_value=1000.0):
+            _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertEqual(recorder.requests, [])
+
+    def test_list_poll_429_pauses_lists_and_messages_silently(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=_decorated(5), chat_conversations=[_listed(7)])
+        with (
+            self._patch_client(_Recorder(_json(429, PLATFORM_429))),
+            patch("doafacil.chat._now", return_value=1000.0),
+        ):
+            result = _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertIsNone(result)
+        self.assertEqual(state.poll_paused_until, 1000.0 + POLL_PAUSE_SECONDS)
+        self.assertEqual(state.list_error, "")
+        self.assertEqual(len(state.chat_conversations), 1)
+
+        # A pausa vale também para as mensagens.
+        recorder = _Recorder(_json(200, _messages_page([_message(6)])))
+        with self._patch_client(recorder), patch("doafacil.chat._now", return_value=1030.0):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+            self.assertIsNone(ChatState.list_poll_tick.fn(state))
+        self.assertEqual(recorder.requests, [])
+
+        # E um 429 nas mensagens pausa a lista.
+        state = _state(active_conversation_id=7, chat_messages=_decorated(5))
+        with (
+            self._patch_client(_Recorder(_json(429, CHAT_429))),
+            patch("doafacil.chat._now", return_value=2000.0),
+        ):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+        recorder = _Recorder(_json(200, _list_page([])))
+        with self._patch_client(recorder), patch("doafacil.chat._now", return_value=2030.0):
+            _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertEqual(recorder.requests, [])
+
+    def test_list_poll_merges_first_page_on_top_without_losing_or_repeating(self) -> None:
+        # Páginas 1 e 2 já carregadas: 1, 2 | 3, 4.
+        state = _state(
+            chat_conversations=[_listed(1), _listed(2), _listed(3), _listed(4)],
+            conversations_page=2,
+            conversations_has_more=True,
+        )
+        # Nova página 1: a conversa 3 ganhou mensagem e subiu; 9 é nova.
+        page_one = [_conversation(3, unread_count=2), _conversation(9, unread_count=1)]
+        recorder = _Recorder(_json(200, _list_page(page_one, has_more=True)))
+        with self._patch_client(recorder):
+            result = _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertIsNone(result)
+        self.assertEqual(recorder.requests[0].url.params["page"], "1")
+        self.assertEqual([c["conversation_id"] for c in state.chat_conversations], [3, 9, 1, 2, 4])
+        self.assertEqual(state.chat_conversations[0]["unread_text"], "2")
+        # As páginas já carregadas continuam valendo para "Carregar mais".
+        self.assertEqual(state.conversations_page, 2)
+        self.assertTrue(state.conversations_has_more)
+
+    def test_list_poll_errors_are_silent_and_401_redirects(self) -> None:
+        state = _state(chat_conversations=[_listed(1, 2)])
+        with self._patch_client(_Recorder(_json(500, {"message": "x"}))):
+            self.assertIsNone(_run(ChatState.list_poll_if_visible.fn(state, "visible")))
+        self.assertEqual(state.list_error, "")
+        self.assertEqual(state.chat_conversations[0]["unread_count"], 2)
+
+        with (
+            self._patch_client(_Recorder(_json(401, {"message": "x"}))),
+            patch("doafacil.chat.rx.redirect", return_value="login-redirect"),
+        ):
+            result = _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertEqual(result, "login-redirect")
+        self.assertEqual(state.auth_token, "")
+
+    # 4.4 ------------------------------------------------------------------
+
+    def test_unread_total_without_token_makes_no_request(self) -> None:
+        state = _state(auth_token="", unread_total=5, unread_total_text="5")
+        recorder = _Recorder(_json(200, {"unread_total": 3}))
+        with self._patch_client(recorder):
+            _run(ChatState.load_unread_total.fn(state))
+        self.assertEqual(recorder.requests, [])
+        self.assertEqual((state.unread_total, state.unread_total_text), (0, ""))
+
+    def test_unread_total_loads_number_text_and_link_label(self) -> None:
+        for total, text, label in (
+            (3, "3", "Mensagens, 3 não lidas"),
+            (150, "99+", "Mensagens, 150 não lidas"),
+            (0, "", "Mensagens"),
+        ):
+            with self.subTest(total=total):
+                state = _state()
+                recorder = _Recorder(_json(200, {"unread_total": total}))
+                with self._patch_client(recorder):
+                    _run(ChatState.load_unread_total.fn(state))
+                self.assertEqual(len(recorder.requests), 1)
+                self.assertEqual(
+                    (state.unread_total, state.unread_total_text, state.unread_link_label),
+                    (total, text, label),
+                )
+
+    def test_unread_total_errors_and_401_leave_zero_without_warning(self) -> None:
+        for status, body in (
+            (401, {"message": "x"}),
+            (429, PLATFORM_429),
+            (500, {"message": "x"}),
+            (200, {"unread_total": "x"}),
+        ):
+            with self.subTest(status=status):
+                state = _state(unread_total=4, unread_total_text="4")
+                with (
+                    self._patch_client(_Recorder(_json(status, body))),
+                    patch("doafacil.chat.rx.redirect") as redirect,
+                ):
+                    result = _run(ChatState.load_unread_total.fn(state))
+                self.assertIsNone(result)
+                redirect.assert_not_called()
+                self.assertEqual((state.unread_total, state.unread_total_text), (0, ""))
+                self.assertEqual(state.unread_link_label, "Mensagens")
+                # O token não é apagado aqui; quem trata o 401 é o load_account.
+                self.assertEqual(state.auth_token, "token-teste")
 
 
 class ChatHelperTests(unittest.TestCase):
@@ -808,7 +1129,8 @@ class ChatPageTests(unittest.TestCase):
 
     def test_poller_only_exists_with_open_conversation(self) -> None:
         moments = [n for n in _nodes(self.page) if type(n).__name__ == "Moment"]
-        self.assertEqual(len(moments), 1)
+        # Um das mensagens (15 s, com conversa aberta) e um da lista (30 s).
+        self.assertEqual(len(moments), 2)
         self.assertIn("interval:15000", self.rendered)
         conds_with_moment = [
             n
@@ -818,6 +1140,40 @@ class ChatPageTests(unittest.TestCase):
             and "active_conversation_id" in str(n)
         ]
         self.assertTrue(conds_with_moment)
+
+    def test_list_poller_is_always_mounted_every_30_seconds(self) -> None:
+        moments = [n for n in _nodes(self.page) if type(n).__name__ == "Moment"]
+        list_moments = [m for m in moments if "list_poll_tick" in str(m.event_triggers.get("on_change"))]
+        self.assertEqual(len(list_moments), 1)
+        self.assertIn("interval:30000", str(list_moments[0]))
+        # Fora de qualquer cond: não depende de conversa aberta.
+        conds = [n for n in _nodes(self.page) if type(n).__name__ == "Cond"]
+        self.assertFalse([c for c in conds if "list_poll_tick" in str(c)])
+
+    def test_conversation_item_shows_green_badge_only_with_unread(self) -> None:
+        from doafacil.chat import ChatState, _conversation_item
+
+        item = _conversation_item(ChatState.chat_conversations[0])
+        badge_conds = [
+            n for n in _nodes(item) if type(n).__name__ == "Cond" and "chat-unread-badge" in str(n)
+        ]
+        self.assertEqual(len(badge_conds), 1)
+        cond = badge_conds[0]
+        # Oculto com 0: a condição é o texto do contador não vazio.
+        condition = str(cond.cond)
+        self.assertIn('["unread_text"]', condition)
+        self.assertTrue(condition.startswith("!(") and '=== ""' in condition.replace("?.valueOf?.()", ""))
+        rendered = str(cond.children[0])
+        self.assertIn('"#007A42"', rendered)
+        self.assertIn('"white"', rendered)
+        self.assertIn("unread_text", rendered)
+        self.assertIn('role:"img"', rendered)
+        self.assertIn('"aria-label":', rendered)
+        self.assertIn("unread_label", rendered)
+        self.assertNotIn("chat-unread-badge", str(cond.children[1]))
+        # O contador fica à direita: depois do nome e do título.
+        row = str(item)
+        self.assertLess(row.index("donation_title"), row.index("chat-unread-badge"))
 
     def test_chat_content_is_never_rendered_as_html(self) -> None:
         kinds = {type(n).__name__ for n in _nodes(self.page)}

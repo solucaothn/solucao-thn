@@ -23,6 +23,7 @@ from doafacil.doafacil import (
     start_here_section,
     _xano_endpoints,
 )
+from doafacil.chat import ChatState
 from doafacil.login import (
     ACCOUNT_FALLBACK_NAME,
     AuthAccountUnavailableError,
@@ -297,7 +298,11 @@ class PublicHomeTests(unittest.TestCase):
         on_load = app._unevaluated_pages["index"].on_load
         self.assertEqual(
             [handler.fn for handler in on_load],
-            [HomeState.load_home_data.fn, LoginState.load_account.fn],
+            [
+                HomeState.load_home_data.fn,
+                LoginState.load_account.fn,
+                ChatState.load_unread_total.fn,
+            ],
         )
 
         class AccountState:

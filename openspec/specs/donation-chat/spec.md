@@ -75,7 +75,7 @@ O sistema MUST permitir que somente participantes enviem mensagens de texto simp
 - **AND** MUST NOT gravar mensagem nem revelar o status da doação na resposta do envio
 
 ### Requirement: Leitura autorizada e paginada
-O sistema MUST permitir a leitura de mensagens somente às duas pessoas participantes. Sem cursor, MUST retornar as mensagens mais recentes; com `before_message_id`, as anteriores a ele; com `after_message_id`, as posteriores. A resposta MUST vir em ordem cronológica, com o título e o status da doação e a indicação de autoria de cada mensagem.
+O sistema MUST permitir a leitura de mensagens somente às duas pessoas participantes. Sem cursor, MUST retornar as mensagens mais recentes; com `before_message_id`, as anteriores a ele; com `after_message_id`, as posteriores. A resposta MUST vir em ordem cronológica, com o título e o status da doação e a indicação de autoria de cada mensagem. A leitura MUST marcar a conversa como lida para quem lê, até a mensagem mais nova devolvida.
 
 #### Scenario: Ler mensagens como participante
 - **WHEN** uma pessoa participante consulta as mensagens com `conversation_id` e limite de página, sem cursor
@@ -117,8 +117,25 @@ O sistema MUST permitir a leitura de mensagens somente às duas pessoas particip
 - **THEN** a identificação nominal de cada remetente MUST conter somente o primeiro nome
 - **AND** a resposta MUST NOT conter e-mail ou sobrenome
 
+#### Scenario: Leitura marca a conversa como lida
+- **WHEN** uma pessoa participante lê mensagens da conversa, em qualquer modo, e a mensagem mais nova devolvida é posterior à última que ela já tinha lido
+- **THEN** o sistema MUST registrar essa mensagem como a última lida por essa pessoa naquela conversa
+- **AND** MUST NOT alterar o registro de leitura da outra pessoa
+
+#### Scenario: Leitura não volta atrás
+- **WHEN** a pessoa carrega mensagens anteriores ou a consulta não devolve mensagens novas
+- **THEN** o registro de leitura dessa pessoa MUST permanecer igual ou avançar, nunca recuar
+
+#### Scenario: Sem confirmação de leitura para a outra pessoa
+- **WHEN** qualquer endpoint do chat responde a uma pessoa participante
+- **THEN** a resposta MUST NOT revelar até qual mensagem a outra pessoa leu
+
+#### Scenario: Marcar como lida não gera evento
+- **WHEN** a leitura atualiza o registro de leitura
+- **THEN** o sistema MUST NOT registrar evento de log
+
 ### Requirement: Listagem das conversas da pessoa
-O sistema MUST listar somente conversas das quais a pessoa autenticada participa, ordenadas da atividade mais recente para a mais antiga, com paginação limitada. Cada item MUST incluir o título e o status atual da doação.
+O sistema MUST listar somente conversas das quais a pessoa autenticada participa, ordenadas da atividade mais recente para a mais antiga, com paginação limitada. Cada item MUST incluir o título e o status atual da doação e o número de mensagens não lidas pela pessoa autenticada.
 
 #### Scenario: Listar conversas da pessoa autenticada
 - **WHEN** uma pessoa autenticada consulta suas conversas
@@ -135,6 +152,12 @@ O sistema MUST listar somente conversas das quais a pessoa autenticada participa
 #### Scenario: Listar sem sessão válida
 - **WHEN** uma pessoa sem sessão válida consulta suas conversas
 - **THEN** o endpoint MUST responder HTTP 401 sem retornar dados de outras pessoas
+
+#### Scenario: Contador de não lidas por conversa
+- **WHEN** uma pessoa autenticada consulta suas conversas
+- **THEN** cada item MUST incluir `unread_count`, igual ao número de mensagens enviadas pela outra pessoa e posteriores à última mensagem que a pessoa autenticada leu naquela conversa
+- **AND** as mensagens enviadas pela própria pessoa MUST NOT contar
+- **AND** uma conversa totalmente lida MUST ter `unread_count` igual a 0
 
 ### Requirement: Limites de envio
 O sistema MUST limitar a dez mensagens por pessoa autenticada em qualquer janela móvel de 60 segundos, considerando todas as conversas dessa pessoa. O limite é de melhor esforço: a contagem das mensagens recentes ocorre antes da gravação, sem isolamento serializável, e sob envios concorrentes o limite pode ser excedido por uma ou duas mensagens.
@@ -186,3 +209,23 @@ O sistema MUST remover as conversas e mensagens associadas quando a pessoa dona 
 - **WHEN** uma pessoa consulta uma conversa depois que a doação foi excluída
 - **THEN** o endpoint MUST responder com o mesmo erro HTTP 404 genérico usado para conversa inexistente
 - **AND** MUST NOT retornar mensagens ou dados de participantes
+
+### Requirement: Total de mensagens não lidas
+O sistema MUST oferecer um endpoint autenticado e leve que devolve somente o total de mensagens não lidas da pessoa autenticada, somando todas as conversas de que ela participa. Contam como não lidas apenas mensagens enviadas pela outra pessoa e posteriores à última mensagem que a pessoa leu naquela conversa.
+
+#### Scenario: Total com mensagens não lidas
+- **WHEN** uma pessoa autenticada consulta o total e tem mensagens não lidas em uma ou mais conversas
+- **THEN** o endpoint MUST responder HTTP 200 com `unread_total` igual à soma das não lidas de todas as suas conversas
+- **AND** a resposta MUST NOT conter mensagens, nomes, títulos ou identificadores de conversa
+
+#### Scenario: Sem mensagens não lidas ou sem conversas
+- **WHEN** a pessoa autenticada leu todas as mensagens ou não participa de nenhuma conversa
+- **THEN** o endpoint MUST responder `unread_total` igual a 0
+
+#### Scenario: Mensagens da própria pessoa não contam
+- **WHEN** a pessoa enviou mensagens que a outra pessoa ainda não leu
+- **THEN** essas mensagens MUST NOT entrar no total de quem as enviou
+
+#### Scenario: Total sem sessão válida
+- **WHEN** uma pessoa sem sessão válida consulta o total
+- **THEN** o endpoint MUST responder HTTP 401 sem retornar dados

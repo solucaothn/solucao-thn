@@ -220,3 +220,10 @@ Diferenças aprovadas em relação ao Figma:
 - **Campo sem autocompletar:** o campo “Digite aqui...” tem `autocomplete="off"`, para o navegador não sugerir textos anteriores.
 - **Somente leitura:** numa doação concluída, o campo e o botão ficam desativados, com o aviso “Esta doação foi concluída. A conversa fica disponível somente para leitura.”.
 - **Animação:** o conteúdo principal usa `page-fade-enter`, que respeita `prefers-reduced-motion`; o cabeçalho e as mensagens carregadas depois não ganham animação própria.
+- **Contador de não lidas na lista:** não está no Figma.
+  - Mensagens não lidas aparecem num círculo à direita do item, como nos aplicativos de mensagem.
+  - O círculo tem fundo `#007A42`, número branco em negrito de 0,7 rem, altura de 20 px e cantos totalmente arredondados.
+  - Acima de 99, mostra “99+”. Com zero não aparece, e a conversa aberta nunca mostra contador.
+  - O rótulo acessível diz o número real (“1 mensagem não lida”, “150 mensagens não lidas”).
+- **Contador no link “Mensagens” da home:** é o mesmo círculo, ao lado do ícone, também no celular, onde aparece só o ícone com o número. Aparece só para quem está logado e com total maior que zero. O rótulo do link vira “Mensagens, N não lidas”, e o círculo fica oculto do leitor de tela para não ler o número duas vezes.
+- **Por que `#007A42` e não `#00A859`:** o verde do avatar (`#00A859`) não chega a 4,5:1 com texto branco em fonte pequena. O `#007A42`, o mesmo das bolhas enviadas e da pílula do dia, chega a esse contraste (AA).

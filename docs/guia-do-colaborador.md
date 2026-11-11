@@ -198,10 +198,19 @@ Como se entra no chat:
 
 Atualização automática:
 
-- **Quando roda:** só com uma conversa aberta e a aba visível, a cada 15 segundos. Pede só as mensagens novas (`after_message_id`). Com a aba oculta, sem conversa aberta ou fora de `/chat`, não há consultas.
-- **Depois de um 429:** qualquer 429 numa consulta automática pausa as consultas por 60 segundos, sem mostrar erro.
-- **Lista de conversas:** não se atualiza sozinha; recarrega ao abrir `/chat` ou pelo botão “Atualizar conversas”.
-- **Carga no Xano:** cerca de 4 requisições por minuto por aba com conversa aberta. Não aumente esse intervalo para menos de 15 segundos (limite da plataforma acima).
+- **Mensagens:** só com uma conversa aberta e a aba visível, a cada 15 segundos. Pede só as mensagens novas (`after_message_id`).
+- **Lista de conversas:** com a aba visível, a cada 30 segundos, com ou sem conversa aberta. Pede a página 1, que traz contadores, ordem e conversas novas. Os itens dela entram no topo, e as conversas já carregadas com “Carregar mais conversas” continuam abaixo, sem repetir. O botão “Atualizar conversas” continua funcionando.
+- **Quando não roda:** com a aba oculta ou fora de `/chat` não há consultas automáticas. A das mensagens também para sem conversa aberta.
+- **Depois de um 429:** qualquer 429 numa consulta automática, das mensagens ou da lista, pausa **as duas** por 60 segundos, sem mostrar erro.
+- **Carga no Xano:** com uma conversa aberta, cerca de 6 requisições por minuto por aba (4 das mensagens e 2 da lista); sem conversa aberta, cerca de 2. Não diminua esses intervalos, por causa do limite da plataforma acima.
+
+Contador de não lidas:
+
+- **Na lista:** cada conversa com mensagens não lidas mostra o número num círculo verde `#007A42` à direita, com “99+” acima de 99. Com zero não aparece.
+- **Ao abrir uma conversa:** o contador dela some na hora, sem esperar a próxima atualização. Enquanto ela estiver aberta, a lista força 0 para ela, mesmo que uma atualização chegue antes da leitura das mensagens novas. A leitura em si é gravada pelo `GET messages`.
+- **Na home:** o link “Mensagens” mostra o total (`GET /catalog/chat/unread_total`), consultado **uma vez por carregamento da home** (`ChatState.load_unread_total`, depois do `LoginState.load_account` no `on_load`). É 1 requisição a mais, só com login. Não há atualização automática; o total se renova ao voltar para a home.
+- **Sem login ou com erro:** sem login, nenhuma consulta é feita. Erro ou 401 deixam o total em 0, sem aviso, e a home continua normal.
+- **Código e testes:** o formato está em `format_unread` e os rótulos acessíveis em `unread_label` e `messages_link_label`, todos em `doafacil/chat.py` e cobertos por `tests/test_chat.py`.
 
 Textos de erro do envio:
 
