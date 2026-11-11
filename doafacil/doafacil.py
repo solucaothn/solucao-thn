@@ -8,7 +8,7 @@ import httpx
 import reflex as rx
 
 from doafacil.cadastro import signup_page
-from doafacil.chat import ChatState, chat_page
+from doafacil.chat import ChatState, chat_page, unread_badge
 from doafacil.cadastro_doacao import (
     DonationCreateState,
     donation_creation_page,
@@ -948,7 +948,9 @@ def index() -> rx.Component:
                         rx.cond(
                             LoginState.auth_token,
                             rx.hstack(
-                                # Entrada no chat; no celular, só o ícone.
+                                # Entrada no chat; no celular, só o ícone e o
+                                # contador. O rótulo do link já diz o total,
+                                # então o círculo fica oculto do leitor de tela.
                                 rx.link(
                                     rx.hstack(
                                         rx.icon("message-circle", size=18),
@@ -958,11 +960,18 @@ def index() -> rx.Component:
                                                 initial="none", md="inline"
                                             ),
                                         ),
+                                        rx.cond(
+                                            ChatState.unread_total > 0,
+                                            unread_badge(
+                                                ChatState.unread_total_text
+                                            ),
+                                            rx.fragment(),
+                                        ),
                                         spacing="1",
                                         align="center",
                                     ),
                                     href="/chat",
-                                    aria_label="Mensagens",
+                                    aria_label=ChatState.unread_link_label,
                                     color="#168447",
                                     font_weight="700",
                                     white_space="nowrap",
@@ -1245,7 +1254,11 @@ app = rx.App(
 )
 app.add_page(
     index,
-    on_load=[HomeState.load_home_data, LoginState.load_account],
+    on_load=[
+        HomeState.load_home_data,
+        LoginState.load_account,
+        ChatState.load_unread_total,
+    ],
 )
 app.add_page(
     login_page,

@@ -723,9 +723,32 @@ class LoginPageTests(unittest.TestCase):
         authenticated, visitor = (str(child) for child in header_conds[0].children)
         self.assertIn("Mensagens", authenticated)
         self.assertIn('to:"/chat"', authenticated)
-        self.assertIn('"aria-label":"Mensagens"', authenticated)
+        # O rótulo do link vem do estado: "Mensagens" ou "Mensagens, N não lidas".
+        self.assertIn('"aria-label":', authenticated)
+        self.assertIn("unread_link_label", authenticated)
         self.assertNotIn("Mensagens", visitor)
         self.assertNotIn("/chat", visitor)
+
+    def test_messages_link_shows_unread_total_only_when_positive(self) -> None:
+        page = index()
+        header_conds = [
+            node
+            for node in _component_nodes(page)
+            if type(node).__name__ == "Cond"
+            and "auth_token" in str(getattr(node, "cond", ""))
+            and "Sair" in str(node.children[0])
+        ]
+        authenticated, visitor = (str(child) for child in header_conds[0].children)
+        # Contador verde dentro do link, só com total maior que zero.
+        self.assertIn("unread_total_rx_state_ > 0", authenticated)
+        self.assertIn("unread_total_text", authenticated)
+        self.assertIn('"#007A42"', authenticated)
+        self.assertIn("chat-unread-badge", authenticated)
+        # O rótulo está no link; o círculo fica oculto do leitor de tela.
+        self.assertIn('"aria-hidden":"true"', authenticated)
+        # Visitante não vê contador.
+        self.assertNotIn("unread_total", visitor)
+        self.assertNotIn("chat-unread-badge", visitor)
 
     def test_home_fades_static_content_without_animating_header_or_xano_data(self) -> None:
         nodes = _component_nodes(index())

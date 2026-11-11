@@ -26,6 +26,7 @@ from doafacil.login import LoginState
 START_PATH = "/catalog/chat/conversations/start"
 CONVERSATIONS_PATH = "/catalog/chat/conversations"
 MESSAGES_PATH = "/catalog/chat/messages"
+UNREAD_TOTAL_PATH = "/catalog/chat/unread_total"
 
 CONVERSATIONS_PAGE_LIMIT = 20
 MESSAGES_PAGE_LIMIT = 50
@@ -63,6 +64,8 @@ NO_CONVERSATION_MESSAGE = "Escolha uma conversa para ver as mensagens."
 EMPTY_CONVERSATION_MESSAGE = "Ainda não há mensagens. Escreva a primeira."
 MESSAGE_PLACEHOLDER = "Digite aqui..."
 POLL_INTERVAL_MS = 15000
+LIST_POLL_INTERVAL_MS = 30000
+UNREAD_DISPLAY_MAX = 99
 
 # Cores (contraste AA sobre os fundos usados).
 GREEN_TEXT = "#166B3B"
@@ -147,6 +150,42 @@ def avatar_initial(name: object) -> str:
     return cleaned[0].upper()
 
 
+def format_unread(count: int) -> str:
+    """Texto do contador: '' com 0 (sem contador), o número até 99 e '99+' acima."""
+    if not _is_int(count) or count <= 0:
+        return ""
+    if count > UNREAD_DISPLAY_MAX:
+        return f"{UNREAD_DISPLAY_MAX}+"
+    return str(count)
+
+
+def unread_label(count: int) -> str:
+    """Rótulo acessível do contador, com o número real (singular ou plural)."""
+    if not _is_int(count) or count <= 0:
+        return ""
+    if count == 1:
+        return "1 mensagem não lida"
+    return f"{count} mensagens não lidas"
+
+
+def messages_link_label(count: int) -> str:
+    """Rótulo acessível do link “Mensagens” da home."""
+    if not _is_int(count) or count <= 0:
+        return "Mensagens"
+    if count == 1:
+        return "Mensagens, 1 não lida"
+    return f"Mensagens, {count} não lidas"
+
+
+def _with_unread(item: dict[str, Any], count: int) -> dict[str, Any]:
+    """Cópia do item com o contador e os textos já formatados para a tela."""
+    updated = dict(item)
+    updated["unread_count"] = count
+    updated["unread_text"] = format_unread(count)
+    updated["unread_label"] = unread_label(count)
+    return updated
+
+
 def day_label(created_at_ms: object, now_ms: float) -> str:
     """'Hoje', 'Ontem' ou dd/mm/aaaa, no fuso de Brasília."""
     if not _is_int(created_at_ms) and not isinstance(created_at_ms, float):
@@ -199,8 +238,15 @@ def _json(response: httpx.Response) -> object:
         raise ChatServiceError from None
 
 
-def _parse_conversation(payload: object) -> dict[str, Any]:
+def _parse_conversation(
+    payload: object, *, require_unread: bool = False
+) -> dict[str, Any]:
+    """Item de conversa. O unread_count é obrigatório nos itens da lista; o
+    start não o devolve, e a conversa iniciada fica com 0."""
     if not isinstance(payload, dict):
+        raise ChatServiceError
+    unread = payload.get("unread_count", None if require_unread else 0)
+    if not _is_int(unread) or unread < 0:
         raise ChatServiceError
     conversation_id = payload.get("conversation_id")
     donation_id = payload.get("donation_id")
@@ -219,7 +265,7 @@ def _parse_conversation(payload: object) -> dict[str, Any]:
     ):
         raise ChatServiceError
     # Só os campos esperados; qualquer outro campo da resposta é descartado.
-    return {
+    item = {
         "conversation_id": conversation_id,
         "donation_id": donation_id,
         "other_user_first_name": name,
@@ -228,6 +274,7 @@ def _parse_conversation(payload: object) -> dict[str, Any]:
         "last_message_at": last_message_at or 0,
         "initial": avatar_initial(name),
     }
+    return _with_unread(item, unread)
 
 
 def _parse_message(payload: object) -> dict[str, Any]:
@@ -329,9 +376,26 @@ async def list_conversations(
     if not isinstance(items, list) or not isinstance(has_more, bool):
         raise ChatServiceError
     return {
-        "conversations": [_parse_conversation(item) for item in items],
+        "conversations": [
+            _parse_conversation(item, require_unread=True) for item in items
+        ],
         "has_more": has_more,
     }
+
+
+async def fetch_unread_total(client: httpx.AsyncClient, auth_token: str) -> int:
+    """Total de não lidas da pessoa; mesma classificação de erros do chat."""
+    endpoint = _chat_endpoint(UNREAD_TOTAL_PATH)
+    try:
+        response = await client.get(endpoint, headers=_bearer(auth_token))
+    except httpx.HTTPError:
+        raise ChatServiceError from None
+    _raise_for_chat_status(response)
+    payload = _json(response)
+    total = payload.get("unread_total") if isinstance(payload, dict) else None
+    if not _is_int(total) or total < 0:
+        raise ChatServiceError
+    return total
 
 
 async def fetch_messages(
@@ -444,6 +508,36 @@ def _merge_conversations(
     return merged
 
 
+def _without_unread_for(
+    items: list[dict[str, Any]], conversation_id: int
+) -> list[dict[str, Any]]:
+    """Zera o contador da conversa aberta: ela nunca mostra não lidas."""
+    if not conversation_id:
+        return list(items)
+    return [
+        _with_unread(item, 0)
+        if item["conversation_id"] == conversation_id and item.get("unread_count")
+        else item
+        for item in items
+    ]
+
+
+def _merge_first_page(
+    current: list[dict[str, Any]], first_page: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Página 1 nova no topo, na ordem dela; as já carregadas de páginas
+    seguintes continuam abaixo, sem repetir."""
+    on_first_page = {item["conversation_id"] for item in first_page}
+    rest = [item for item in current if item["conversation_id"] not in on_first_page]
+    return [*first_page, *rest]
+
+
+def _set_unread_total(state: Any, total: int) -> None:
+    state.unread_total = total
+    state.unread_total_text = format_unread(total)
+    state.unread_link_label = messages_link_label(total)
+
+
 async def _load_list(state: Any, client: httpx.AsyncClient) -> None:
     state.list_error = ""
     try:
@@ -454,7 +548,9 @@ async def _load_list(state: Any, client: httpx.AsyncClient) -> None:
     except (ChatServiceError, ChatNotFoundError, ChatInvalidMessageError):
         state.list_error = LIST_ERROR_MESSAGE
         return
-    state.chat_conversations = result["conversations"]
+    state.chat_conversations = _without_unread_for(
+        result["conversations"], state.active_conversation_id
+    )
     state.conversations_page = 1
     state.conversations_has_more = result["has_more"]
 
@@ -481,6 +577,10 @@ async def _open_conversation(
 ) -> None:
     _reset_conversation(state)
     state.active_conversation_id = conversation_id
+    # O contador some na hora; a leitura no Xano acontece no GET abaixo.
+    state.chat_conversations = _without_unread_for(
+        state.chat_conversations, conversation_id
+    )
     try:
         page = await fetch_messages(client, state.auth_token, conversation_id)
     except ChatNotFoundError:
@@ -542,8 +642,32 @@ class ChatState(LoginState):
 
     send_error: str = ""
     is_sending: bool = False
+    # Pausa compartilhada pelas consultas automáticas de mensagens e da lista.
     poll_paused_until: float = 0.0
     mobile_view: str = "list"
+
+    # Total de não lidas do link “Mensagens” da home.
+    unread_total: int = 0
+    unread_total_text: str = ""
+    unread_link_label: str = "Mensagens"
+
+    @rx.event
+    async def load_unread_total(self) -> None:
+        """Uma consulta por carregamento da home; sem token, nenhuma.
+
+        Qualquer erro, inclusive 401 (o load_account já trata o token
+        recusado), deixa o total em 0, sem aviso.
+        """
+        if not self.auth_token:
+            _set_unread_total(self, 0)
+            return
+        try:
+            async with _new_client() as client:
+                total = await fetch_unread_total(client, self.auth_token)
+        except ChatError:
+            _set_unread_total(self, 0)
+            return
+        _set_unread_total(self, total)
 
     @rx.event
     async def load_chat(self) -> rx.event.EventSpec | None:
@@ -667,8 +791,9 @@ class ChatState(LoginState):
             return None
         finally:
             self.is_loading_list = False
-        self.chat_conversations = _merge_conversations(
-            self.chat_conversations, result["conversations"]
+        self.chat_conversations = _without_unread_for(
+            _merge_conversations(self.chat_conversations, result["conversations"]),
+            self.active_conversation_id,
         )
         self.conversations_page = next_page
         self.conversations_has_more = result["has_more"]
@@ -789,6 +914,52 @@ class ChatState(LoginState):
                 self.has_older = page["has_older"]
         return None
 
+    @rx.event
+    def list_poll_tick(self, _value: Any = None) -> rx.event.EventSpec | None:
+        if (
+            not self.auth_token
+            or self.is_loading_list
+            or _now() < self.poll_paused_until
+        ):
+            return None
+        return rx.call_script(
+            "document.visibilityState",
+            callback=ChatState.list_poll_if_visible,
+        )
+
+    @rx.event
+    async def list_poll_if_visible(
+        self, visibility: str
+    ) -> rx.event.EventSpec | None:
+        """Atualiza a página 1 da lista (contadores, ordem e conversas novas)."""
+        if (
+            visibility != "visible"
+            or not self.auth_token
+            or self.is_loading_list
+            or _now() < self.poll_paused_until
+        ):
+            return None
+        try:
+            async with _new_client() as client:
+                result = await list_conversations(client, self.auth_token, page=1)
+        except ChatUnauthorizedError:
+            _clear_session(self)
+            return rx.redirect("/login")
+        except ChatRateLimitError:
+            # Mesma pausa silenciosa das mensagens.
+            self.poll_paused_until = _now() + POLL_PAUSE_SECONDS
+            return None
+        except ChatError:
+            return None
+        self.chat_conversations = _without_unread_for(
+            _merge_first_page(self.chat_conversations, result["conversations"]),
+            self.active_conversation_id,
+        )
+        # Com páginas seguintes já carregadas, has_more continua o da última.
+        if self.conversations_page <= 1:
+            self.conversations_has_more = result["has_more"]
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Página /chat
@@ -814,6 +985,38 @@ def _avatar(initial: rx.Var, size: str = "38px") -> rx.Component:
         border_radius="50%",
         background=GREEN_AVATAR,
         aria_hidden="true",
+    )
+
+
+def unread_badge(
+    text: rx.Var | str, label: rx.Var | str | None = None
+) -> rx.Component:
+    """Círculo de não lidas: #007A42 com número branco (contraste AA).
+
+    Com `label`, o círculo é lido como imagem com esse rótulo; sem ele, fica
+    oculto do leitor de tela (o rótulo está no elemento em volta).
+    """
+    accessibility: dict[str, Any] = (
+        {"role": "img", "aria_label": label}
+        if label is not None
+        else {"aria_hidden": "true"}
+    )
+    return rx.center(
+        rx.text(
+            text,
+            color="white",
+            font_weight="700",
+            font_size="0.7rem",
+            line_height="1",
+        ),
+        class_name="chat-unread-badge",
+        min_width="20px",
+        height="20px",
+        padding="0 6px",
+        border_radius="999px",
+        background=GREEN_BUTTON,
+        flex_shrink="0",
+        **accessibility,
     )
 
 
@@ -883,6 +1086,12 @@ def _conversation_item(item: rx.Var) -> rx.Component:
                 align="start",
                 min_width="0",
                 flex="1",
+            ),
+            # Contador de não lidas à direita; oculto com 0.
+            rx.cond(
+                item["unread_text"] != "",
+                unread_badge(item["unread_text"], item["unread_label"]),
+                rx.fragment(),
             ),
             spacing="2",
             align="center",
@@ -1267,6 +1476,13 @@ def chat_page() -> rx.Component:
         rx.flex(
             _conversation_list(),
             _conversation_panel(),
+            # Atualização da lista: sempre montada em /chat (a 30 s, só com a
+            # aba visível); para ao sair da página.
+            rx.moment(
+                interval=LIST_POLL_INTERVAL_MS,
+                on_change=ChatState.list_poll_tick,
+                display="none",
+            ),
             class_name="page-fade-enter",
             width="100%",
             height="calc(100vh - 64px)",

@@ -21,30 +21,30 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
 ## 3. Parte A: teste real e documentação do backend
 
 - [x] 3.1 Atualizar `scripts/teste_chat_real.py` com os cenários da decisão A7, mantendo os existentes, as pausas e a regra de não imprimir tokens, e-mails nem corpos. Verificação: `python -m py_compile scripts/teste_chat_real.py` passa.
-- [ ] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK.
+- [x] 3.2 (manual) Rodar o script contra o Xano real. Verificação: todos os cenários OK.
 - [x] 3.3 Atualizar a seção do chat em `docs/guia-do-colaborador.md`: campos de leitura, `unread_count`, `GET catalog/chat/unread_total`, a marcação de leitura dentro do `GET messages`, a ausência de “visto” e a conferência manual de schema no painel após mudanças em tabela existente. Verificação: o texto bate com a spec delta `donation-chat`.
 
 ## 4. Parte B: cliente e estado (`doafacil/chat.py`)
 
-- [ ] 4.1 Exigir `unread_count` (inteiro ≥ 0) no item da lista, criar `fetch_unread_total` e `format_unread`. Verificação: `tests/test_chat.py` cobre o parsing, os valores 0, 1, 99, 100 e 150 e o rótulo acessível no singular e no plural.
-- [ ] 4.2 Zerar o `unread_count` da conversa ao abri-la e forçar 0 na conversa aberta ao receber a lista. Verificação: testes do estado.
-- [ ] 4.3 Implementar `list_poll_tick` e `list_poll_if_visible` (30 s, aba visível, pausa compartilhada após um 429, página 1 no topo sem perder nem repetir as páginas já carregadas). Verificação: testes com a aba oculta, com a pausa ativa, com um 429 e com a mesclagem.
-- [ ] 4.4 Implementar `unread_total` e `load_unread_total`: sem token, nenhuma chamada; erro ou 401 deixam 0 sem aviso. Verificação: testes.
+- [x] 4.1 Exigir `unread_count` (inteiro ≥ 0) no item da lista, criar `fetch_unread_total` e `format_unread`. Verificação: `tests/test_chat.py` cobre o parsing, os valores 0, 1, 99, 100 e 150 e o rótulo acessível no singular e no plural.
+- [x] 4.2 Zerar o `unread_count` da conversa ao abri-la e forçar 0 na conversa aberta ao receber a lista. Verificação: testes do estado.
+- [x] 4.3 Implementar `list_poll_tick` e `list_poll_if_visible` (30 s, aba visível, pausa compartilhada após um 429, página 1 no topo sem perder nem repetir as páginas já carregadas). Verificação: testes com a aba oculta, com a pausa ativa, com um 429 e com a mesclagem.
+- [x] 4.4 Implementar `unread_total` e `load_unread_total`: sem token, nenhuma chamada; erro ou 401 deixam 0 sem aviso. Verificação: testes.
 
 ## 5. Parte B: interface
 
-- [ ] 5.1 Na lista de `/chat`: círculo `#007A42` com o número, “99+” e rótulo acessível, oculto com 0; segundo `rx.moment` de 30 s sempre montado na página. Verificação: testes de componente.
-- [ ] 5.2 Na home: acrescentar `ChatState.load_unread_total` ao `on_load` depois de `LoginState.load_account` e mostrar o contador no link “Mensagens”, só no ramo autenticado e só com total maior que 0. Verificação: testes do cabeçalho em `tests/test_login.py` e `tests/test_public_home.py`.
-- [ ] 5.3 Atualizar `docs/design/README.md` (seção “Chat”) com o contador da lista e do link e com o motivo da cor `#007A42`. Verificação: o texto bate com a spec `donation-chat-interface`.
+- [x] 5.1 Na lista de `/chat`: círculo `#007A42` com o número, “99+” e rótulo acessível, oculto com 0; segundo `rx.moment` de 30 s sempre montado na página. Verificação: testes de componente.
+- [x] 5.2 Na home: acrescentar `ChatState.load_unread_total` ao `on_load` depois de `LoginState.load_account` e mostrar o contador no link “Mensagens”, só no ramo autenticado e só com total maior que 0. Verificação: testes do cabeçalho em `tests/test_login.py` e `tests/test_public_home.py`.
+- [x] 5.3 Atualizar `docs/design/README.md` (seção “Chat”) com o contador da lista e do link e com o motivo da cor `#007A42`. Verificação: o texto bate com a spec `donation-chat-interface`.
 
 ## 6. Parte B: guia
 
-- [ ] 6.1 Atualizar “Tela do chat” no guia: contador por conversa, total na home (uma vez por carregamento), lista a cada 30 s e as requisições por minuto. Verificação: o texto bate com o `design.md`.
+- [x] 6.1 Atualizar “Tela do chat” no guia: contador por conversa, total na home (uma vez por carregamento), lista a cada 30 s e as requisições por minuto. Verificação: o texto bate com o `design.md`.
 
 ## 7. Verificação final
 
-- [ ] 7.1 Rodar `python -m unittest discover -s tests -v` e mostrar `git status` e `git diff --stat`. Verificação: todos os testes passam e, na parte B, nada muda em `xano/`.
-- [ ] 7.2 (manual) No navegador, com duas contas:
+- [x] 7.1 Rodar `python -m unittest discover -s tests -v` e mostrar `git status` e `git diff --stat`. Verificação: todos os testes passam e, na parte B, nada muda em `xano/`.
+- [x] 7.2 (manual) No navegador, com duas contas:
   - a interessada envia 3 mensagens;
   - a dona vê “3” na lista e no link “Mensagens” da home;
   - ao abrir a conversa, o contador some;
@@ -54,3 +54,9 @@ O apply vem em duas partes. **Parte A (grupos 1 a 3):** Xano. **Parte B (grupos 
   - a outra pessoa não vê nenhum “visto”.
 
   Verificação: todos os itens conferidos e anotados.
+
+  Anotação do Higor no navegador:
+  - o contador apareceu na lista e no link “Mensagens” da home, com 4 mensagens;
+  - o contador sumiu ao abrir a conversa.
+
+  O “99+”, a aba oculta e a ausência de “visto” também estão cobertos pelos testes automáticos da 7.1.
