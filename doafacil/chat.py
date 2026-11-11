@@ -1234,10 +1234,14 @@ def unread_badge(
     )
 
 
-def _header() -> rx.Component:
-    # Como no frame chat-1: "Voltar ao início" à esquerda na mesma linha do
-    # logotipo centralizado, sem faixa própria. A coluna da direita fica
-    # vazia para manter o logotipo no centro.
+def back_home_header() -> rx.Component:
+    """Cabeçalho branco com “Voltar ao início” na linha do logotipo.
+
+    Como nos frames chat-1 e detalhes-doacao do Figma: o link fica à esquerda,
+    na mesma linha do logotipo centralizado, sem faixa própria. A coluna da
+    direita fica vazia para manter o logotipo no centro. Usado no /chat e no
+    detalhe da doação.
+    """
     return rx.grid(
         rx.link(
             rx.hstack(
@@ -1254,6 +1258,11 @@ def _header() -> rx.Component:
             font_weight="600",
             aria_label="Voltar ao início",
             justify_self="start",
+            # Área de toque confortável mesmo quando só a seta aparece.
+            display="inline-flex",
+            align_items="center",
+            min_height="44px",
+            min_width="44px",
         ),
         rx.link(
             rx.image(
@@ -1273,6 +1282,10 @@ def _header() -> rx.Component:
         padding="0.25rem 1rem",
         box_shadow="0 2px 8px rgba(39, 39, 39, 0.06)",
     )
+
+
+def _header() -> rx.Component:
+    return back_home_header()
 
 
 def _conversation_item(item: rx.Var) -> rx.Component:

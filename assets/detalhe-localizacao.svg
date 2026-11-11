@@ -1,0 +1,39 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Localiza&#195;&#167;&#195;&#163;o/Ilustra&#195;&#167;&#195;&#163;o de edif&#195;&#173;cios" clip-path="url(#clip0_0_428)">
+<path id="Fundo da ilustra&#195;&#167;&#195;&#163;o" d="M9.75428 0L53.6485 7.08434C55.7387 7.08434 56.4355 8.43373 55.7387 11.1325L49.4681 54.6506C49.4681 56 48.0747 56.3374 45.2877 55.6627L1.39347 48.5783C0 48.5783 -0.348367 47.2289 0.348367 44.5301L6.61897 3.03614C6.61897 1.01205 7.66407 0 9.75428 0Z" fill="#CEFCE1"/>
+<path id="Sol" d="M3 48H53" stroke-width="0.8" stroke="#666666"/>
+<g id="Copa da &#195;&#161;rvore">
+<use xlink:href="#stroke0_0_428" fill="white"/>
+<mask id="stroke1_0_428" fill="white">
+<use xlink:href="#stroke0_0_428"/>
+</mask>
+<path d="M40.2901 42.3194C34.9902 42.3194 34.9902 38.1748 38.1702 36.1025C34.9902 31.9579 38.1702 28.8494 41.3501 29.8856C41.3501 24.7048 47.7099 24.7048 47.7099 29.8856C53.0098 29.8856 53.0098 35.0663 49.8298 36.1025C54.0697 41.2832 47.7099 44.3917 44.53 41.2832C43.47 43.3556 41.3501 43.3556 40.2901 42.3194Z" stroke-width="1.8" stroke="#666666" mask="url(#stroke1_0_428)"/>
+</g>
+<g id="Edif&#195;&#173;cio anexo">
+<path d="M7 30C7 28.8954 7.89543 28 9 28H17C18.1046 28 19 28.8954 19 30V48H7V30Z" fill="white"/>
+<mask id="stroke2_0_428" fill="white">
+<path d="M7 30C7 28.8954 7.89543 28 9 28H17C18.1046 28 19 28.8954 19 30V48H7V30Z"/>
+</mask>
+<path d="M19 48V30C19 28.8954 18.1046 28 17 28H9C7.89543 28 7 28.8954 7 30V48H19Z" stroke-width="1.6" stroke="#666666" mask="url(#stroke2_0_428)"/>
+</g>
+<g id="Edif&#195;&#173;cio principal">
+<path d="M19 20C19 18.8954 19.8954 18 21 18H35C36.1046 18 37 18.8954 37 20V48H19V20Z" fill="#007D32"/>
+<mask id="stroke3_0_428" fill="white">
+<path d="M19 20C19 18.8954 19.8954 18 21 18H35C36.1046 18 37 18.8954 37 20V48H19V20Z"/>
+</mask>
+<path d="M37 48V20C37 18.8954 36.1046 18 35 18H21C19.8954 18 19 18.8954 19 20V48H37Z" stroke-width="2" stroke="#666666" mask="url(#stroke3_0_428)"/>
+</g>
+<rect id="Cobertura" x="22.5" y="15.5" width="9" height="4" rx="0.5" fill="white" stroke="#666666"/>
+<path id="Antena" d="M25 9V18" stroke="#666666"/>
+<path id="Galhos" d="M44 33V40M44 40V48M44 40L41 37M44 40L48 36" stroke-width="0.9" stroke="#666666"/>
+<path id="Janelas laterais" d="M11 32H16M11 36H16M11 40H16M11 44H16" stroke-width="0.8" stroke="#007D32"/>
+<path id="Porta" d="M25 48V44C25 43.2044 25.3161 42.4413 25.8787 41.8787C26.4413 41.3161 27.2044 41 28 41C28.7956 41 29.5587 41.3161 30.1213 41.8787C30.6839 42.4413 31 43.2044 31 44V48H25Z" fill="white"/>
+<path id="Janelas" d="M23 23H32M23 26.5H32M23 30H32M23 33.5H32M23 37H32" stroke="white"/>
+</g>
+<defs>
+<clipPath id="clip0_0_428">
+<rect width="56" height="56" fill="white"/>
+</clipPath>
+<path id="stroke0_0_428" d="M40.2901 42.3194C34.9902 42.3194 34.9902 38.1748 38.1702 36.1025C34.9902 31.9579 38.1702 28.8494 41.3501 29.8856C41.3501 24.7048 47.7099 24.7048 47.7099 29.8856C53.0098 29.8856 53.0098 35.0663 49.8298 36.1025C54.0697 41.2832 47.7099 44.3917 44.53 41.2832C43.47 43.3556 41.3501 43.3556 40.2901 42.3194Z"/>
+</defs>
+</svg>
