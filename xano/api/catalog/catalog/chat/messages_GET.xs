@@ -5,10 +5,16 @@ query "catalog/chat/messages" verb=GET {
   input {
     int conversation_id
     int after_message_id?
+    int before_message_id?
     int limit?
   }
 
   stack {
+    precondition ($input.after_message_id == null || $input.before_message_id == null) {
+      error_type = "inputerror"
+      error = "Informe somente um cursor de mensagens."
+    }
+
     precondition ($input.limit == null || $input.limit > 0) {
       error_type = "inputerror"
       error = "O limite da página deve ser maior que zero."
@@ -48,45 +54,146 @@ query "catalog/chat/messages" verb=GET {
     db.get donation {
       field_name = "id"
       field_value = $conversation.donation_id
-      output = ["id"]
+      output = ["id", "title", "status"]
     } as $donation
-  
+
     precondition ($donation != null) {
       error_type = "notfound"
       error = "Conversa não encontrada."
     }
-  
-    db.query chat_message {
-      where = ($db.chat_message.conversation_id == $conversation.id && ($input.after_message_id == null || $db.chat_message.id > $input.after_message_id))
-      return = {type: "count"}
-    } as $remaining_count
-  
-    db.query chat_message {
-      where = ($db.chat_message.conversation_id == $conversation.id && ($input.after_message_id == null || $db.chat_message.id > $input.after_message_id))
-      sort = {id: "asc"}
-      return = {
-        type: "list"
-        paging: {page: 1, per_page: $page_limit, metadata: false}
+
+    var $messages {
+      value = []
+    }
+
+    var $has_older {
+      value = false
+    }
+
+    var $has_newer {
+      value = false
+    }
+
+    // Resultado da consulta decrescente (sem cursor ou com before_message_id).
+    var $recent_messages {
+      value = []
+    }
+
+    conditional {
+      if ($input.after_message_id != null) {
+        // Mensagens novas (atualização automática), em ordem crescente.
+        db.query chat_message {
+          where = ($db.chat_message.conversation_id == $conversation.id && $db.chat_message.id > $input.after_message_id)
+          return = {type: "count"}
+        } as $newer_count
+
+        db.query chat_message {
+          where = ($db.chat_message.conversation_id == $conversation.id && $db.chat_message.id > $input.after_message_id)
+          sort = {id: "asc"}
+          return = {
+            type  : "list"
+            paging: {page: 1, per_page: $page_limit, metadata: false}
+          }
+
+          output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+        } as $newer_messages
+
+        var.update $messages {
+          value = $newer_messages
+        }
+
+        var.update $has_newer {
+          value = $newer_count > $page_limit
+        }
       }
-      output = ["id", "conversation_id", "sender_id", "text", "created_at"]
-    } as $messages
-  
+
+      else {
+        // Últimas N mensagens, ou as anteriores a before_message_id:
+        // busca em ordem decrescente e monta a lista em ordem cronológica
+        // inserindo cada mensagem no início (foreach + unshift, mesmo padrão
+        // de foreach + push usado no projeto).
+
+        // Duas consultas separadas: nenhuma comparação com $input nulo
+        // dentro do where.
+        conditional {
+          if ($input.before_message_id == null) {
+            db.query chat_message {
+              where = $db.chat_message.conversation_id == $conversation.id
+              sort = {id: "desc"}
+              return = {
+                type  : "list"
+                paging: {page: 1, per_page: $page_limit, metadata: false}
+              }
+
+              output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+            } as $latest_messages
+
+            var.update $recent_messages {
+              value = $latest_messages
+            }
+          }
+
+          else {
+            db.query chat_message {
+              where = ($db.chat_message.conversation_id == $conversation.id && $db.chat_message.id < $input.before_message_id)
+              sort = {id: "desc"}
+              return = {
+                type  : "list"
+                paging: {page: 1, per_page: $page_limit, metadata: false}
+              }
+
+              output = ["id", "conversation_id", "sender_id", "text", "created_at"]
+            } as $previous_messages
+
+            var.update $recent_messages {
+              value = $previous_messages
+            }
+          }
+        }
+
+        foreach ($recent_messages) {
+          each as $recent_message {
+            var.update $messages {
+              value = $messages|unshift:$recent_message
+            }
+          }
+        }
+
+        conditional {
+          if (($messages|count) > 0) {
+            var $oldest_message {
+              value = $messages|first
+            }
+
+            db.query chat_message {
+              where = ($db.chat_message.conversation_id == $conversation.id && $db.chat_message.id < $oldest_message.id)
+              return = {type: "count"}
+            } as $older_count
+
+            var.update $has_older {
+              value = $older_count > 0
+            }
+          }
+        }
+      }
+    }
+
     db.get user {
       field_name = "id"
       field_value = $conversation.donor_id
       output = ["name"]
     } as $donor_user
-
+  
     db.get user {
       field_name = "id"
       field_value = $conversation.interested_user_id
       output = ["name"]
     } as $interested_user
-
+  
     var $donor_first_name {
       value = "Usuário"
     }
-
+  
     conditional {
       if ($donor_user != null) {
         var.update $donor_first_name {
@@ -94,11 +201,11 @@ query "catalog/chat/messages" verb=GET {
         }
       }
     }
-
+  
     var $interested_first_name {
       value = "Usuário"
     }
-
+  
     conditional {
       if ($interested_user != null) {
         var.update $interested_first_name {
@@ -106,13 +213,9 @@ query "catalog/chat/messages" verb=GET {
         }
       }
     }
-
+  
     var $messages_with_names {
       value = []
-    }
-
-    var $last_message_id {
-      value = null
     }
 
     foreach ($messages) {
@@ -129,6 +232,11 @@ query "catalog/chat/messages" verb=GET {
           }
         }
 
+        // Autoria calculada a partir da sessão; sender_id não vai na resposta.
+        var $sent_by_me {
+          value = $message.sender_id == $auth.id
+        }
+
         var.update $messages_with_names {
           value = $messages_with_names
             |push:```
@@ -136,39 +244,23 @@ query "catalog/chat/messages" verb=GET {
                 id: $message.id,
                 conversation_id: $message.conversation_id,
                 sender_first_name: $sender_first_name,
+                sent_by_me: $sent_by_me,
                 text: $message.text,
                 created_at: $message.created_at
               }
               ```
-        }
-
-        var.update $last_message_id {
-          value = $message.id
-        }
-      }
-    }
-
-    var $has_more {
-      value = $remaining_count > $page_limit
-    }
-
-    var $next_after_message_id {
-      value = null
-    }
-
-    conditional {
-      if ($has_more && $last_message_id != null) {
-        var.update $next_after_message_id {
-          value = $last_message_id
         }
       }
     }
   }
 
   response = {
-    messages              : $messages_with_names
-    has_more              : $has_more
-    next_after_message_id: $next_after_message_id
+    messages       : $messages_with_names
+    donation_title : $donation.title
+    donation_status: $donation.status
+    has_older      : $has_older
+    has_newer      : $has_newer
   }
+
   guid = "_vyIXcGn_BV6HB8-w8xgjvBdiAw"
 }

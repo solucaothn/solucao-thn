@@ -146,16 +146,24 @@ Tabelas:
 
 Endpoints (grupo Catalog, todos exigem login; sem login, HTTP 401):
 
-- `POST /catalog/chat/conversations/start` (`donation_id`): inicia a conversa ou devolve a que já existe para essa pessoa e doação.
-- `GET /catalog/chat/conversations` (`page` e `limit` opcionais; padrão 20, máximo 50): lista as conversas em que a pessoa participa, da mais recente para a mais antiga.
-- `GET /catalog/chat/messages` (`conversation_id`; `after_message_id` e `limit` opcionais; padrão 50, máximo 100): lê as mensagens da conversa em ordem de envio.
+- `POST /catalog/chat/conversations/start` (`donation_id`): inicia a conversa ou devolve a que já existe para essa pessoa e doação. A resposta traz `donation_title` e `donation_status`.
+- `GET /catalog/chat/conversations` (`page` e `limit` opcionais; padrão 20, máximo 50): lista as conversas em que a pessoa participa, da mais recente para a mais antiga. Cada item traz `donation_title` e `donation_status`.
+- `GET /catalog/chat/messages` (`conversation_id`; `limit` opcional, padrão 50, máximo 100): lê as mensagens da conversa. A resposta vem sempre em ordem de envio e traz `donation_title`, `donation_status`, `has_older` e `has_newer`. Há três modos:
+  - **sem cursor:** as últimas N mensagens; `has_older` diz se há mensagens mais antigas;
+  - **`before_message_id`:** as N anteriores a essa mensagem, para o “Carregar anteriores”; `has_older` diz se ainda há mais;
+  - **`after_message_id`:** só as posteriores a essa mensagem, para a atualização automática; `has_newer` diz se há mais do que o limite.
+
+  Mandar os dois cursores juntos dá HTTP 400.
 - `POST /catalog/chat/messages` (`conversation_id`, `message_text`): envia uma mensagem.
+
+Cada mensagem (na leitura e na resposta do envio) traz `sent_by_me`, verdadeiro quando foi a pessoa logada que enviou. É assim que a tela decide o lado da mensagem, em vez de comparar nomes, que podem se repetir. O campo é calculado pela sessão, e a resposta não traz identificadores de usuário.
 
 Regras:
 
 - **404 genérico:** conversa ou doação inexistente, de outra pessoa ou fora das condições recebe sempre a mesma resposta “Conversa não encontrada.”, para não revelar o que existe. Isso inclui a dona tentando abrir conversa na própria doação.
 - **Quem pode conversar:** só a dona e a pessoa interessada. Conversa nova só em doação disponível, com contato “Chat do DoaFácil”. Enviar mensagem só com a doação disponível ou reservada.
 - **Só o primeiro nome:** as respostas identificam a outra pessoa e o remetente apenas pelo primeiro nome. Nunca trazem e-mail nem sobrenome.
+- **Status visível só para participantes:** `donation_status` aparece nos endpoints do chat para as duas pessoas da conversa. É o mesmo status já público no detalhe da doação. A resposta de um envio recusado continua com o 404 genérico, sem dizer o status.
 - **Tamanho:** de 1 a 1000 caracteres depois de tirar espaços das pontas; fora disso, HTTP 400. O tamanho é validado antes do limite de envio. O texto é guardado e devolvido como texto, e a interface precisa mostrá-lo como texto, sem interpretar HTML.
 - **Limite de envio:** 10 mensagens por pessoa em 60 segundos, somando todas as conversas; acima disso, HTTP 429 com “Limite de mensagens atingido. Tente novamente em instantes.”. É de melhor esforço: sob envios simultâneos pode passar uma ou duas a mais.
 - **Logs:** só `chat_started` (conversa nova) e `chat_message_sent` (envio aceito), com `user_id`, ação e data. Leituras, repetições e erros não geram evento.
@@ -185,7 +193,8 @@ O script pede e-mail e senha de cada conta e depois o ID da doação. **A senha 
 
 Cuidados:
 
-- **O script cria dados reais:** uma conversa e cerca de 12 mensagens na doação informada.
+- **O script cria dados reais:** uma conversa e cerca de 12 mensagens na doação informada, incluindo uma resposta da dona.
+- **Paginação (cenários 8c a 8h):** usa as próprias mensagens da execução, sem envios extras. Precisa de pelo menos 7 mensagens na conversa (3 últimas, 3 anteriores e 1 a mais para `has_older`). Se houver menos, os cenários 8d a 8g são pulados com um aviso.
 - **Espere pelo menos 1 minuto entre execuções.** As mensagens da execução anterior ainda contam no limite de 10 por 60 segundos e fazem os cenários falharem.
 - O script tem pausas entre as requisições por causa do limite da plataforma, então leva alguns minutos. Não rode outros testes no Xano ao mesmo tempo.
 - Opcionalmente, o script pede o ID de uma segunda doação, disponível, com contato por “E-mail” e sem conversa da interessada, para conferir que ela não abre conversa. Enter pula.

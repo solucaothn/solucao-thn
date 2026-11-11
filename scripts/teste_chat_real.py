@@ -11,6 +11,7 @@ As credenciais são pedidas no terminal e mantidas só em memória. O script nã
 grava nada em arquivo e não imprime tokens, e-mails nem corpos de resposta.
 
 Atenção: o script cria dados reais (conversa e mensagens) na doação informada.
+A paginação (8c-8h) usa as mensagens já criadas pela própria execução.
 Os cenários 9 (status) e 10 (exclusão) são opcionais e pedem confirmação:
 o 9 deixa a doação concluída, o que não tem volta.
 """
@@ -31,6 +32,10 @@ TIMEOUT = httpx.Timeout(20.0)
 LIMITE_TENTATIVAS_RATE_LIMIT = 20
 MENSAGEM_ACENTUADA = "Olá! A doação ainda está disponível?"
 MENSAGEM_HTML = "<b>oi</b> & <script>x</script>"
+MENSAGEM_DONA = "Olá! Sim, ainda está disponível."
+# Mensagens mínimas na conversa para os cenários de paginação (8d-8g):
+# 3 últimas + 3 anteriores + 1 para has_older continuar verdadeiro.
+MINIMO_PAGINACAO = 7
 # Espera para a janela de 60 s do limite do chat esvaziar depois do cenário 8.
 ESPERA_JANELA_SEGUNDOS = 62
 # Mensagem do 429 do próprio endpoint; outro texto indica limite da plataforma.
@@ -71,11 +76,33 @@ def json_ou_none(resposta: httpx.Response) -> Any:
         return None
 
 
+def estrutura(dados: object) -> str:
+    """Só as chaves e o tamanho das listas; nunca valores nem textos."""
+    if isinstance(dados, list):
+        return f"lista({len(dados)})"
+    if not isinstance(dados, dict):
+        return type(dados).__name__
+    partes = []
+    for chave, valor in dados.items():
+        if isinstance(valor, list):
+            item = valor[0] if valor and isinstance(valor[0], dict) else None
+            chaves_item = f" itens com [{', '.join(item)}]" if item else ""
+            partes.append(f"{chave}: lista({len(valor)}){chaves_item}")
+        else:
+            partes.append(f"{chave}: {type(valor).__name__}")
+    return "{" + "; ".join(partes) + "}"
+
+
 def erro_resumido(resposta: httpx.Response | None) -> str:
-    """Só os campos code e message do JSON de erro; nunca o corpo inteiro."""
+    """Erro: só code e message. Resposta 2xx inesperada: só a estrutura.
+
+    Nunca imprime o corpo inteiro, textos de mensagens, nomes ou tokens.
+    """
     if resposta is None:
         return ""
     dados = json_ou_none(resposta)
+    if 200 <= resposta.status_code < 300:
+        return " | estrutura: " + estrutura(dados)
     if not isinstance(dados, dict):
         return " | corpo não é JSON"
     partes = []
@@ -140,17 +167,21 @@ def main() -> None:
     api = base_url("XANO_API_URL")
     auth = base_url("XANO_AUTH_API_URL")
 
+    rapido = os.getenv("TESTE_CHAT_RAPIDO", "").strip() == "1"
+    if rapido:
+        print("Modo rápido (TESTE_CHAT_RAPIDO=1): login, 2a, 3, 3c e duas leituras.")
+
     with httpx.Client(timeout=TIMEOUT) as cliente:
         dona = login(cliente, auth, "dona da doação")
         interessada = login(cliente, auth, "interessada")
-        estranha = login(cliente, auth, "não participante")
+        estranha = None if rapido else login(cliente, auth, "não participante")
 
         try:
             donation_id = int(input("\nID da doação (da dona, disponível, contato por chat): ").strip())
         except ValueError:
             sys.exit("ID da doação precisa ser um inteiro.")
 
-        texto_email = input(
+        texto_email = "" if rapido else input(
             "ID de outra doação, disponível, com contato por E-mail e sem conversa da"
             " interessada (Enter para pular): "
         ).strip()
@@ -214,12 +245,45 @@ def main() -> None:
                 headers=conta.headers,
             )
 
+        def ler_com(conta: Conta, conversa: int, **parametros: int) -> httpx.Response:
+            # Leitura com cursores (before_message_id / after_message_id) e limit.
+            time.sleep(PAUSA_SEGUNDOS)
+            return cliente.get(
+                f"{api}/catalog/chat/messages",
+                params={"conversation_id": conversa, **parametros},
+                headers=conta.headers,
+            )
+
+        def lista_de_mensagens(resposta: httpx.Response) -> list[dict]:
+            dados = json_ou_none(resposta)
+            lista = dados.get("messages") if isinstance(dados, dict) else None
+            if not isinstance(lista, list):
+                return []
+            return [m for m in lista if isinstance(m, dict)]
+
+        def ids(mensagens: list[dict]) -> list[object]:
+            return [m.get("id") for m in mensagens]
+
+        def dados_da_doacao_ok(dados: object, status: str = "disponível") -> bool:
+            return (
+                isinstance(dados, dict)
+                and isinstance(dados.get("donation_title"), str)
+                and dados["donation_title"].strip() != ""
+                and dados.get("donation_status") == status
+            )
+
         def listar(conta: Conta) -> httpx.Response:
             # Sem parâmetros de propósito: é o caso do bug 1.
             time.sleep(PAUSA_SEGUNDOS)
             return cliente.get(
                 f"{api}/catalog/chat/conversations", headers=conta.headers
             )
+
+        if rapido:
+            modo_rapido(
+                iniciar, enviar, ler_com, lista_de_mensagens, dona, interessada
+            )
+            return
 
         print("\n=== Cenários ===")
 
@@ -249,6 +313,11 @@ def main() -> None:
             r2.status_code == 200 and mesmo,
             f"HTTP {r2.status_code}, mesma conversa: {'sim' if mesmo else 'não'}",
             r2,
+        )
+        registrar(
+            "2d. start devolve donation_title e donation_status “disponível”",
+            dados_da_doacao_ok(d1) and dados_da_doacao_ok(d2),
+            "campos presentes" if dados_da_doacao_ok(d1) and dados_da_doacao_ok(d2) else "campos ausentes ou inesperados",
         )
 
         # 2c. (Opcional) Doação com preferência "E-mail" não abre conversa.
@@ -285,6 +354,17 @@ def main() -> None:
             r3b,
         )
 
+        # 3c. A dona responde: o POST marca sent_by_me verdadeiro.
+        r3c = enviar(dona, conversa_id, MENSAGEM_DONA)
+        d = json_ou_none(r3c)
+        proprio = isinstance(d, dict) and d.get("sent_by_me") is True
+        registrar(
+            "3c. Dona envia; POST devolve sent_by_me = true",
+            r3c.status_code == 200 and proprio,
+            f"HTTP {r3c.status_code}, sent_by_me verdadeiro: {'sim' if proprio else 'não'}",
+            r3c,
+        )
+
         # 4. Dona lista conversas e lê mensagens, sem e-mail nem sobrenome.
         rl = listar(dona)
         dl = json_ou_none(rl)
@@ -316,6 +396,7 @@ def main() -> None:
             "start 2b": r2,
             "POST messages 3": r3,
             "POST messages 3b": r3b,
+            "POST messages 3c": r3c,
             "GET conversations": rl,
             "GET messages": rm,
         }
@@ -347,6 +428,37 @@ def main() -> None:
             rs.status_code == 200 and viu_sem_limite,
             f"HTTP {rs.status_code}, vê a mensagem: {'sim' if viu_sem_limite else 'não'}",
             rs,
+        )
+
+        # 4f. Título e status na lista de conversas e na leitura.
+        item = next(
+            (c for c in (conversas or []) if isinstance(c, dict) and c.get("conversation_id") == conversa_id),
+            None,
+        )
+        campos_ok = dados_da_doacao_ok(item) and dados_da_doacao_ok(dm)
+        registrar(
+            "4f. Lista e leitura trazem donation_title e donation_status",
+            campos_ok,
+            "campos presentes" if campos_ok else "campos ausentes ou inesperados",
+        )
+
+        # 4g. sent_by_me depende de quem lê: a mesma mensagem muda de lado.
+        ri = ler(interessada, conversa_id)
+        por_dona = {m.get("text"): m.get("sent_by_me") for m in lista_de_mensagens(rm)}
+        por_interessada = {m.get("text"): m.get("sent_by_me") for m in lista_de_mensagens(ri)}
+        autoria_ok = (
+            por_dona.get(MENSAGEM_DONA) is True
+            and por_dona.get(MENSAGEM_ACENTUADA) is False
+            and por_interessada.get(MENSAGEM_DONA) is False
+            and por_interessada.get(MENSAGEM_ACENTUADA) is True
+        )
+        sem_sender_id = all("sender_id" not in m for m in lista_de_mensagens(rm) + lista_de_mensagens(ri))
+        registrar(
+            "4g. sent_by_me correto para cada leitor e sem sender_id",
+            ri.status_code == 200 and autoria_ok and sem_sender_id,
+            f"HTTP {ri.status_code}, autoria: {'ok' if autoria_ok else 'errada'}, "
+            f"sem sender_id: {'sim' if sem_sender_id else 'não'}",
+            ri,
         )
 
         # 5. Não participante tenta ler e enviar.
@@ -426,6 +538,106 @@ def main() -> None:
                 r,
             )
 
+        # 8c-8h. Paginação do GET messages, usando as mensagens já criadas
+        # (sem novos envios). Precisa de pelo menos MINIMO_PAGINACAO mensagens.
+        rf = ler_com(dona, conversa_id, limit=100)
+        todas = lista_de_mensagens(rf)
+        todos_ids = ids(todas)
+        crescente = todos_ids == sorted(todos_ids, key=lambda v: v if isinstance(v, int) else -1)
+        registrar(
+            "8c. Leitura com limit=100 vem em ordem cronológica",
+            rf.status_code == 200 and len(todas) > 0 and crescente,
+            f"HTTP {rf.status_code}, {len(todas)} mensagem(ns), crescente: {'sim' if crescente else 'não'}",
+            rf,
+        )
+        if len(todas) < MINIMO_PAGINACAO or not crescente:
+            print(
+                f"Cenários 8d-8g pulados: a conversa tem {len(todas)} mensagem(ns) "
+                f"e são necessárias pelo menos {MINIMO_PAGINACAO}."
+            )
+        else:
+            # Últimas N: limit=3 sem cursor devolve as 3 mais recentes, em ordem crescente.
+            r = ler_com(dona, conversa_id, limit=3)
+            d = json_ou_none(r)
+            ultimas = ids(lista_de_mensagens(r))
+            ok = (
+                r.status_code == 200
+                and ultimas == todos_ids[-3:]
+                and isinstance(d, dict)
+                and d.get("has_older") is True
+                and d.get("has_newer") is False
+            )
+            registrar(
+                "8d. Sem cursor: últimas 3 em ordem crescente, has_older = true",
+                ok,
+                f"HTTP {r.status_code}, últimas corretas: {'sim' if ultimas == todos_ids[-3:] else 'não'}",
+                r,
+            )
+
+            # Página anterior: before_message_id = a mais antiga das 3 últimas.
+            r = ler_com(dona, conversa_id, before_message_id=todos_ids[-3], limit=3)
+            d = json_ou_none(r)
+            anteriores = ids(lista_de_mensagens(r))
+            ainda_ha = len(todos_ids) > 6
+            ok = (
+                r.status_code == 200
+                and anteriores == todos_ids[-6:-3]
+                and isinstance(d, dict)
+                and d.get("has_older") is ainda_ha
+                and d.get("has_newer") is False
+            )
+            registrar(
+                "8e. before_message_id: as 3 anteriores, has_older correto",
+                ok,
+                f"HTTP {r.status_code}, página anterior correta: {'sim' if anteriores == todos_ids[-6:-3] else 'não'}",
+                r,
+            )
+
+            # Mensagens novas com mais do que o limite: has_newer = true.
+            r = ler_com(dona, conversa_id, after_message_id=todos_ids[-6], limit=2)
+            d = json_ou_none(r)
+            novas = ids(lista_de_mensagens(r))
+            ok = (
+                r.status_code == 200
+                and novas == todos_ids[-5:-3]
+                and isinstance(d, dict)
+                and d.get("has_newer") is True
+                and d.get("has_older") is False
+            )
+            registrar(
+                "8f. after_message_id com mais novas que o limite: has_newer = true",
+                ok,
+                f"HTTP {r.status_code}, novas corretas: {'sim' if novas == todos_ids[-5:-3] else 'não'}",
+                r,
+            )
+
+            # Só a última é nova: has_newer = false.
+            r = ler_com(dona, conversa_id, after_message_id=todos_ids[-2])
+            d = json_ou_none(r)
+            novas = ids(lista_de_mensagens(r))
+            ok = (
+                r.status_code == 200
+                and novas == todos_ids[-1:]
+                and isinstance(d, dict)
+                and d.get("has_newer") is False
+            )
+            registrar(
+                "8g. after_message_id da penúltima: só a última, has_newer = false",
+                ok,
+                f"HTTP {r.status_code}, só a última: {'sim' if novas == todos_ids[-1:] else 'não'}",
+                r,
+            )
+
+        # Dois cursores juntos são recusados.
+        primeiro_id = todos_ids[0] if todos_ids and isinstance(todos_ids[0], int) else 1
+        r = ler_com(dona, conversa_id, before_message_id=primeiro_id + 1, after_message_id=primeiro_id)
+        registrar(
+            "8h. before_message_id e after_message_id juntos → 400",
+            r.status_code == 400,
+            f"HTTP {r.status_code}",
+            r,
+        )
+
         # 9. (Opcional) Status: reservada permite envio; concluída só leitura.
         resposta = input(
             "\nMarcar a doação como reservada e depois concluída? "
@@ -447,7 +659,13 @@ def main() -> None:
             r = enviar(interessada, conversa_id, "Mensagem com a doação concluída")
             registrar("9d. Interessada envia com a doação concluída → 404", r.status_code == 404, f"HTTP {r.status_code}", r)
             r = ler(interessada, conversa_id)
-            registrar("9e. Interessada lê com a doação concluída → 200", r.status_code == 200, f"HTTP {r.status_code}", r)
+            concluida = dados_da_doacao_ok(json_ou_none(r), "concluída")
+            registrar(
+                "9e. Interessada lê com a doação concluída → 200 e donation_status “concluída”",
+                r.status_code == 200 and concluida,
+                f"HTTP {r.status_code}, status concluída: {'sim' if concluida else 'não'}",
+                r,
+            )
 
         # 10. (Opcional) Dona apaga a doação; a conversa some para a interessada.
         resposta = input("\nApagar a doação de teste agora? (s/N) ").strip().lower()
@@ -490,6 +708,44 @@ def main() -> None:
                 r,
             )
 
+    resumo()
+
+
+def modo_rapido(iniciar, enviar, ler_com, lista_de_mensagens, dona, interessada) -> None:
+    """Checagem rápida da leitura: 2a, 3, 3c e duas leituras, sem status nem exclusão.
+
+    Imprime só status HTTP e tamanho da lista.
+    Pode ser repetido com a mesma doação (respeitando 1 minuto entre execuções).
+    """
+    print("\n=== Modo rápido ===")
+    r1 = iniciar(interessada)
+    d1 = json_ou_none(r1)
+    conversa_id = d1.get("conversation_id") if isinstance(d1, dict) else None
+    registrar(
+        "2a. Interessada inicia ou reabre a conversa → sucesso",
+        r1.status_code == 200 and isinstance(conversa_id, int),
+        f"HTTP {r1.status_code}",
+        r1,
+    )
+    if not isinstance(conversa_id, int):
+        resumo()
+        return
+
+    r3 = enviar(interessada, conversa_id, MENSAGEM_ACENTUADA)
+    registrar("3. Interessada envia mensagem → sucesso", r3.status_code == 200, f"HTTP {r3.status_code}", r3)
+    r3c = enviar(dona, conversa_id, MENSAGEM_DONA)
+    registrar("3c. Dona envia mensagem → sucesso", r3c.status_code == 200, f"HTTP {r3c.status_code}", r3c)
+
+    for rotulo, parametros in (("sem limit", {}), ("limit=100", {"limit": 100})):
+        r = ler_com(dona, conversa_id, **parametros)
+        tamanho = len(lista_de_mensagens(r))
+        print(f"Leitura {rotulo}: HTTP {r.status_code}, messages={tamanho}")
+        registrar(
+            f"Leitura {rotulo} → ao menos 2 mensagens",
+            r.status_code == 200 and tamanho >= 2,
+            f"HTTP {r.status_code}, {tamanho} mensagem(ns)",
+            r,
+        )
     resumo()
 
 

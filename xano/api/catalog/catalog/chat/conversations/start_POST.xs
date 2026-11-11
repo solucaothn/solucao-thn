@@ -10,7 +10,7 @@ query "catalog/chat/conversations/start" verb=POST {
     db.get donation {
       field_name = "id"
       field_value = $input.donation_id
-      output = ["id", "owner_id", "status", "contact_preference"]
+      output = ["id", "owner_id", "status", "contact_preference", "title"]
     } as $donation
   
     precondition ($donation != null) {
@@ -21,7 +21,13 @@ query "catalog/chat/conversations/start" verb=POST {
     db.query chat_conversation {
       where = ($db.chat_conversation.donation_id == $input.donation_id && $db.chat_conversation.interested_user_id == $auth.id)
       return = {type: "single"}
-      output = ["id", "donation_id", "donor_id", "interested_user_id", "last_message_at"]
+      output = [
+        "id"
+        "donation_id"
+        "donor_id"
+        "interested_user_id"
+        "last_message_at"
+      ]
     } as $conversation
   
     var $created_new {
@@ -46,7 +52,14 @@ query "catalog/chat/conversations/start" verb=POST {
                     interested_user_id: $auth.id
                     last_message_at   : "now"
                   }
-                  output = ["id", "donation_id", "donor_id", "interested_user_id", "last_message_at"]
+                
+                  output = [
+                    "id"
+                    "donation_id"
+                    "donor_id"
+                    "interested_user_id"
+                    "last_message_at"
+                  ]
                 } as $created_conversation
               
                 var.update $conversation {
@@ -58,26 +71,30 @@ query "catalog/chat/conversations/start" verb=POST {
                 }
               
                 function.run "Quick Start/log_event" {
-                  input = {
-                    user_id: $auth.id
-                    action : "chat_started"
-                  }
+                  input = {user_id: $auth.id, action: "chat_started"}
                 } as $chat_started_event
               }
             }
           }
+        
           catch {
             db.query chat_conversation {
               where = ($db.chat_conversation.donation_id == $input.donation_id && $db.chat_conversation.interested_user_id == $auth.id)
               return = {type: "single"}
-              output = ["id", "donation_id", "donor_id", "interested_user_id", "last_message_at"]
+              output = [
+                "id"
+                "donation_id"
+                "donor_id"
+                "interested_user_id"
+                "last_message_at"
+              ]
             } as $existing_conversation
           
             precondition ($existing_conversation != null) {
               error_type = "notfound"
               error = "Conversa não encontrada."
             }
-
+          
             var.update $conversation {
               value = $existing_conversation
             }
@@ -91,11 +108,11 @@ query "catalog/chat/conversations/start" verb=POST {
       field_value = $conversation.donor_id
       output = ["name"]
     } as $donor
-
+  
     var $donor_first_name {
       value = "Usuário"
     }
-
+  
     conditional {
       if ($donor != null) {
         var.update $donor_first_name {
@@ -110,6 +127,9 @@ query "catalog/chat/conversations/start" verb=POST {
     donation_id          : $conversation.donation_id
     last_message_at      : $conversation.last_message_at
     other_user_first_name: $donor_first_name
+    donation_title       : $donation.title
+    donation_status      : $donation.status
   }
+
   guid = "glP_tB6dJlsTKyRbf5SADE-yHXo"
 }
