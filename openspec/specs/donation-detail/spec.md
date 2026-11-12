@@ -54,12 +54,19 @@ A página de detalhe MUST apresentar os dados existentes e aprovados da doação
 - **WHEN** uma pessoa abre uma doação disponível
 - **THEN** a página MUST apresentar a galeria, o título, a condição com o rótulo “Condição”, a descrição, o nome da categoria, a cidade/UF, a modalidade de entrega, a preferência de contato como texto e o cartão de quem doa com somente primeiro nome e cidade/UF
 - **AND** MUST apresentar no topo do cartão os botões “Outros meios de comunicação” e “Chat” em conformidade com o layout aprovado no Figma
-- **AND** MUST NOT apresentar botões de acesso ao perfil do doador
+- **AND** o acesso ao perfil de quem doa MUST ser feito somente pelo cartão “Quem doa”, sem outros botões de perfil
 
 #### Scenario: Não apresentar dados ou recursos indisponíveis
 - **WHEN** a página exibe os detalhes da doação
-- **THEN** MUST permanecerem ocultos Cor, Material, Tipo, bairro, CEP, avaliações, histórico de doações, presença online, indicadores de conta ou e-mail verificados, foto de perfil e qualquer botão ou link para o perfil do doador
+- **THEN** MUST permanecerem ocultos Cor, Material, Tipo, bairro, CEP, avaliações, presença online, indicadores de conta ou e-mail verificados e foto de perfil
+- **AND** as outras doações de quem doa MUST aparecer somente no perfil público, não no detalhe
 - **AND** MUST NOT apresentar esses itens como “Em breve”
+
+#### Scenario: Cartão “Quem doa” leva ao perfil
+- **WHEN** a pessoa clica ou aciona pelo teclado o cartão “Quem doa”
+- **THEN** a página MUST navegar para `/doacao/<id>/quem-doa`, com o identificador da doação aberta
+- **AND** o cartão MUST ter rótulo acessível que indique o perfil, como “Ver perfil de <primeiro nome>”, foco visível e área de toque confortável
+- **AND** o frontend MUST NOT receber nem usar o identificador de usuário de quem doa
 
 #### Scenario: Galeria e resumo no computador
 - **WHEN** a página é exibida em tela larga
