@@ -821,11 +821,48 @@ class DonationDetailTests(unittest.TestCase):
 
         card = _donor_card()
         rendered = str(card)
-        self.assertEqual(_component_contents(card), ["Quem doa", ", "])
+        # O único texto novo é a indicação “Ver perfil” do link.
+        self.assertEqual(_component_contents(card), ["Quem doa", ", ", "Ver perfil"])
         self.assertIn("donor_first_name_rx_state_", rendered)
         self.assertIn("LucideMapPin", rendered)
         self.assertNotIn("<img", rendered)
         self.assertNotIn("Image", [type(n).__name__ for n in _all_component_nodes(card)])
+
+    def test_donor_card_links_to_public_profile_by_donation_id(self) -> None:
+        from doafacil.detalhe_doacao import _donor_card
+
+        card = _donor_card()
+        rendered = str(card)
+        # O cartão inteiro é o link, com o id da doação (nunca o de quem doa).
+        self.assertEqual(type(card).__name__, "Link")
+        self.assertIn("ReactRouterLink", rendered)
+        self.assertIn('"/doacao/"+', rendered)
+        self.assertIn("donation_id_rx_state_", rendered)
+        self.assertIn('"/quem-doa"', rendered)
+        self.assertNotIn("owner_id", rendered)
+        self.assertNotIn("user_id", rendered)
+
+    def test_donor_card_link_has_accessible_label_and_visible_focus(self) -> None:
+        from doafacil.detalhe_doacao import _donor_card
+
+        rendered = str(_donor_card())
+        self.assertIn("Ver perfil de ", rendered)
+        self.assertIn('"aria-label"', rendered)
+        self.assertIn("donor_first_name_rx_state_", rendered)
+        self.assertIn("LucideChevronRight", rendered)
+        # Hover com borda verde e foco com contorno visível.
+        self.assertIn('"#007A42"', rendered)
+        self.assertIn("&:hover", rendered)
+        self.assertIn("&:focus-visible", rendered)
+        self.assertIn("2px solid #007A42", rendered)
+
+    def test_detail_has_no_other_profile_buttons(self) -> None:
+        contents = _component_contents(donation_detail_page())
+        # O perfil só se abre pelo cartão “Quem doa”.
+        self.assertEqual(contents.count("Ver perfil"), 1)
+        for excluded in ("Acessar perfil do doador", "Ver perfil completo", "Perfil"):
+            with self.subTest(excluded=excluded):
+                self.assertNotIn(excluded, contents)
 
     def test_figma_icons_exist_with_root_size(self) -> None:
         for name, size in (("detalhe-atributo.svg", "18"), ("detalhe-localizacao.svg", "56")):

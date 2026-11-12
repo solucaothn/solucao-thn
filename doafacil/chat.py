@@ -1289,29 +1289,32 @@ def chat_fab() -> rx.Component:
     )
 
 
-def back_home_header() -> rx.Component:
-    """Cabeçalho branco com “Voltar ao início” na linha do logotipo.
+def back_link_header(
+    href: str | rx.Var, label: str, color: str = GREEN_TEXT
+) -> rx.Component:
+    """Cabeçalho branco com um link de voltar na linha do logotipo.
 
-    Como nos frames chat-1 e detalhes-doacao do Figma: o link fica à esquerda,
-    na mesma linha do logotipo centralizado, sem faixa própria. A coluna da
-    direita fica vazia para manter o logotipo no centro. Usado no /chat e no
-    detalhe da doação.
+    Como nos frames chat-1, detalhes-doacao e perfil-doador do Figma: o link
+    fica à esquerda, na mesma linha do logotipo centralizado, sem faixa
+    própria. A coluna da direita fica vazia para manter o logotipo no centro.
+    Em telas estreitas aparece só a seta, com o rótulo acessível e 44 px de
+    área de toque.
     """
     return rx.grid(
         rx.link(
             rx.hstack(
                 rx.icon("chevron-left", size=20),
                 rx.text(
-                    "Voltar ao início",
+                    label,
                     display=rx.breakpoints(initial="none", sm="inline"),
                 ),
                 spacing="1",
                 align="center",
             ),
-            href="/",
-            color=GREEN_TEXT,
+            href=href,
+            color=color,
             font_weight="600",
-            aria_label="Voltar ao início",
+            aria_label=label,
             justify_self="start",
             # Área de toque confortável mesmo quando só a seta aparece.
             display="inline-flex",
@@ -1337,6 +1340,11 @@ def back_home_header() -> rx.Component:
         padding="0.25rem 1rem",
         box_shadow="0 2px 8px rgba(39, 39, 39, 0.06)",
     )
+
+
+def back_home_header() -> rx.Component:
+    """“Voltar ao início” (para /) em #166B3B. Usado no /chat e no detalhe."""
+    return back_link_header("/", "Voltar ao início", GREEN_TEXT)
 
 
 def _header() -> rx.Component:

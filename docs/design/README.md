@@ -202,7 +202,7 @@ O que segue o Figma:
 - **Título e descrição logo abaixo da galeria:** o título em negrito, em caixa alta e preto; a descrição em texto corrido, mantendo as quebras de linha. O título aparece nos dois lugares, como no Figma.
 - **“Detalhes”:** uma grade em que cada item tem o ícone verde do Figma (`assets/detalhe-atributo.svg`), um rótulo pequeno e o valor logo abaixo. Os itens são Categoria, Condição, Forma de entrega e Preferência de contato. A grade tem 4 colunas em telas largas, 2 em médias e 1 no celular.
 - **“Localização”:** a ilustração de edifícios do Figma (`assets/detalhe-localizacao.svg`, 56 px) e “Cidade, UF”.
-- **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, o primeiro nome e o ícone de local com “Cidade, UF”.
+- **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, o primeiro nome e o ícone de local com “Cidade, UF”. O cartão inteiro é o link para o perfil público (veja “Perfil público de quem doa”).
 - **No celular:** uma coluna, na ordem galeria → resumo → título e descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
 
 Diferenças aprovadas em relação ao Figma:
@@ -216,6 +216,11 @@ Diferenças aprovadas em relação ao Figma:
 - **“Localização” num cartão branco** com borda, no lugar das divisórias do Figma, e com uma só linha: “Cidade, UF”.
 - **Sem “NOVO” e sem status:** o detalhe não recebe a data de criação e só mostra doações disponíveis (decisão do grupo).
 - **Ícones decorativos:** os dois SVGs do Figma têm `alt=""` e `aria-hidden`.
+- **Cartão “Quem doa” como link (não está no Figma):** leva a `/doacao/<id>/quem-doa`, com o id da doação aberta.
+  - O rótulo acessível é “Ver perfil de <primeiro nome>”.
+  - Uma linha “Ver perfil”, com o ícone `chevron-right` em `#007A42`, mostra que o cartão é clicável.
+  - No hover, a borda fica `#007A42`; o foco tem contorno de 2 px em `#007A42`.
+  - É o único acesso ao perfil no detalhe: não há outro botão de perfil.
 - **Visualizador de fotos (não está no Figma):** cada foto da galeria é um botão, com rótulo como “Ampliar foto 2 de 5” e cursor de lupa.
   - **Abrir:** clicar, Enter ou Espaço abre um modal em tela cheia com fundo creme semitransparente (`rgba(255, 246, 232, 0.85)`) e desfoque de 6 px, sem o véu escuro padrão do diálogo. Textos e ícones em `#1F1F1F`.
   - **Foto em 1x:** inteira (`contain`), cabendo abaixo do cabeçalho de 80 px, sem passar da borda de baixo nem das laterais.
@@ -228,7 +233,50 @@ Diferenças aprovadas em relação ao Figma:
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações, histórico de doações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O botão Acessar perfil do doador continua oculto porque o perfil público não foi implementado, e não é apresentado como “Em breve”.
+Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
+
+## Perfil público de quem doa
+
+### Frames `perfil-doador-01` e `perfil-doador-02` do Figma — página `/doacao/<id>/quem-doa`
+
+A referência são os frames `perfil-doador-01` (com doações, dentro do grupo `Group 8`) e `perfil-doador-02` (sem doações), ainda sem PNG em `docs/design`. Esta seção prevalece sobre eles.
+
+O perfil é aberto a partir de uma doação (o cartão “Quem doa” do detalhe), nunca por id de usuário. A página só mostra dados que o endpoint público `catalog/donations/donor` devolve.
+
+O que segue o Figma:
+
+- **Fundo creme `#FFF6E8`**, com conteúdo de até 1396 px e 16 px de margem lateral no celular.
+- **Cartão de identificação:**
+  - branco, com borda `#D9D9D9` e cantos de 8 px;
+  - à esquerda, um círculo `#F2F2F2` com a inicial do primeiro nome em `#555555`, de 120 px no computador e 72 px no celular;
+  - o primeiro nome como título (`h1`) em `#166B3B`, “Cidade, UF” em `#2A2A2A` e “No DoaFácil desde <mês> de <ano>” em `#555555`, com o mês por extenso.
+  - No celular, o círculo fica acima do texto, e tudo fica centralizado.
+- **“Doações disponíveis”** (`h2` em `#166B3B`), com o contador “1 item” ou “N itens” em `#555555` ao lado.
+- **Cartões iguais aos da home:** foto (ou a imagem genérica), título, “Condição: …”, NOVO para doações de até 7 dias e “Acessar”, que leva a `/doacao/<id>` do item.
+  - Ficam numa grade `repeat(auto-fill, minmax(220px, 1fr))` com 24 px entre os cartões: 5 colunas a 1512 px e 1 a 360 px.
+  - Na grade, o cartão ocupa a largura da célula, em vez dos 280 px fixos do carrossel da home.
+- **Estado vazio (`perfil-doador-02`):** cartão branco centralizado com “Nenhuma doação disponível no momento” (`#166B3B`, negrito), a frase “Quando <nome> publicar uma nova doação, ela aparece aqui.” e o link “Explorar outras doações” (`#007A42`), que leva à home até existir uma página de explorar. Sem contador e sem paginação.
+
+Diferenças aprovadas em relação ao Figma:
+
+- **“Voltar à doação”** na linha do logotipo, à esquerda, em `#007A42`, no lugar do verde claro do Figma, que não tinha contraste AA. É o mesmo cabeçalho do chat e do detalhe (`back_link_header()`), com rótulo acessível e área de toque de 44 px; em telas estreitas aparece só a seta.
+  - Leva a `/doacao/<id>` da doação de origem. Com um id inválido na rota, leva a `/`.
+  - Os frames não têm a linha do logotipo; ela entra para o perfil ficar igual às outras páginas.
+- **Sem foto de perfil:** fica só o círculo com a inicial.
+- **Sem o selo “E-mail verificado”, sem o botão de chat e sem avaliações.** Esses itens não aparecem nem como “Em breve”. O botão flutuante do chat também não aparece no perfil.
+- **Só o primeiro nome:** nada de sobrenome ou e-mail. A cidade e a UF são as da doação de origem, o mesmo dado que o detalhe já mostra.
+- **Paginação, que não está no Figma:** de 12 em 12, só quando há mais de uma página.
+  - Os botões “Anterior” e “Próxima” têm contorno `#007A42` e 44 px de altura, e o texto “Página N de M” é anunciado ao leitor de tela (`aria-live="polite"`).
+  - “Anterior” fica desativado na primeira página e “Próxima” na última. Os dois ficam desativados durante o carregamento.
+  - Cada troca faz uma requisição só para a página pedida. Com erro, a página anterior continua visível e a mensagem aparece abaixo dos botões.
+  - Recarregar a página volta à página 1: a página da lista não fica na URL.
+- **Estados:**
+  - “Carregando perfil...” enquanto busca;
+  - “Doação não encontrada” para um id inválido (sem consultar o Xano) ou para uma doação inexistente ou indisponível;
+  - uma mensagem de erro simples para falha de rede, resposta inválida ou limite de acessos (429).
+- **Fonte LINE Seed JP** e as cores AA do projeto, como no resto do site. Todos os pares passam de 4,5:1. Os de menor contraste são `#007A42` sobre o creme (5,1:1) e `#555555` sobre o `#F2F2F2` do círculo (6,7:1).
+- **Animação:** `page-fade-enter`, que respeita `prefers-reduced-motion`, só nos títulos fixos (“Doações disponíveis”, o título do estado vazio) e nas mensagens de estado. O cabeçalho, o cartão de identificação e os cartões de doação, que vêm do Xano, não animam.
+
 ## Chat
 
 ### Frame `chat-1` do Figma — página `/chat`

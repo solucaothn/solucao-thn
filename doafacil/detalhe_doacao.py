@@ -982,7 +982,37 @@ def _location_card() -> rx.Component:
 
 
 def _donor_card() -> rx.Component:
-    """Cartão mínimo de quem doa: primeiro nome e “Cidade, UF”."""
+    """Cartão mínimo de quem doa: primeiro nome e “Cidade, UF”.
+
+    O cartão inteiro é o link para o perfil público (/doacao/<id>/quem-doa),
+    com rótulo acessível “Ver perfil de <primeiro nome>”. O frontend só usa o
+    id da doação, nunca o id de quem doa.
+    """
+    return rx.link(
+        _donor_card_content(),
+        href=f"/doacao/{DonationDetailState.donation_id}/quem-doa",
+        aria_label=(
+            rx.Var.create("Ver perfil de ")
+            + DonationDetailState.donor_first_name
+        ),
+        class_name="detail-donor-card",
+        display="block",
+        width="100%",
+        padding="32px 28px",
+        background="white",
+        border=f"1px solid {BORDER_SOFT}",
+        border_radius="8px",
+        text_decoration="none",
+        color=TEXT_DONOR,
+        _hover={"borderColor": PRIMARY_GREEN, "textDecoration": "none"},
+        _focus_visible={
+            "outline": f"2px solid {PRIMARY_GREEN}",
+            "outlineOffset": "2px",
+        },
+    )
+
+
+def _donor_card_content() -> rx.Component:
     return rx.vstack(
         rx.heading(
             "Quem doa",
@@ -1010,14 +1040,17 @@ def _donor_card() -> rx.Component:
             spacing="3",
             align="center",
         ),
-        class_name="detail-donor-card",
+        # Mostra que o cartão é clicável.
+        rx.hstack(
+            rx.text("Ver perfil", color=PRIMARY_GREEN, font_weight="700"),
+            rx.icon("chevron-right", size=18, color=PRIMARY_GREEN, aria_hidden="true"),
+            spacing="1",
+            align="center",
+            padding_top="4px",
+        ),
         align="stretch",
         spacing="3",
         width="100%",
-        padding="32px 28px",
-        background="white",
-        border=f"1px solid {BORDER_SOFT}",
-        border_radius="8px",
     )
 
 
