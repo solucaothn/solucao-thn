@@ -84,7 +84,7 @@ python -m unittest discover -s tests -v
 
 - Explorar Doações (ainda sem design).
 - Detalhe da doação e Minhas doações.
-- **Pendência:** `DELETE /catalog/donations` apaga mensagens, conversas e a doação, mas não as linhas de `donation_photo` dessa doação. As fotos ficam órfãs no banco. Corrigir numa change própria, combinada com o grupo.
+- **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
 - Páginas "Como funciona" e "Categorias".
 - Botões e links da home que ainda não levam a lugar nenhum.
@@ -176,7 +176,7 @@ Regras:
 - **Tamanho:** de 1 a 1000 caracteres depois de tirar espaços das pontas; fora disso, HTTP 400. O tamanho é validado antes do limite de envio. O texto é guardado e devolvido como texto, e a interface precisa mostrá-lo como texto, sem interpretar HTML.
 - **Limite de envio:** 10 mensagens por pessoa em 60 segundos, somando todas as conversas; acima disso, HTTP 429 com “Limite de mensagens atingido. Tente novamente em instantes.”. É de melhor esforço: sob envios simultâneos pode passar uma ou duas a mais.
 - **Logs:** só `chat_started` (conversa nova), `chat_message_sent` (envio aceito) e `chat_message_edited` (edição que mudou o texto), com `user_id`, ação e data. Leituras (inclusive a marcação de lida), repetições, edições sem mudança e erros não geram evento.
-- **Apagar a doação apaga as conversas:** `DELETE /catalog/donations` remove as mensagens, as conversas e a doação na mesma transação. Depois disso, quem tentar ler a conversa recebe o 404 genérico. As linhas de `donation_photo` não são apagadas (pendência registrada na seção 7).
+- **Apagar a doação apaga as conversas:** `DELETE /catalog/donations` remove as mensagens, as conversas e a doação na mesma transação. Depois disso, quem tentar ler a conversa recebe o 404 genérico. Desde a change minhas-doacoes, as linhas de `donation_photo` também são apagadas. Os arquivos de imagem no armazenamento continuam lá (pendência registrada na seção 7).
 
 > **Atenção ao limite da plataforma:** o plano gratuito do Xano limita a **instância inteira** a 10 requisições a cada 20 segundos, somando todos os endpoints e todas as pessoas. Acima disso, o próprio Xano responde HTTP 429 com uma mensagem diferente da do chat. Telas com atualização automática (por exemplo, buscar mensagens novas) precisam de intervalo longo entre as consultas, senão derrubam o resto do site.
 
@@ -375,6 +375,94 @@ Cuidados:
 
 - O script espera 2,5 s entre as requisições por causa do limite de 10 a cada 20 s. Com 12 itens, leva cerca de 1 minuto. A pausa pode ser trocada com a variável `TESTE_PERFIL_PAUSA`.
 - Não rode outros testes no Xano ao mesmo tempo, porque eles dividem o mesmo limite.
+
+### Minhas doações (backend)
+
+Endpoints com login para quem doa ver e gerenciar as próprias doações. A pessoa vem sempre do token (`$auth.id`), nunca de um id enviado pelo cliente.
+
+- `GET /catalog/donations/mine`:
+  - **Entrada:** `page`, que é opcional e vale 1 por padrão. Uma página menor que 1 é tratada como 1.
+  - **Resposta:** `{owner: {first_name}, counts: {active, completed}, items, page, per_page, total, page_total}`.
+  - **`items`:** 6 por página, todas as doações da pessoa, de qualquer status, das mais novas para as mais antigas. Cada item tem `id`, `created_at`, `title`, `photo` (URL pública ou nula), `condition` e `status`.
+  - **`counts`:** `active` soma as disponíveis e as reservadas, e `completed` conta as concluídas. Os dois consideram todas as doações da pessoa, não só a página.
+  - **Página além da última:** vem com a lista vazia e os totais corretos.
+  - **Sem token:** 401.
+  - **Privacidade:** nunca traz e-mail, `owner_id` ou dados de outras pessoas.
+- `GET /catalog/donations/mine/item?donation_id=`:
+  - lê uma doação **da própria pessoa**, de qualquer status, para a tela de edição;
+  - devolve `id`, `title`, `description`, `category_id`, `condition`, `delivery_method`, `contact_preference` e `status`;
+  - uma doação inexistente ou de outra pessoa dá o mesmo 404 “Doação não encontrada.”.
+- `PATCH /catalog/donations` (contrato novo):
+  - **Entradas obrigatórias:**
+    - `donation_id` e `category_id`;
+    - `title`, de 1 a 100 caracteres;
+    - `description`, de 1 a 2000 caracteres;
+    - `condition` (Ótimo, Bom ou Regular), `delivery_method` (só “A combinar”) e `contact_preference` (“E-mail” ou “Chat do DoaFácil”).
+  - **Erros:**
+    - uma doação de outra pessoa ou inexistente dá 404 genérico;
+    - uma doação concluída dá 400, porque não pode ser editada;
+    - um valor fora das regras dá 400.
+  - **O que não muda:** as fotos, a cidade, a UF e o status.
+- `PATCH /catalog/donations/status`:
+  - as transições permitidas são disponível ⇄ reservada e disponível ou reservada → concluída;
+  - uma doação concluída não muda mais (400);
+  - uma doação de outra pessoa dá 403.
+- `DELETE /catalog/donations`:
+  - numa transação, apaga as mensagens, as conversas, as linhas de `donation_photo` e a doação;
+  - os arquivos de imagem ficam no armazenamento (pendência da seção 7);
+  - uma doação de outra pessoa dá 403.
+
+#### Testar “Minhas doações” contra o Xano real
+
+O script `scripts/teste_minhas_doacoes_real.py` roda os cenários MD1 a MD19 contra o Xano publicado. Ele fica fora de `tests/`, então o `unittest` não o executa.
+
+Antes de rodar, tenha:
+
+- **duas contas:** a dona das doações e outra pessoa;
+- **o ID de uma doação disponível da dona**, de preferência com entrega “A combinar” e contato “E-mail” ou “Chat do DoaFácil”;
+- **opcionalmente, o ID de uma doação concluída da dona**, para o MD14 e o MD17;
+- **opcionalmente, o ID de uma doação de teste da dona que pode ser apagada**, para o MD19. Ela precisa ser outra, não a doação disponível acima.
+- as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas no terminal (seção 4).
+
+Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_minhas_doacoes_real.py
+```
+
+O script pede o e-mail e a senha das duas contas e depois os IDs. **A senha não aparece ao digitar**, nem como asteriscos. Nada é gravado em arquivo. Ele não imprime nomes, e-mails, títulos, URLs nem corpos de resposta: cada cenário mostra OK ou FALHOU com o status HTTP e, nas falhas, só os campos `code` e `message` do erro ou as chaves da resposta.
+
+| Cenário | O que confere |
+|---|---|
+| MD1 | a lista sem token dá 401 |
+| MD2 | a lista da dona dá 200 com só as chaves permitidas e os tipos certos |
+| MD3 | nenhuma chave proibida, `@` ou sobrenome; a lista da outra pessoa não traz a doação da dona |
+| MD4 | até 6 itens, página 1, mais novas primeiro, sem ids repetidos |
+| MD5 | os totais, as páginas e os contadores coerentes, com a doação informada na lista quando há até 6 |
+| MD6 | `page=0` volta a página 1; uma página além da última vem vazia com os totais |
+| MD7 | a dona lê a própria doação com só os campos editáveis |
+| MD8 | a outra pessoa e um id inexistente recebem o mesmo 404 |
+| MD9 | a leitura sem token dá 401 |
+| MD10 | uma edição válida dá 200 e grava os campos, sem `owner_id` na resposta |
+| MD11 | um título com 100 “á” é aceito, o que mostra que o limite conta caracteres |
+| MD12 | os valores inválidos dão 400 sem alterar a doação: título ou descrição vazios ou longos demais, “Entrega”, “WhatsApp”, condição ou categoria inválidas |
+| MD13 | a outra pessoa editando a doação da dona dá 404 |
+| MD14 | editar uma doação concluída dá 400; Enter pula este cenário |
+| MD15 | disponível → reservada → disponível, com o detalhe público dando 404 e depois 200 |
+| MD16 | a outra pessoa mudando o status é recusada, e o status não muda |
+| MD17 | concluída → disponível dá 400; Enter pula este cenário |
+| MD18 | a outra pessoa apagando a doação da dona é recusada, e a doação continua |
+| MD19 | a dona apaga a doação de teste e depois a leitura dá 404; só roda com confirmação |
+
+Cuidados:
+
+- **O script altera a doação disponível:**
+  - edita o título e a condição e, no fim, grava de novo os valores originais, mesmo se der erro no meio;
+  - reserva a doação e volta para disponível.
+  - Se a doação tiver entrega ou contato fora das opções do cadastro, o script avisa, e esses dois campos não voltam.
+- **O MD19 apaga a doação de teste, e isso não tem volta.** O script pergunta antes, e só `s` apaga.
+- O script espera 2,5 s entre as requisições por causa do limite de 10 a cada 20 s. São cerca de 40 requisições, o que leva perto de 2 minutos. A pausa pode ser trocada com a variável `TESTE_MINHAS_PAUSA`.
+- Não rode outros testes no Xano ao mesmo tempo.
 
 ## 9. Design
 

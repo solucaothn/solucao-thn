@@ -64,7 +64,7 @@ O Xano permite 10 requisições a cada 20 s.
      - `total`, com todas as doações da pessoa.
 
      Uma doação com `status` nulo, que não deveria existir, entra no total, mas em nenhum contador.
-   - **Lista:** `db.query donation` com `owner_id == $auth.id`, `sort created_at desc` e `paging: {page, per_page: 6, metadata: false}`. A saída é `id`, `created_at`, `title`, `photo` e `status`, com a foto montada como no `recent_GET.xs`.
+   - **Lista:** `db.query donation` com `owner_id == $auth.id`, `sort created_at desc` e `paging: {page, per_page: 6, metadata: false}`. A saída é `id`, `created_at`, `title`, `photo`, `condition` e `status`, com a foto montada como no `recent_GET.xs`.
    - **Resposta:** `{owner: {first_name}, counts: {active, completed}, items, page, per_page, total, page_total}`. `page_total` é calculado como no `donor_GET.xs`. Não há e-mail, `owner_id`, id de usuário nem log de evento, porque é uma leitura.
    - **Alternativa descartada:** paginação nativa com metadados. Os nomes do total não foram confirmados no MCP na change perfil-publico, e o `count` já foi validado lá.
 2. **`GET catalog/donations/mine/item`** (`.../donations/mine/item_GET.xs`), com `auth = "user"` (dúvida 4).
@@ -111,7 +111,7 @@ O Xano permite 10 requisições a cada 20 s.
      - `confirm_action` faz a requisição e recarrega a página atual. Se a página ficou além da última depois de uma exclusão, recarrega a última. São 2 requisições por ação.
      - `cancel_action` só fecha.
      - `action_busy` bloqueia outra ação, e `notice` e `notice_is_error` mostram o resultado num `role="status"`.
-9. **Cartão da doação (`my_donation_card`):** segue a aparência do cartão da home (foto com degradê e título em branco), mas é outro componente, porque tem selo e menu.
+9. **Cartão da doação (`my_donation_card`):** segue a aparência do cartão da home (foto com degradê, título e “Condição: …” em branco), mas é outro componente, porque tem selo e menu.
    - **Selo de status** no canto superior esquerdo, no lugar do NOVO (dúvida 3), com fundo opaco, para o contraste não depender da foto:
      - “Disponível”: `#E3F5EA` com texto `#166B3B`;
      - “Reservada”: `#FFF1D6` com texto `#7A4B00`;
@@ -178,3 +178,21 @@ O Xano permite 10 requisições a cada 20 s.
    - restringir a entrega e o contato às opções do cadastro.
 
    Nenhuma tela usa o endpoint hoje. Confirma?
+
+### Respostas do Higor
+
+1. Liberar a volta de reservada para disponível (decisão 4).
+2. Editar só doações disponíveis e reservadas; as concluídas são recusadas pelo backend.
+3. Sem o NOVO, com o selo de status no lugar dele, e “Ver anúncio” só nas disponíveis. **A linha “Condição: …” fica no cartão.** Por isso, a listagem também devolve `condition` (decisão 1), e a spec foi ajustada.
+4. Criar o `GET catalog/donations/mine/item`.
+5. O `DELETE` apaga as linhas de `donation_photo` nesta change.
+6. O `PATCH` fica como recomendado: 404 genérico, descrição e campos novos obrigatórios, entrega e contato restritos às opções do cadastro.
+
+## Consulta ao Xano Developer MCP (tarefa 2.1)
+
+- **Tamanho do texto:** `filters=trim|min:1|max:100` (e `max:2000` na descrição). Na doc, `min` e `max` são o tamanho mínimo e máximo do texto. O `trim` vem antes, então só espaços também é recusado.
+- **Texto obrigatório:** um `text` obrigatório recusa `""` e `null` na validação da plataforma, antes do `stack`, com 400.
+- **Enum:** `enum <nome> { values = [...] }`. Com um valor só, a lista tem um elemento: `values = ["A combinar"]`.
+- **“Ou” no `where`:** com `||` entre parênteses, como no `donations_GET.xs`.
+- **Exclusão em lote:** `db.bulk.delete <tabela> { where = ... }`, que já é usada no `donations_DELETE.xs`.
+- **A conferir no teste real:** se o `max:100` conta caracteres ou bytes. O MD11 envia um título com 100 “á”, que precisa ser aceito.

@@ -43,6 +43,10 @@ query "catalog/donations" verb=DELETE {
           where = $db.chat_conversation.donation_id == $input.donation_id
         } as $deleted_conversations
       
+        db.bulk.delete donation_photo {
+          where = $db.donation_photo.donation_id == $input.donation_id
+        } as $deleted_photos
+      
         db.del donation {
           field_name = "id"
           field_value = $input.donation_id

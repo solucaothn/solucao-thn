@@ -8,23 +8,26 @@ O dry-run e o push são feitos pelo Higor.
 
 ## 1. Preparação
 
-- [ ] 1.1 (manual) Responder às dúvidas 1 a 6 do `design.md` e ajustar a spec, o design e estas tarefas se alguma resposta mudar o comportamento. Verificação: o `design.md` tem as respostas e o `openspec validate minhas-doacoes --strict` passa.
-- [ ] 1.2 Pedir confirmação ao Higor e rodar `xano workspace pull -d ./xano`. Verificação: `git diff --ignore-all-space --ignore-cr-at-eol --stat -- xano` mostra só as divergências antigas e conhecidas.
+- [x] 1.1 (manual) Responder às dúvidas 1 a 6 do `design.md` e ajustar a spec, o design e estas tarefas se alguma resposta mudar o comportamento. Verificação: o `design.md` tem as respostas e o `openspec validate minhas-doacoes --strict` passa.
+- [x] 1.2 Pedir confirmação ao Higor e rodar `xano workspace pull -d ./xano`. Verificação: `git diff --ignore-all-space --ignore-cr-at-eol --stat -- xano` mostra só as divergências antigas e conhecidas.
+  - Pull feito pelo Higor. O diff sem espaços mostra só as divergências antigas, que não são desta change: `signup_pending` sem os valores padrão, `donation_photo.photo` opcional, `signup_POST` com `tags` e o `contact_email_GET.xs` duplicado. Os `guid` do `donations_PATCH.xs`, do `status_PATCH.xs` e do `donations_DELETE.xs` estão iguais aos de antes.
 
 ## 2. Endpoints no Xano (Parte A)
 
-- [ ] 2.1 Consultar no Xano Developer MCP a sintaxe do limite de tamanho de texto (`max:`), do enum de valor único, da condição com “ou” no `where` e do `db.bulk.delete`. Verificação: as respostas anotadas no `design.md`.
-- [ ] 2.2 Escrever `xano/api/catalog/catalog/donations/mine_GET.xs` (decisão 1). Verificação: validação do arquivo no Xano Developer MCP sem erros.
-- [ ] 2.3 Escrever `xano/api/catalog/catalog/donations/mine/item_GET.xs` (decisão 2). Verificação: validação no MCP sem erros.
-- [ ] 2.4 Alterar `donations_PATCH.xs` (decisão 3), `status_PATCH.xs` (decisão 4, se a dúvida 1 for aprovada) e `donations_DELETE.xs` (decisão 5, se a dúvida 5 for aprovada). Verificação: validação no MCP sem erros e um `git diff -- xano` só com essas mudanças.
-- [ ] 2.5 Mostrar ao Higor os arquivos e o `git diff -- xano` e parar antes do dry-run. Verificação: o diff tem só os arquivos desta change, além das divergências conhecidas.
-- [ ] 2.6 (manual) O Higor roda `xano workspace push -d ./xano --dry-run`, revisa e faz o push. Verificação: só os CREATE e UPDATE esperados no dry-run.
-- [ ] 2.7 (manual) Pull pós-push, para os `guid` dos endpoints novos. Verificação: os arquivos novos ganharam a linha `guid`, sem mudar a lógica.
+- [x] 2.1 Consultar no Xano Developer MCP a sintaxe do limite de tamanho de texto (`max:`), do enum de valor único, da condição com “ou” no `where` e do `db.bulk.delete`. Verificação: as respostas anotadas no `design.md`.
+- [x] 2.2 Escrever `xano/api/catalog/catalog/donations/mine_GET.xs` (decisão 1). Verificação: validação do arquivo no Xano Developer MCP sem erros.
+- [x] 2.3 Escrever `xano/api/catalog/catalog/donations/mine/item_GET.xs` (decisão 2). Verificação: validação no MCP sem erros.
+- [x] 2.4 Alterar `donations_PATCH.xs` (decisão 3), `status_PATCH.xs` (decisão 4, se a dúvida 1 for aprovada) e `donations_DELETE.xs` (decisão 5, se a dúvida 5 for aprovada). Verificação: validação no MCP sem erros e um `git diff -- xano` só com essas mudanças.
+- [x] 2.5 Mostrar ao Higor os arquivos e o `git diff -- xano` e parar antes do dry-run. Verificação: o diff tem só os arquivos desta change, além das divergências conhecidas.
+- [x] 2.6 (manual) O Higor roda `xano workspace push -d ./xano --dry-run`, revisa e faz o push. Verificação: só os CREATE e UPDATE esperados no dry-run.
+  - Dry-run conferido pelo Higor: 2 CREATE (`mine` e `mine/item`) e 3 UPDATE (`PATCH` da doação, `status` e `DELETE`). Com o OK do grupo, o push foi feito.
+- [x] 2.7 (manual) Pull pós-push, para os `guid` dos endpoints novos. Verificação: os arquivos novos ganharam a linha `guid`, sem mudar a lógica.
+  - O `mine_GET.xs` e o `mine/item_GET.xs` ganharam só a linha `guid`. Os três endpoints alterados mantiveram os `guid` de antes.
 
 ## 3. Teste real e documentação do backend (Parte A)
 
-- [ ] 3.1 Escrever `scripts/teste_minhas_doacoes_real.py` com os cenários MD1 a MD19 (decisão 6), reaproveitando os auxiliares do `teste_chat_real.py`, sem imprimir nomes, e-mails, URLs nem corpos de resposta, e desfazendo a edição e o status no fim. Verificação: `python -m py_compile scripts/teste_minhas_doacoes_real.py` e a leitura do script pelo Higor.
-- [ ] 3.2 Documentar no `docs/guia-do-colaborador.md` os endpoints novos, as mudanças no `PATCH`, no status e no `DELETE`, e como rodar o teste real. Se a dúvida 5 for aprovada, tirar a pendência das fotos órfãs da seção 7. Verificação: o texto bate com as decisões 1 a 6.
+- [x] 3.1 Escrever `scripts/teste_minhas_doacoes_real.py` com os cenários MD1 a MD19 (decisão 6), reaproveitando os auxiliares do `teste_chat_real.py`, sem imprimir nomes, e-mails, URLs nem corpos de resposta, e desfazendo a edição e o status no fim. Verificação: `python -m py_compile scripts/teste_minhas_doacoes_real.py` e a leitura do script pelo Higor.
+- [x] 3.2 Documentar no `docs/guia-do-colaborador.md` os endpoints novos, as mudanças no `PATCH`, no status e no `DELETE`, e como rodar o teste real. Se a dúvida 5 for aprovada, tirar a pendência das fotos órfãs da seção 7. Verificação: o texto bate com as decisões 1 a 6.
 
 ## 4. Verificação real (Parte A)
 
