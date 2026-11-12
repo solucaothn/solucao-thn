@@ -119,3 +119,20 @@
 1. **Cidade e UF do perfil:** da doação de origem (recomendado, porque é o que o detalhe já mostra e não expõe nada novo) ou do cadastro da conta (`user.city` e `user.state`, que hoje não são públicos)?
 2. **A doação de origem entra na lista?** Recomendo que sim: a lista são as doações disponíveis da pessoa e o contador conta todas. Nesse caso, porém, o estado vazio quase nunca aparece, porque o perfil só abre a partir de uma doação disponível. Ele ficaria só como defesa. Se a doação de origem sair da lista, o título passaria a “Outras doações disponíveis” e o estado vazio vira o caso comum de quem tem uma doação só.
 3. **NOVO:** a mesma regra da home, até 7 dias. Confirma?
+
+### Respostas do Higor
+
+1. Cidade e UF vêm da doação de origem.
+2. A doação de origem entra na lista e no contador. O título fica “Doações disponíveis”.
+3. NOVO com a regra da home (até 7 dias).
+
+As três respostas seguem as recomendações, então a spec não muda.
+
+## Consulta ao Xano Developer MCP (tarefa 2.1)
+
+- **`int page?=1`:** confirmado. O `?` depois do nome torna a entrada opcional, e `=1` é o valor padrão. Uma página menor que 1 é normalizada no `stack`, com um `conditional`. Não usamos `filters=min:1`, porque ele responde 400 em vez de tratar como página 1.
+- **Filtro de data:** `format_timestamp:"<formato>":"<fuso>"`. O perfil usa `format_timestamp:"Y-m":"America/Sao_Paulo"`.
+- **Paginação:** a doc confirma `paging: {page, per_page, ...}` e uma resposta com `itemsReceived`, `curPage`, `nextPage`, `prevPage`, `offset`, `perPage` e `items`. Ela **não** confirma os nomes do total de itens e de páginas (`itemsTotal` e `pageTotal`).
+  - Por isso, a decisão 3 usa só o que foi confirmado: a lista com `metadata: false`, como no `recent_GET.xs`, e um segundo `db.query` com `return = {type: "count"}` para o total.
+  - `page_total` é `$total|to_decimal|divide:12|ceil|to_int`. O validador recusou `div`, que a doc dá como alias, e aceitou `divide`.
+  - A resposta da decisão 4 não muda. O PP5 do teste real confere o total e as páginas.
