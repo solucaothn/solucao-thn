@@ -321,6 +321,61 @@ Cuidados:
 - **O cenário 9 conclui a doação, e isso não tem volta.** O script pergunta antes; com `s`, espera cerca de 1 minuto e marca a doação como reservada e depois concluída. Uma doação concluída não serve para uma nova execução.
 - **O cenário 10 apaga a doação.** No fim, o script pergunta “Apagar a doação de teste agora? (s/N)”. Só responda `s` se for uma doação de teste; qualquer outra resposta mantém a doação.
 
+### Perfil público de quem doa (backend)
+
+O perfil é aberto **a partir de uma doação**, nunca por id de usuário. O frontend não recebe o `owner_id` de quem doa.
+
+- `GET /catalog/donations/donor`, **público** (sem login).
+  - **Entradas:** `donation_id` e `page`, que é opcional e vale 1 por padrão. Uma página menor que 1 é tratada como 1.
+  - **Erro:** doação inexistente, não disponível ou sem dono responde 404, com a mesma mensagem genérica do detalhe, “Doação não encontrada.”.
+  - **Resposta:** `{donor: {first_name, city, state, member_since}, items, page, per_page, total, page_total}`.
+- **`donor`:**
+  - `first_name` é o primeiro nome, calculado como no detalhe;
+  - `city` e `state` vêm da doação de origem, não do cadastro da conta;
+  - `member_since` é o mês e o ano do cadastro no formato `AAAA-MM`, no fuso `America/Sao_Paulo`.
+- **`items`:** as doações `disponível` da mesma pessoa, da mais nova para a mais antiga, 12 por página, com `id`, `created_at`, `title`, `photo` (URL pública ou nula) e `condition`, como na home.
+  - A doação de origem entra na lista e no `total`.
+  - Uma página além da última vem com a lista vazia e o total correto, sem erro.
+- **Privacidade:** a resposta nunca traz e-mail, sobrenome, `owner_id` nem id de usuário. Como o detalhe, o endpoint não grava log de evento.
+- **Paginação:** o total vem de um `db.query` com `count`, separado da lista. A doc do Xano não confirma os nomes do total nos metadados nativos da paginação.
+- **Carga no Xano:** são 3 consultas ao banco por requisição e 1 requisição por página.
+
+#### Testar o perfil contra o Xano real
+
+O script `scripts/teste_perfil_real.py` roda os cenários PP1 a PP10 contra o Xano publicado. Ele fica fora de `tests/`, então o `unittest` não o executa.
+
+Antes de rodar, tenha:
+
+- **o ID de uma doação disponível.** O ideal é que seja de uma pessoa com mais de uma doação disponível;
+- **opcionalmente, o ID de uma doação reservada ou concluída**, para o PP9;
+- a variável `XANO_API_URL` definida no terminal (seção 4). A `XANO_AUTH_API_URL` não é usada.
+
+Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_perfil_real.py
+```
+
+O script **não pede login nem senha**, só os IDs. Ele não cria nem altera dados. Também não imprime nomes, cidades, e-mails, URLs nem corpos de resposta: cada cenário mostra OK ou FALHOU com o status HTTP e, nas falhas, só chaves, tipos ou os campos `code` e `message` do erro.
+
+| Cenário | O que confere |
+|---|---|
+| PP1 | 200 com só as chaves permitidas, no topo, em `donor` e em cada item |
+| PP2 | os tipos dos campos, com o `first_name` numa palavra só |
+| PP3 | `member_since` no formato `AAAA-MM` |
+| PP4 | nenhuma chave proibida (`owner_id`, `email`, `name`, `status` e outras) em nenhum nível, e nenhum `@` |
+| PP5 | até 12 itens, `page_total` igual a `total` dividido por 12 e arredondado para cima, mais novos primeiro, sem ids repetidos, e a doação de origem na lista quando o total é de até 12 |
+| PP6 | `page=0` volta a página 1 |
+| PP7 | uma página além da última vem vazia, com o mesmo total |
+| PP8 | um id inexistente dá 404 “Doação não encontrada.” |
+| PP9 | uma doação não disponível dá o mesmo 404 do PP8; Enter pula este cenário |
+| PP10 | cada item da página 1 abre no detalhe com 200, o que mostra que todos estão disponíveis |
+
+Cuidados:
+
+- O script espera 2,5 s entre as requisições por causa do limite de 10 a cada 20 s. Com 12 itens, leva cerca de 1 minuto. A pausa pode ser trocada com a variável `TESTE_PERFIL_PAUSA`.
+- Não rode outros testes no Xano ao mesmo tempo, porque eles dividem o mesmo limite.
+
 ## 9. Design
 
 - As telas ficam em `docs/design` como PNG. O `README.md` dessa pasta **prevalece sobre as imagens**.

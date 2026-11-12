@@ -8,21 +8,29 @@ O dry-run e o push são feitos pelo Higor.
 
 ## 1. Preparação
 
-- [ ] 1.1 (manual) Responder às dúvidas 1 a 3 do `design.md` e ajustar a spec, se alguma resposta mudar o comportamento. Verificação: o `design.md` tem as respostas e o `openspec validate perfil-publico --strict` passa.
-- [ ] 1.2 Pedir confirmação ao Higor e rodar `xano workspace pull -d ./xano`. Verificação: `git status -- xano` sem alterações além das de formatação já conhecidas.
+- [x] 1.1 (manual) Responder às dúvidas 1 a 3 do `design.md` e ajustar a spec, se alguma resposta mudar o comportamento. Verificação: o `design.md` tem as respostas e o `openspec validate perfil-publico --strict` passa.
+- [x] 1.2 Pedir confirmação ao Higor e rodar `xano workspace pull -d ./xano`. Verificação: `git status -- xano` sem alterações além das de formatação já conhecidas.
+  - Pull feito pelo Higor. Além da formatação, o diff mostra divergências antigas e conhecidas entre o painel e o Git, que já são pendência do grupo e não são desta change: `signup_pending` sem os valores padrão, `donation_photo.photo` opcional, `signup_POST` com `tags` e o `contact_email_GET.xs` duplicado. Elas não entram no commit desta change.
 
 ## 2. Endpoint no Xano (Parte A)
 
-- [ ] 2.1 Consultar no Xano Developer MCP a sintaxe da paginação com metadados, do filtro de formatação de data com fuso e de `int page?=1`. Verificação: as respostas anotadas no `design.md` (decisões 2 e 3).
-- [ ] 2.2 Escrever `xano/api/catalog/catalog/donations/donor_GET.xs` com as decisões 1 a 4. Verificação: validação do arquivo no Xano Developer MCP sem erros.
-- [ ] 2.3 Mostrar ao Higor o arquivo e o `git diff -- xano` e parar antes do dry-run. Verificação: o diff mostra só o arquivo novo.
-- [ ] 2.4 (manual) O Higor roda `xano workspace push -d ./xano --dry-run`, revisa e faz o push. Verificação: o endpoint aparece no painel do Xano.
-- [ ] 2.5 (manual) Pull pós-push, para o `guid` do endpoint novo. Verificação: o `donor_GET.xs` ganhou só a linha `guid`.
+- [x] 2.1 Consultar no Xano Developer MCP a sintaxe da paginação com metadados, do filtro de formatação de data com fuso e de `int page?=1`. Verificação: as respostas anotadas no `design.md` (decisões 2 e 3).
+- [x] 2.2 Escrever `xano/api/catalog/catalog/donations/donor_GET.xs` com as decisões 1 a 4. Verificação: validação do arquivo no Xano Developer MCP sem erros.
+- [x] 2.3 Mostrar ao Higor o arquivo e o `git diff -- xano` e parar antes do dry-run. Verificação: o diff mostra só o arquivo novo.
+  - Desta change, o diff traz só o `donor_GET.xs`. As outras diferenças em `xano/` são as divergências conhecidas da 1.2. O critério final é o dry-run, feito pelo Higor na 2.4.
+- [x] 2.4 (manual) O Higor roda `xano workspace push -d ./xano --dry-run`, revisa e faz o push. Verificação: o endpoint aparece no painel do Xano.
+  - Dry-run só com `CREATE catalog/donations/donor GET`. Push feito (“Synced 1 GUIDs”).
+- [x] 2.5 (manual) Pull pós-push, para o `guid` do endpoint novo. Verificação: o `donor_GET.xs` ganhou só a linha `guid`.
+  - Ganhou a linha `guid`. O Xano também refez a formatação de duas expressões, sem mudar a lógica:
+    - o `page_total` passou a ter um filtro por linha;
+    - o objeto `donor` da resposta ficou entre três crases.
+  - O arquivo continua válido no Xano Developer MCP.
 
 ## 3. Teste real (Parte A)
 
-- [ ] 3.1 Escrever `scripts/teste_perfil_real.py` com os cenários PP1 a PP10 (decisão 5), sem imprimir nomes, e-mails, URLs nem corpos de resposta. Verificação: `python -m py_compile scripts/teste_perfil_real.py` e leitura do script pelo Higor.
+- [x] 3.1 Escrever `scripts/teste_perfil_real.py` com os cenários PP1 a PP10 (decisão 5), sem imprimir nomes, e-mails, URLs nem corpos de resposta. Verificação: `python -m py_compile scripts/teste_perfil_real.py` e leitura do script pelo Higor.
 - [ ] 3.2 (manual) O Higor roda o script contra o Xano real. Verificação: todos os cenários OK, anotados aqui.
+- [x] 3.3 Documentar o endpoint e o teste real no `docs/guia-do-colaborador.md`, numa seção sobre o perfil público de quem doa dentro da seção 8. Verificação: o texto bate com a decisão 4 e com os cenários do script.
 
 ## 4. Cliente e estado (Parte B)
 
