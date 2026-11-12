@@ -35,15 +35,6 @@ query "catalog/donations/status" verb=PATCH {
       }
     }
   
-    conditional {
-      if ($existing.status == "reservada" && $input.status == "disponível") {
-        throw {
-          name = "inputerror"
-          value = "Uma doação reservada não pode voltar para disponível."
-        }
-      }
-    }
-  
     db.edit donation {
       field_name = "id"
       field_value = $input.donation_id

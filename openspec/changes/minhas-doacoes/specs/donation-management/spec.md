@@ -10,7 +10,7 @@ O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisiç
 #### Scenario: Página das próprias doações
 - **WHEN** uma pessoa autenticada pede uma página das suas doações
 - **THEN** a resposta MUST trazer até 6 doações cadastradas por ela, de qualquer status, ordenadas por criação decrescente
-- **AND** cada item MUST conter identificador, data de criação, título, foto como URL pública ou nula e status
+- **AND** cada item MUST conter identificador, data de criação, título, foto como URL pública ou nula, condição e status
 - **AND** a resposta MUST informar o número da página, o total de itens e o total de páginas
 
 #### Scenario: Contadores na mesma resposta
@@ -137,7 +137,7 @@ A página `/minhas-doacoes` MUST exigir login e apresentar o cartão da pessoa e
 
 #### Scenario: Grade das doações
 - **WHEN** a pessoa tem doações
-- **THEN** a página MUST mostrar até 6 cartões por página, das mais novas para as mais antigas, cada um com foto (ou a imagem genérica), título, selo de status e menu de ações
+- **THEN** a página MUST mostrar até 6 cartões por página, das mais novas para as mais antigas, cada um com foto (ou a imagem genérica), título, a linha “Condição: …”, selo de status e menu de ações
 - **AND** o selo MUST dizer “Disponível”, “Reservada” ou “Concluída”, com cores de contraste AA e o texto como informação principal, não só a cor
 - **AND** só os cartões de doações disponíveis MUST ter o link “Ver anúncio”, que leva a `/doacao/<id>`
 - **AND** os cartões MUST NOT mostrar o selo NOVO
