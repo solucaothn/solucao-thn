@@ -279,7 +279,7 @@ class MyDonationsClientTests(unittest.TestCase):
         data = _parse_my_donations(payload)
         self.assertEqual(
             set(data),
-            {"first_name", "about", "active", "completed", "items", "page", "total", "page_total"},
+            {"first_name", "about", "photo", "active", "completed", "items", "page", "total", "page_total"},
         )
         self.assertEqual(
             set(data["items"][0]),

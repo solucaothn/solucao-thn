@@ -262,7 +262,7 @@ class DonorProfileClientTests(unittest.TestCase):
         profile = _parse_donor_profile(payload, NOW)
         self.assertEqual(
             set(profile),
-            {"first_name", "city", "state", "member_since", "about", "items", "page", "total", "page_total"},
+            {"first_name", "city", "state", "member_since", "about", "photo", "items", "page", "total", "page_total"},
         )
         self.assertEqual(
             set(profile["items"][0]), {"id", "title", "photo", "condition_label", "is_new"}

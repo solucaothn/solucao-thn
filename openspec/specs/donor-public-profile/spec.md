@@ -22,14 +22,15 @@ O sistema MUST permitir consultar, sem autenticação, o perfil público de quem
 - **THEN** o frontend MUST fazer uma única requisição ao endpoint do perfil, que traz a identificação e a página pedida da lista
 
 ### Requirement: Resposta do perfil sem dados privados
-A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês e o ano de cadastro e o texto de Sobre de quem doa e a página pedida das doações disponíveis. Ela MUST NOT expor dados privados nem identificadores de usuário.
+A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês e o ano de cadastro, o texto de Sobre e a URL pública da foto de perfil de quem doa e a página pedida das doações disponíveis. Ela MUST NOT expor dados privados nem identificadores de usuário.
 
 #### Scenario: Dados de identificação retornados
 - **WHEN** a consulta do perfil é respondida com sucesso
-- **THEN** a resposta MUST incluir o primeiro nome, a cidade, a UF, o mês e o ano de cadastro e o texto de Sobre de quem doa
+- **THEN** a resposta MUST incluir o primeiro nome, a cidade, a UF, o mês e o ano de cadastro, o texto de Sobre e a URL pública da foto de perfil de quem doa
 - **AND** o primeiro nome MUST ser o único dado nominal
 - **AND** a data de cadastro MUST ser reduzida a mês e ano, sem dia nem horário
 - **AND** um Sobre não preenchido MUST vir vazio ou nulo
+- **AND** sem foto, a URL MUST vir nula
 
 #### Scenario: Campos privados excluídos
 - **WHEN** a resposta do perfil é construída
@@ -58,7 +59,7 @@ A página `/doacao/<id>/quem-doa` MUST apresentar a identificação de quem doa 
 
 #### Scenario: Identificação de quem doa
 - **WHEN** o perfil carrega com sucesso
-- **THEN** a página MUST mostrar, num cartão, um círculo com a inicial do primeiro nome, o primeiro nome, “Cidade, UF” e “No DoaFácil desde <mês> de <ano>”, com o mês por extenso em português
+- **THEN** a página MUST mostrar, num cartão, a foto de perfil de quem doa, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo com a inicial do primeiro nome, no mesmo tamanho do círculo, o primeiro nome, “Cidade, UF” e “No DoaFácil desde <mês> de <ano>”, com o mês por extenso em português
 
 #### Scenario: Sobre de quem doa
 - **WHEN** o perfil carrega com sucesso e quem doa preencheu o Sobre
@@ -67,7 +68,7 @@ A página `/doacao/<id>/quem-doa` MUST apresentar a identificação de quem doa 
 
 #### Scenario: Itens fora do escopo
 - **WHEN** a página do perfil é exibida
-- **THEN** MUST NOT apresentar foto de perfil, selo de e-mail verificado, botão de chat, avaliações, sobrenome ou e-mail
+- **THEN** MUST NOT apresentar selo de e-mail verificado, botão de chat, avaliações, sobrenome ou e-mail
 - **AND** MUST NOT apresentar esses itens como “Em breve”
 
 #### Scenario: Lista de doações e contador

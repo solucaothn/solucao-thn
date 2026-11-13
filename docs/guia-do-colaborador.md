@@ -86,7 +86,7 @@ python -m unittest discover -s tests -v
 
 - Explorar Doações (ainda sem design).
 - Detalhe da doação.
-- Perfil: foto de perfil, editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
+- Perfil: editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
 - **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
 - Páginas "Como funciona" e "Categorias".
@@ -517,7 +517,7 @@ O código fica em `doafacil/editar_perfil.py`, e o layout está descrito em `doc
   - atualiza o `account_name` do `LoginState`, e o “Olá” da home passa a mostrar o primeiro nome novo;
   - volta a `/minhas-doacoes` com o aviso “Alterações salvas.”, guardado em `MyDonationsState.flash`.
 - **Estado:** uma UF que não esteja entre as 27 siglas deixa o campo Estado vazio, para ser escolhido.
-- **Sobre na tela:** o componente `about_text`, em `doafacil/sobre.py`, mostra o Sobre como texto simples, com as quebras de linha, e não mostra nada quando ele está vazio. É usado na prévia, no perfil público e em “Minhas doações”.
+- **Sobre na tela:** o componente `about_text`, em `doafacil/perfil_publico.py` (antes `sobre.py`, renomeado na change foto-perfil), mostra o Sobre como texto simples, com as quebras de linha, e não mostra nada quando ele está vazio. É usado na prévia, no perfil público e em “Minhas doações”.
 - **Testes:** `tests/test_edit_profile.py`. O Sobre no perfil público e em “Minhas doações” está em `tests/test_donor_profile.py` e em `tests/test_my_donations.py`.
 
 #### Testar a edição do perfil contra o Xano real
@@ -591,6 +591,28 @@ A foto de perfil é da própria pessoa: os endpoints usam sempre o token, nunca 
 
   A foto vem nas respostas que já existiam, sem requisição a mais e sem consulta nova ao banco. O `start` do chat e o envio e a edição de mensagens não trazem a foto.
 - **Fotos de doação:** continuam sem limite de tamanho. Esse limite vale só para a foto de perfil.
+
+#### Foto de perfil nas telas
+
+- **Componente compartilhado:** `avatar()`, em `doafacil/perfil_publico.py`, mostra a foto redonda (`object-fit: cover`, texto alternativo “Foto de <primeiro nome>”) ou, sem foto, o círculo com a inicial, do mesmo tamanho. `parse_photo_url()` aceita só URL `http(s)` ou nula; outro valor é resposta inválida.
+- **Onde aparece:**
+
+  | Tela | Tamanho | Campo lido |
+  |---|---|---|
+  | Prévia de `/perfil/editar` | 80 px | `photo` de `GET /auth/profile` |
+  | Seção Foto de `/perfil/editar` | 96 px | `photo` de `GET /auth/profile` |
+  | Cartão da pessoa em `/minhas-doacoes` | 80 px | `owner.photo` |
+  | Perfil público | 120 px (72 px no celular) | `donor.photo` |
+  | “Quem doa” no detalhe | 48 px | `donor_photo` |
+  | Lista e cabeçalho do chat | 38 px | `other_user_photo` |
+
+- **Seção Foto** (`doafacil/editar_perfil.py`):
+  - “Alterar foto” usa `rx.upload` com `accept` (os formatos do cadastro de doação), `max_files=1` e `max_size` de 5 MB. Um arquivo recusado pela tela chama `photo_rejected` e não faz requisição.
+  - O arquivo aceito vai na hora para `upload_photo`, que confere de novo o formato (extensão e tipo) e o tamanho e envia `POST /auth/profile/photo` (multipart, campo `photo`) com o token.
+  - “Remover foto” chama `remove_photo` (`DELETE /auth/profile/photo`), sem confirmação.
+  - Um 400 do envio mostra a mensagem de tamanho quando o Xano fala em “MB”, e a de formato nos outros casos. Um 401 limpa a sessão e leva a `/login`; um 429 mostra o aviso de limite.
+  - A foto e o formulário são independentes: enviar ou remover a foto não salva os outros campos, e “Salvar alterações” não envia a foto.
+- **Testes:** `tests/test_edit_profile.py` (seção Foto, cliente e eventos) e `tests/test_profile_photo.py` (avatar, `parse_photo_url` e a foto nas outras telas).
 
 #### Testar a foto de perfil contra o Xano real
 

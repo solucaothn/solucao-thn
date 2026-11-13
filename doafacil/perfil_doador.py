@@ -20,7 +20,7 @@ import reflex as rx
 
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
-from doafacil.sobre import about_text, parse_about
+from doafacil.perfil_publico import about_text, avatar, parse_about, parse_photo_url
 from doafacil.detalhe_doacao import (
     DONATION_NOT_FOUND_MESSAGE,
     DonationNotFoundError,
@@ -129,6 +129,7 @@ def _parse_donor_profile(
     ):
         raise ValueError("A resposta do perfil contém dados inválidos.")
     about = parse_about(donor.get("about"))
+    photo = parse_photo_url(donor.get("photo"))
 
     page = payload.get("page")
     total = payload.get("total")
@@ -149,6 +150,7 @@ def _parse_donor_profile(
         "state": state,
         "member_since": member_since,
         "about": about,
+        "photo": photo,
         "items": _parse_donations(payload.get("items"), now),
         "page": page,
         "total": total,
@@ -187,6 +189,7 @@ class DonorProfileState(rx.State):
     location: str = ""
     member_since_label: str = ""
     about: str = ""
+    photo: str = ""
     items: list[dict[str, Any]] = []
     total: int = 0
     count_label: str = ""
@@ -201,6 +204,7 @@ class DonorProfileState(rx.State):
         self.location = location_label(profile["city"], profile["state"])
         self.member_since_label = member_since_label(profile["member_since"])
         self.about = profile["about"]
+        self.photo = profile["photo"]
         self.items = profile["items"]
         self.total = profile["total"]
         self.count_label = items_count_label(profile["total"])
@@ -213,6 +217,7 @@ class DonorProfileState(rx.State):
         self.location = ""
         self.member_since_label = ""
         self.about = ""
+        self.photo = ""
         self.items = []
         self.total = 0
         self.count_label = ""
@@ -327,30 +332,20 @@ def _state_message(message: rx.Var | str, color: str) -> rx.Component:
 
 
 def _identity_card() -> rx.Component:
-    """Círculo com a inicial, primeiro nome, “Cidade, UF” e “membro desde”.
-
-    Sem foto de perfil e sem selo de e-mail verificado (fora do escopo).
+    """Foto de perfil (ou, sem foto, o círculo com a inicial), primeiro nome,
+    “Cidade, UF”, “membro desde” e o Sobre. Sem selo de e-mail verificado.
     """
     avatar_size = rx.breakpoints(initial="72px", md="120px")
     return rx.flex(
-        rx.box(
-            rx.text(
-                DonorProfileState.initial,
-                color=TEXT_MUTED,
-                font_weight="700",
-                font_size=rx.breakpoints(initial="2rem", md="3rem"),
-                line_height="1",
-            ),
-            aria_hidden="true",
-            class_name="donor-profile-avatar",
-            display="flex",
-            align_items="center",
-            justify_content="center",
-            flex_shrink="0",
-            width=avatar_size,
-            height=avatar_size,
-            border_radius="999px",
+        avatar(
+            DonorProfileState.photo,
+            DonorProfileState.initial,
+            DonorProfileState.first_name,
+            avatar_size,
             background=AVATAR_BACKGROUND,
+            color=TEXT_MUTED,
+            font_size=rx.breakpoints(initial="2rem", md="3rem"),
+            id="donor-profile-avatar",
         ),
         rx.vstack(
             rx.heading(

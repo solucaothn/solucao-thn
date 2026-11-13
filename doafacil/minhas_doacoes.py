@@ -31,7 +31,7 @@ from doafacil.detalhe_doacao import (
     _positive_donation_id,
 )
 from doafacil.login import LoginState
-from doafacil.sobre import about_text, parse_about
+from doafacil.perfil_publico import about_text, avatar, parse_about, parse_photo_url
 
 
 MY_DONATIONS_PATH = "/catalog/donations/mine"
@@ -220,6 +220,7 @@ def _parse_my_donations(payload: object) -> dict[str, Any]:
 
     try:
         about = parse_about(owner.get("about"))
+        photo = parse_photo_url(owner.get("photo"))
     except ValueError:
         raise MyDonationsServiceError from None
 
@@ -229,6 +230,7 @@ def _parse_my_donations(payload: object) -> dict[str, Any]:
     return {
         "first_name": first_name.strip(),
         "about": about,
+        "photo": photo,
         "active": active,
         "completed": completed,
         "items": items,
@@ -355,6 +357,7 @@ def _clear_session(state: Any) -> None:
 def _clear_list(state: Any) -> None:
     state.first_name = ""
     state.about = ""
+    state.photo = ""
     state.initial = ""
     state.active_count = 0
     state.completed_count = 0
@@ -367,6 +370,7 @@ def _clear_list(state: Any) -> None:
 def _apply_list(state: Any, data: dict[str, Any]) -> None:
     state.first_name = data["first_name"]
     state.about = data["about"]
+    state.photo = data["photo"]
     state.initial = avatar_initial(data["first_name"])
     state.active_count = data["active"]
     state.completed_count = data["completed"]
@@ -436,6 +440,7 @@ class MyDonationsState(LoginState):
     load_error: str = ""
     first_name: str = ""
     about: str = ""
+    photo: str = ""
     initial: str = ""
     active_count: int = 0
     completed_count: int = 0
@@ -1047,26 +1052,18 @@ def _stat(value: rx.Var, label: rx.Var) -> rx.Component:
 
 
 def _owner_card() -> rx.Component:
-    """Círculo com a inicial, primeiro nome, os dois contadores, o Sobre (só
-    quando preenchido) e “Editar perfil”. Sem foto, e-mail, “Compartilhar”,
-    avaliações, selo ou chat."""
+    """Foto de perfil (ou, sem foto, o círculo com a inicial), primeiro nome,
+    os dois contadores, o Sobre (só quando preenchido) e “Editar perfil”. Sem
+    e-mail, “Compartilhar”, avaliações, selo ou chat."""
     return rx.vstack(
-        rx.box(
-            rx.text(
-                MyDonationsState.initial,
-                color=TEXT_MUTED,
-                font_weight="700",
-                font_size="2rem",
-                line_height="1",
-            ),
-            aria_hidden="true",
-            display="flex",
-            align_items="center",
-            justify_content="center",
-            width="80px",
-            height="80px",
-            border_radius="999px",
+        avatar(
+            MyDonationsState.photo,
+            MyDonationsState.initial,
+            MyDonationsState.first_name,
+            "80px",
             background=AVATAR_BACKGROUND,
+            color=TEXT_MUTED,
+            font_size="2rem",
         ),
         rx.text(
             MyDonationsState.first_name,

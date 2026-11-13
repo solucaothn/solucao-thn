@@ -1482,17 +1482,17 @@ class ChatPageTests(unittest.TestCase):
                 escaped = text.encode("ascii", "backslashreplace").decode().replace("\\x", "\\u00")
                 self.assertTrue(text in self.rendered or escaped in self.rendered)
 
-    def test_entry_animation_and_no_online_or_photos(self) -> None:
+    def test_entry_animation_and_no_online(self) -> None:
         self.assertIn("page-fade-enter", self.rendered)
         self.assertNotIn("Online", self.rendered)
-        # Avatares são círculos com a inicial; a única imagem é o logotipo.
-        images = [n for n in _nodes(self.page) if type(n).__name__ in {"Img", "Image"}]
-        self.assertEqual(len(images), 1)
-        # O item da lista (renderizado pelo foreach) também não tem imagem.
+        # Desde a change foto-perfil, o avatar da lista e do cabeçalho mostra a
+        # foto da outra pessoa ou, sem foto, o círculo verde com a inicial.
         from doafacil.chat import ChatState, _conversation_item
 
-        item = _conversation_item(ChatState.chat_conversations[0])
-        self.assertFalse([n for n in _nodes(item) if type(n).__name__ in {"Img", "Image"}])
+        item = str(_conversation_item(ChatState.chat_conversations[0]))
+        self.assertIn('["other_user_photo"]', item)
+        self.assertIn("profile-avatar-initial", item)
+        self.assertIn("profile-avatar-photo", item)
 
     def test_message_input_limits_length_and_form_sends(self) -> None:
         inputs = [n for n in _nodes(self.page) if getattr(n, "id", None) is not None and "chat-message-input" in str(n.id)]
