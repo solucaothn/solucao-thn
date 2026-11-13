@@ -182,7 +182,7 @@ A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto 
 #### Scenario: Pessoa logada na home
 - **WHEN** a home está com o cabeçalho autenticado
 - **THEN** a página MUST mostrar o botão flutuante “Mensagens”, levando a `/chat`
-- **AND** o cabeçalho MUST mostrar só “Olá, <primeiro nome>” e “Sair”, sem “Mensagens”
+- **AND** o cabeçalho MUST mostrar só “Minhas doações”, “Olá, <primeiro nome>” e “Sair”, sem “Mensagens”
 
 #### Scenario: Visitante na home
 - **WHEN** a home está com o cabeçalho de visitante
@@ -207,7 +207,7 @@ A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto 
 - **AND** MUST ficar fixo a 24 px das bordas inferior e direita no computador, e a 16 px no celular
 
 #### Scenario: Páginas sem o botão
-- **WHEN** a pessoa está no detalhe da doação (`/doacao/<id>`), que já tem o botão “Chat” da própria doação, ou em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha` ou `/cadastro-doacao`
+- **WHEN** a pessoa está no detalhe da doação (`/doacao/<id>`), que já tem o botão “Chat” da própria doação, ou em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha`, `/cadastro-doacao`, `/minhas-doacoes` ou `/minhas-doacoes/<id>/editar`
 - **THEN** o botão flutuante MUST NOT aparecer
 - **AND** o detalhe da doação MUST NOT consultar o total de não lidas
 

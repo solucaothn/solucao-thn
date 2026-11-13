@@ -31,31 +31,33 @@ O dry-run e o push são feitos pelo Higor.
 
 ## 4. Verificação real (Parte A)
 
-- [ ] 4.1 (manual) O Higor roda o script contra o Xano real. Verificação: todos os cenários OK, anotados aqui.
+- [x] 4.1 (manual) O Higor roda o script contra o Xano real. Verificação: todos os cenários OK, anotados aqui.
+  - 21 de 21 OK, com a doação 17, que foi restaurada no fim. O MD19 apagou a doação 25.
+  - O MD14 e o MD17 foram pulados por falta de doação concluída e serão conferidos no roteiro manual (9.2).
 
 ## 5. Cliente e estado da lista (Parte B)
 
-- [ ] 5.1 Criar em `doafacil/minhas_doacoes.py` o cliente da decisão 7, com a validação das respostas. Verificação: testes em `tests/test_my_donations.py` da URL e do token de cada chamada, do 200, 400, 401, 403, 404 e 429, de resposta inválida e de campos extras ignorados.
-- [ ] 5.2 Criar o `MyDonationsState` (decisão 8): `load_page` com a proteção de login, `go_to_page`, ações com confirmação, recarga depois da ação e 401 levando a `/login`. Verificação: testes de sem token sem requisição, do carregamento, do erro, da troca de página, de cada ação e do cancelamento sem requisição, da exclusão que volta uma página, do bloqueio com uma ação em andamento e do 401.
+- [x] 5.1 Criar em `doafacil/minhas_doacoes.py` o cliente da decisão 7, com a validação das respostas. Verificação: testes em `tests/test_my_donations.py` da URL e do token de cada chamada, do 200, 400, 401, 403, 404 e 429, de resposta inválida e de campos extras ignorados.
+- [x] 5.2 Criar o `MyDonationsState` (decisão 8): `load_page` com a proteção de login, `go_to_page`, ações com confirmação, recarga depois da ação e 401 levando a `/login`. Verificação: testes de sem token sem requisição, do carregamento, do erro, da troca de página, de cada ação e do cancelamento sem requisição, da exclusão que volta uma página, do bloqueio com uma ação em andamento e do 401.
 
 ## 6. Página Minhas doações (Parte B)
 
-- [ ] 6.1 Montar o cartão da doação com selo, menu e “Ver anúncio” (decisão 9) e a confirmação (decisão 10). Verificação: testes das ações por status, do rótulo acessível do menu, do “Ver anúncio” só nas disponíveis, da ausência do NOVO e do texto de cada confirmação, e o contraste dos três selos calculado e anotado no `docs/design/README.md`.
-- [ ] 6.2 Montar a página da decisão 11: cabeçalho, título, cartão da pessoa, grade, paginação, estado vazio, carregamento, erro, aviso e animação. Registrar a rota `/minhas-doacoes`. Verificação: testes de componente de cada parte e da ausência de foto, e-mail, “Sobre”, “Compartilhar”, “Editar perfil”, avaliações, selo de verificação e chat, teste da rota e do `on_load`, e `reflex compile` sem erros.
-- [ ] 6.3 Escrever no `docs/design/README.md` a seção “Minhas doações”, com o frame `Group 6`, as diferenças aprovadas e os itens que não entram. Verificação: o texto bate com a spec delta.
+- [x] 6.1 Montar o cartão da doação com selo, menu e “Ver anúncio” (decisão 9) e a confirmação (decisão 10). Verificação: testes das ações por status, do rótulo acessível do menu, do “Ver anúncio” só nas disponíveis, da ausência do NOVO e do texto de cada confirmação, e o contraste dos três selos calculado e anotado no `docs/design/README.md`.
+- [x] 6.2 Montar a página da decisão 11: cabeçalho, título, cartão da pessoa, grade, paginação, estado vazio, carregamento, erro, aviso e animação. Registrar a rota `/minhas-doacoes`. Verificação: testes de componente de cada parte e da ausência de foto, e-mail, “Sobre”, “Compartilhar”, “Editar perfil”, avaliações, selo de verificação e chat, teste da rota e do `on_load`, e `reflex compile` sem erros.
+- [x] 6.3 Escrever no `docs/design/README.md` a seção “Minhas doações”, com o frame `Group 6`, as diferenças aprovadas e os itens que não entram. Verificação: o texto bate com a spec delta.
 
 ## 7. Link no cabeçalho da home (Parte B)
 
-- [ ] 7.1 Acrescentar “Minhas doações” ao cabeçalho logado da home (decisão 12) e atualizar o teste atual do cabeçalho. Verificação: testes do link com login, da ausência sem login, do rótulo acessível no celular e de “Mensagens” continuar fora do cabeçalho.
+- [x] 7.1 Acrescentar “Minhas doações” ao cabeçalho logado da home (decisão 12) e atualizar o teste atual do cabeçalho. Verificação: testes do link com login, da ausência sem login, do rótulo acessível no celular e de “Mensagens” continuar fora do cabeçalho.
 
 ## 8. Página de edição (Parte B)
 
-- [ ] 8.1 Criar o `EditDonationState` e a página `/minhas-doacoes/[id]/editar` (decisão 13), com a rota. Verificação: testes de sem token, de id inválido sem requisição, de não encontrada, de concluída sem formulário, do preenchimento, do valor fora das opções, de cada validação sem requisição, do salvar com sucesso e o aviso na lista, do erro que mantém os valores, e da animação `auth-card-enter`.
-- [ ] 8.2 Atualizar no `docs/design/README.md` a seção “Minhas doações” com a página de edição. Verificação: o texto bate com a spec delta.
+- [x] 8.1 Criar o `EditDonationState` e a página `/minhas-doacoes/[id]/editar` (decisão 13), com a rota. Verificação: testes de sem token, de id inválido sem requisição, de não encontrada, de concluída sem formulário, do preenchimento, do valor fora das opções, de cada validação sem requisição, do salvar com sucesso e o aviso na lista, do erro que mantém os valores, e da animação `auth-card-enter`.
+- [x] 8.2 Atualizar no `docs/design/README.md` a seção “Minhas doações” com a página de edição. Verificação: o texto bate com a spec delta.
 
 ## 9. Verificação final
 
-- [ ] 9.1 Rodar `python -m unittest discover -s tests`, `openspec validate minhas-doacoes --strict` e `reflex compile`, e mostrar o `git diff --stat`. Verificação: tudo passa.
+- [x] 9.1 Rodar `python -m unittest discover -s tests`, `openspec validate minhas-doacoes --strict` e `reflex compile`, e mostrar o `git diff --stat`. Verificação: tudo passa.
 - [ ] 9.2 (manual) No navegador, em 1512 px e 360 px, conferir:
   - a entrada sem login (vai para `/login`);
   - o link no cabeçalho da home;
@@ -64,6 +66,7 @@ O dry-run e o push são feitos pelo Higor.
   - os contadores atualizados depois de cada ação;
   - a edição com sucesso e com erro;
   - o estado vazio, com uma conta sem doações;
+  - numa doação concluída: o menu só com “Apagar” e a edição pela URL mostrando que ela não pode mais ser editada (cobre os cenários MD14 e MD17, pulados no teste real);
   - a paginação, com mais de 6 doações;
   - nenhuma rolagem horizontal e o contraste.
 

@@ -24,6 +24,12 @@ from doafacil.detalhe_doacao import (
     donation_detail_page,
 )
 from doafacil.login import LoginState, login_page
+from doafacil.minhas_doacoes import (
+    EditDonationState,
+    MyDonationsState,
+    edit_donation_page,
+    my_donations_page,
+)
 from doafacil.perfil_doador import DonorProfileState, donor_profile_page
 from doafacil.recuperacao_senha import (
     new_password_page,
@@ -757,7 +763,9 @@ def index() -> rx.Component:
                                 font_weight="700",
                                 white_space="nowrap",
                             ),
-                            spacing="6",
+                            # 16 px entre 992 e 1279 px (menos espaço) e
+                            # 32 px a partir de 1280 px.
+                            spacing=rx.breakpoints(initial="4", lg="6"),
                         )
                     ),
                     rx.spacer(),
@@ -767,15 +775,61 @@ def index() -> rx.Component:
                             rx.hstack(
                                 # A entrada no chat é o botão flutuante
                                 # (chat_fab), não um link do cabeçalho.
+                                # “Minhas doações”: abaixo de 1280 px, só o
+                                # ícone, com o rótulo acessível e 44 px de
+                                # toque, para nada quebrar linha no cabeçalho.
+                                rx.link(
+                                    rx.icon("package", size=20, aria_hidden="true"),
+                                    rx.text(
+                                        "Minhas doações",
+                                        display=rx.breakpoints(
+                                            initial="none", lg="inline"
+                                        ),
+                                    ),
+                                    href="/minhas-doacoes",
+                                    aria_label="Minhas doações",
+                                    class_name="home-my-donations-link",
+                                    display="inline-flex",
+                                    align_items="center",
+                                    gap="6px",
+                                    min_height="44px",
+                                    min_width="44px",
+                                    justify_content="center",
+                                    color="#168447",
+                                    font_weight="700",
+                                    white_space="nowrap",
+                                    # Com o texto visível (1280 px+), 20 px + o
+                                    # gap de 12 px do grupo = 32 px, o
+                                    # spacing="6" dos itens do menu. Só com o
+                                    # ícone, fica o gap do grupo.
+                                    margin_right=rx.breakpoints(
+                                        initial="0px", lg="20px"
+                                    ),
+                                ),
+                                # “Olá, <nome>” sempre numa linha só, com
+                                # reticências num nome longo. Entre 768 e
+                                # 1279 px fica oculto, para o cabeçalho não
+                                # quebrar linha com o menu.
                                 rx.text(
                                     "Olá, ",
                                     LoginState.account_name,
+                                    class_name="home-greeting",
                                     color="#168447",
                                     font_weight="700",
+                                    white_space="nowrap",
+                                    overflow="hidden",
+                                    text_overflow="ellipsis",
+                                    min_width="0",
+                                    # As duas propriedades com as mesmas chaves
+                                    # e na mesma ordem: assim as regras saem
+                                    # em ordem crescente (0, 48em, 80em) e a de
+                                    # 80em vence a de 48em.
                                     max_width=rx.breakpoints(
-                                        initial="110px", md="180px"
+                                        initial="110px", sm="110px", lg="160px"
                                     ),
-                                    overflow_wrap="anywhere",
+                                    display=rx.breakpoints(
+                                        initial="block", sm="none", lg="block"
+                                    ),
                                 ),
                                 rx.button(
                                     "Sair",
@@ -1084,6 +1138,16 @@ app.add_page(
     donor_profile_page,
     route="/doacao/[id]/quem-doa",
     on_load=DonorProfileState.load_profile,
+)
+app.add_page(
+    my_donations_page,
+    route="/minhas-doacoes",
+    on_load=MyDonationsState.load_page,
+)
+app.add_page(
+    edit_donation_page,
+    route="/minhas-doacoes/[id]/editar",
+    on_load=EditDonationState.load_edit,
 )
 app.add_page(
     chat_page,

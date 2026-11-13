@@ -143,7 +143,10 @@ O Xano permite 10 requisições a cada 20 s.
       - os selects de categoria, condição, entrega e contato, com as opções do cadastro;
       - as mesmas mensagens e regras do `_validate_step`, sem a regra de cidade e UF;
       - um valor atual fora das opções deixa o campo vazio.
-    - **Cores:** os ids novos dos campos entram no `app.style`, com as cores de placeholder e de texto da spec do cadastro.
+    - **Cores:**
+      - os campos de texto reaproveitam os ids do cadastro (`donation-title` e `donation-description`), e as regras de cor do placeholder e do texto digitado que já estão no `app.style` valem aqui também. As duas páginas nunca aparecem juntas, então os ids não se repetem numa página.
+      - os selects têm ids próprios (`edit-donation-*`) e um componente próprio (`_edit_select`), com o estilo no `Select.Trigger`: fundo branco, borda `#C8C8C8`, 40 px de altura, cantos de 8 px, texto `#1F1F1F`, placeholder `#333333` e foco visível em `#007A42`.
+      - o `_select_field` do cadastro põe o estilo no `Select.Root`, que não desenha nada, e o botão ficava com o fundo cinza padrão, parecendo desativado (roteiro 9.2). O cadastro não foi alterado nesta change.
     - **Salvar:** uma requisição. No sucesso, grava o aviso e redireciona para `/minhas-doacoes`, que mostra o aviso uma vez. Um erro mantém os valores.
     - **Cabeçalho:** `back_link_header("/minhas-doacoes", "Voltar a Minhas doações", "#007A42")`.
     - **Animação:** o cartão do formulário usa `auth-card-enter`.
