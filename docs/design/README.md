@@ -277,6 +277,85 @@ Diferenças aprovadas em relação ao Figma:
 - **Fonte LINE Seed JP** e as cores AA do projeto, como no resto do site. Todos os pares passam de 4,5:1. Os de menor contraste são `#007A42` sobre o creme (5,1:1) e `#555555` sobre o `#F2F2F2` do círculo (6,7:1).
 - **Animação:** `page-fade-enter`, que respeita `prefers-reduced-motion`, só nos títulos fixos (“Doações disponíveis”, o título do estado vazio) e nas mensagens de estado. O cabeçalho, o cartão de identificação e os cartões de doação, que vêm do Xano, não animam.
 
+## Minhas doações
+
+### Frame `Group 6` (`meu-perfil-1`) do Figma — página `/minhas-doacoes`
+
+A referência é o frame `Group 6` do arquivo do Figma, ainda sem PNG em `docs/design`. Esta seção prevalece sobre ele. A página só abre com login; sem login, leva a `/login`.
+
+O que segue o Figma:
+
+- **Fundo creme `#FFF6E8`,** com o título “Minhas doações” acima do conteúdo.
+- **Cartão da pessoa, à esquerda:**
+  - branco, com borda `#D9D9D9` e cantos de 8 px;
+  - o círculo `#F2F2F2` com a inicial em `#555555` e o primeiro nome;
+  - os dois números em `#166B3B`: “Doações”, que soma as disponíveis e as reservadas, e “Doações realizadas”, que conta as concluídas. O rótulo fica no singular com 1.
+- **Grade à direita, com 6 doações por página:** 3 colunas em telas largas (`lg`), o 3 × 2 do Figma; 2 colunas em telas médias; 1 no celular.
+- **Cartão da doação:** como o da home, com a foto (ou a imagem genérica), o degradê e, em branco, o título e “Condição: …”.
+- **Paginação:** “Página N de M”.
+
+Diferenças aprovadas em relação ao Figma:
+
+- **Cabeçalho com o logotipo:** “Voltar ao início” fica na linha do logotipo, em `#007A42`, com o mesmo cabeçalho das outras páginas (`back_link_header()`). Os 44 px de área de toque e o rótulo acessível valem também no celular, onde aparece só a seta.
+- **Título à esquerda,** em negrito e `#166B3B`, no lugar do título centralizado e preto.
+- **Cartão da pessoa só com o essencial:** sem foto de perfil, e-mail, “Sobre”, “Compartilhar link do perfil”, “Editar perfil”, avaliações, selo “Verificado” e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”.
+- **Selo de status no lugar do NOVO,** no canto superior esquerdo da foto. O fundo é opaco, então o contraste não depende da foto:
+
+  | Selo | Fundo | Texto | Contraste |
+  |---|---|---|---|
+  | Disponível | `#E3F5EA` | `#166B3B` | 5,8:1 |
+  | Reservada | `#FFF1D6` | `#7A4B00` | 6,6:1 |
+  | Concluída | `#ECECEC` | `#3D3D3D` | 9,2:1 |
+
+- **“Condição: …”** no lugar do “Estado: …” do Figma, como no resto do site.
+- **“Ver anúncio” só nas doações disponíveis,** no lugar do “Acessar”, porque o detalhe público dá 404 para as reservadas e as concluídas. Tem fundo `#007A42` e texto branco (5,4:1).
+- **Menu de ações, que não está no Figma:**
+  - um botão branco redondo de 44 px com o ícone `ellipsis-vertical`, no canto superior direito da foto;
+  - o rótulo acessível é “Ações da doação <título>”, e o foco tem contorno `#007A42`;
+  - o menu abre pelo teclado, e as setas e o Enter escolhem um item;
+  - só aparecem as ações válidas para o status:
+    - disponível: “Marcar como reservada”, “Marcar como concluída”, “Editar” e “Apagar”;
+    - reservada: “Marcar como disponível”, “Marcar como concluída”, “Editar” e “Apagar”;
+    - concluída: só “Apagar”.
+  - “Apagar” fica em vermelho `#B42318` (6,6:1 sobre o branco).
+- **Confirmação, que não está no Figma:** uma janela modal (`alert_dialog`, que prende o foco e fecha com Esc) para “Marcar como concluída” e “Apagar”.
+  - “Marcar como concluída” avisa que a doação não volta a outro status e que as conversas ficam somente para leitura.
+  - “Apagar” avisa que a doação, as fotos e as conversas e mensagens dela serão apagadas e que isso não tem volta. O botão de confirmar é vermelho `#B42318` com texto branco.
+  - “Cancelar” fecha sem fazer requisição. Reservar e voltar a disponível não pedem confirmação.
+- **Aviso de resultado:** depois de cada ação, uma frase curta acima da grade, anunciada ao leitor de tela (`role="status"`), em `#166B3B` no sucesso e `#9B2C2C` no erro. A grade e os contadores são recarregados com 1 requisição.
+- **Paginação:** “Anterior” e “Próxima” com contorno `#007A42` e 44 px, no lugar do ícone de grade do Figma. Ela só aparece com mais de 6 doações.
+- **Estado vazio:** um cartão branco com “Você ainda não tem doações”, uma frase de apoio e o botão “Quero Doar” (`#007A42`), que leva a `/cadastro-doacao`.
+- **Celular:** uma coluna, com o cartão da pessoa acima da grade e 16 px de margem lateral.
+- **Sem o botão flutuante do chat.**
+- **Animação:** `page-fade-enter` no título e nas mensagens de estado. O cabeçalho e os dados do Xano não animam.
+
+### Link “Minhas doações” no cabeçalho da home
+
+- Com login, o cabeçalho da home mostra “Minhas doações” antes de “Olá, <primeiro nome>”, com o ícone `package`, em `#168447` (4,8:1 sobre o branco), levando a `/minhas-doacoes`. A partir de 1280 px, o espaço até “Olá” é de 32 px, o mesmo dos itens do menu (“Explorar Doações”, “Como funciona”, “Categorias”).
+- Abaixo de 1280 px, aparece só o ícone, com o rótulo acessível “Minhas doações” e 44 px de área de toque.
+- **Nada quebra linha no cabeçalho entre 768 e 1512 px:**
+  - “Olá, <primeiro nome>” fica sempre numa linha só, com reticências num nome longo (até 160 px a partir de 1280 px e 110 px abaixo);
+  - entre 768 e 1279 px, o “Olá” fica oculto, e “Sair” e “Quero Doar” continuam;
+  - o menu tem 16 px entre os itens até 1279 px e 32 px a partir de 1280 px.
+- Visitantes não veem o link.
+
+### Página `/minhas-doacoes/<id>/editar` (sem frame no Figma)
+
+- **Cabeçalho:** “Voltar a Minhas doações”, em `#007A42`, na linha do logotipo.
+- **Cartão do formulário:** branco, de até 640 px, centralizado, com a animação `auth-card-enter`, como as telas de formulário. Tem o título “Editar doação” e o aviso “As fotos, a cidade e a UF não mudam por aqui.”.
+- **Campos:** os do cadastro, com os mesmos textos de exemplo, cores e limites. São o nome do item (até 100 caracteres), a descrição (até 2000), a categoria (sem “Alimentos” e “Móveis”), a condição, a forma de entrega (só “A combinar”) e a forma de contato (“E-mail” ou “Chat do DoaFácil”).
+  - Os campos de texto usam os mesmos ids do cadastro, então as regras de cor do placeholder e do texto digitado valem aqui também.
+  - Os selects (categoria, condição, entrega e contato) têm fundo branco, borda `#C8C8C8`, 40 px de altura e cantos de 8 px, como os campos de texto. O texto é `#1F1F1F`, o placeholder `#333333` e o foco tem contorno de 2 px em `#007A42`. Eles não ficam com o fundo cinza, que parecia de campo desativado.
+  - Um valor atual fora das opções deixa o campo vazio.
+- **Botões:** “Cancelar” (contorno `#85858D`), que volta a `/minhas-doacoes`, e “Salvar alterações” (`#007A42`).
+  - Um erro aparece em `#9B2C2C` acima dos botões, com os valores mantidos.
+  - No sucesso, a página volta à lista com o aviso “Alterações salvas.”.
+- **Estados:**
+  - “Carregando doação...”;
+  - “Doação não encontrada”, para um id inválido (sem consultar o Xano) ou para uma doação de outra pessoa ou inexistente;
+  - “Esta doação foi concluída e não pode mais ser editada.”;
+  - uma mensagem de erro simples.
+
 ## Chat
 
 ### Frame `chat-1` do Figma — página `/chat`
@@ -318,7 +397,7 @@ Diferenças aprovadas em relação ao Figma:
   - **Rótulo e destino:** com login, “Mensagens” ou “Mensagens, N não lidas”, e abre `/chat`. Sem login, “Mensagens”, vai para `/login` e não consulta o Xano. O contador fica oculto do leitor de tela, porque o total já está no rótulo.
   - **Onde aparece:** só na home, por enquanto. É o componente `chat_fab()`, para reutilizar nas próximas telas que forem pedidas.
     - Não aparece no detalhe da doação, que já tem o botão “Chat” da própria doação; dois botões de chat confundiriam.
-    - Também não aparece em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha` e `/cadastro-doacao`.
+    - Também não aparece em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha`, `/cadastro-doacao`, `/minhas-doacoes` e `/minhas-doacoes/<id>/editar`.
   - **Espaço no fim:** a home reserva no fim do rodapé 88 px no celular e 104 px no computador (o botão mais as margens). Com a página rolada até o fim, nenhum botão de ação fica coberto.
   - **Realce:** ao passar o mouse ou focar, o botão sobe 2 px e a sombra aumenta; o foco tem contorno `#1F1F1F`. Com `prefers-reduced-motion`, não há transição nem deslocamento (`assets/chat.css`). Não tem animação de entrada.
 - **“Visto” nas próprias mensagens:** não está no Figma. Fica na linha do horário, embaixo da bolha e fora dela, como `12:41 (editada) ✓✓`. Dentro da bolha verde, um ícone cinza ou verde não teria contraste.

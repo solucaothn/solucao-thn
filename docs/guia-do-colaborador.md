@@ -79,11 +79,13 @@ python -m unittest discover -s tests -v
 - Recuperação de senha por código: API no Xano e as três telas (`/recuperar-senha`, `/verificar-email`, `/nova-senha`).
 - Cadastro de doação em 5 etapas (`/cadastro-doacao`) e endpoint `catalog/donations/publish`.
 - Chat da doação: página `/chat` (lista de conversas e mensagens), botão “Chat” no detalhe da doação e link “Mensagens” no cabeçalho logado da home. Veja “Chat da doação” na seção 8.
+- Minhas doações: `/minhas-doacoes` (lista com status, contadores e ações) e `/minhas-doacoes/<id>/editar`, com o link “Minhas doações” no cabeçalho logado da home. Veja “Minhas doações” na seção 8.
 
 ## 7. O que ainda falta
 
 - Explorar Doações (ainda sem design).
-- Detalhe da doação e Minhas doações.
+- Detalhe da doação.
+- Minhas doações: editar as fotos e o perfil da pessoa (e-mail, “Sobre”, compartilhar, avaliações) ficam para outras changes.
 - **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
 - Páginas "Como funciona" e "Categorias".
@@ -463,6 +465,26 @@ Cuidados:
 - **O MD19 apaga a doação de teste, e isso não tem volta.** O script pergunta antes, e só `s` apaga.
 - O script espera 2,5 s entre as requisições por causa do limite de 10 a cada 20 s. São cerca de 40 requisições, o que leva perto de 2 minutos. A pausa pode ser trocada com a variável `TESTE_MINHAS_PAUSA`.
 - Não rode outros testes no Xano ao mesmo tempo.
+
+#### Telas de “Minhas doações”
+
+O código fica em `doafacil/minhas_doacoes.py`, e o layout está descrito em `docs/design/README.md` (seção “Minhas doações”).
+
+- **Login:** as duas páginas exigem login. Sem token, levam a `/login` sem consultar o Xano. Um 401 em qualquer requisição limpa a sessão e também leva a `/login`.
+- **Requisições:**
+  - abrir a lista ou trocar de página faz 1 requisição (`mine`);
+  - cada ação faz 2: a ação e a recarga da página atual, para atualizar a grade e os contadores. Se a página atual ficou vazia depois de apagar, a página anterior é carregada;
+  - abrir a edição faz 2 (as categorias e `mine/item`), e salvar faz 1.
+
+  Não há consulta automática.
+- **Ações:**
+  - “Marcar como reservada” e “Marcar como disponível” rodam direto;
+  - “Marcar como concluída” e “Apagar” pedem confirmação numa janela modal, e “Cancelar” não faz requisição;
+  - enquanto uma ação está em andamento, o menu e a paginação ficam bloqueados.
+- **Edição:** valida no frontend as mesmas regras do `PATCH`, antes de enviar.
+  - Um valor atual fora das opções do cadastro deixa o campo vazio.
+  - No sucesso, a página volta à lista com o aviso “Alterações salvas.”, guardado em `MyDonationsState.flash` e mostrado uma vez.
+- **Testes:** `tests/test_my_donations.py` cobre o cliente, os estados, as páginas e o link no cabeçalho da home.
 
 ## 9. Design
 
