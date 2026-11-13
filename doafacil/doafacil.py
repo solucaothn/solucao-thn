@@ -39,6 +39,9 @@ from doafacil.recuperacao_senha import (
 
 
 RECENT_DONATIONS_PATH = "/catalog/donations/recent"
+# Fonte do menu do cabeçalho: 14 px entre 992 e 1279 px (o menu só aparece a
+# partir de 992 px), para nada quebrar linha com “Olá, <nome>”; 16 px depois.
+NAV_FONT_SIZE = rx.breakpoints(initial="0.875rem", lg="1rem")
 DONATION_COUNT_PATH = "/catalog/donations/count"
 
 
@@ -750,22 +753,25 @@ def index() -> rx.Component:
                                 color="#168447",
                                 font_weight="700",
                                 white_space="nowrap",
+                                font_size=NAV_FONT_SIZE,
                             ),
                             rx.text(
                                 "Como funciona",
                                 color="#168447",
                                 font_weight="700",
                                 white_space="nowrap",
+                                font_size=NAV_FONT_SIZE,
                             ),
                             rx.text(
                                 "Categorias",
                                 color="#168447",
                                 font_weight="700",
                                 white_space="nowrap",
+                                font_size=NAV_FONT_SIZE,
                             ),
-                            # 16 px entre 992 e 1279 px (menos espaço) e
+                            # 12 px entre 992 e 1279 px (menos espaço) e
                             # 32 px a partir de 1280 px.
-                            spacing=rx.breakpoints(initial="4", lg="6"),
+                            spacing=rx.breakpoints(initial="3", lg="6"),
                         )
                     ),
                     rx.spacer(),
@@ -806,10 +812,8 @@ def index() -> rx.Component:
                                         initial="0px", lg="20px"
                                     ),
                                 ),
-                                # “Olá, <nome>” sempre numa linha só, com
-                                # reticências num nome longo. Entre 768 e
-                                # 1279 px fica oculto, para o cabeçalho não
-                                # quebrar linha com o menu.
+                                # “Olá, <nome>” sempre visível e numa linha
+                                # só, com reticências num nome longo.
                                 rx.text(
                                     "Olá, ",
                                     LoginState.account_name,
@@ -820,15 +824,8 @@ def index() -> rx.Component:
                                     overflow="hidden",
                                     text_overflow="ellipsis",
                                     min_width="0",
-                                    # As duas propriedades com as mesmas chaves
-                                    # e na mesma ordem: assim as regras saem
-                                    # em ordem crescente (0, 48em, 80em) e a de
-                                    # 80em vence a de 48em.
                                     max_width=rx.breakpoints(
-                                        initial="110px", sm="110px", lg="160px"
-                                    ),
-                                    display=rx.breakpoints(
-                                        initial="block", sm="none", lg="block"
+                                        initial="100px", lg="120px"
                                     ),
                                 ),
                                 rx.button(

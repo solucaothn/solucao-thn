@@ -334,9 +334,8 @@ Diferenças aprovadas em relação ao Figma:
 - Com login, o cabeçalho da home mostra “Minhas doações” antes de “Olá, <primeiro nome>”, com o ícone `package`, em `#168447` (4,8:1 sobre o branco), levando a `/minhas-doacoes`. A partir de 1280 px, o espaço até “Olá” é de 32 px, o mesmo dos itens do menu (“Explorar Doações”, “Como funciona”, “Categorias”).
 - Abaixo de 1280 px, aparece só o ícone, com o rótulo acessível “Minhas doações” e 44 px de área de toque.
 - **Nada quebra linha no cabeçalho entre 768 e 1512 px:**
-  - “Olá, <primeiro nome>” fica sempre numa linha só, com reticências num nome longo (até 160 px a partir de 1280 px e 110 px abaixo);
-  - entre 768 e 1279 px, o “Olá” fica oculto, e “Sair” e “Quero Doar” continuam;
-  - o menu tem 16 px entre os itens até 1279 px e 32 px a partir de 1280 px.
+  - “Olá, <primeiro nome>” aparece em todas as larguras, sempre numa linha só, com reticências num nome longo (até 100 px abaixo de 1280 px e 120 px a partir dele);
+  - entre 992 e 1279 px, o espaço sai do menu: fonte de 14 px e 12 px entre os itens. A partir de 1280 px, são 16 px de fonte e 32 px entre os itens. O menu só aparece a partir de 992 px.
 - Visitantes não veem o link.
 
 ### Página `/minhas-doacoes/<id>/editar` (sem frame no Figma)

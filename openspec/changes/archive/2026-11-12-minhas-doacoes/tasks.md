@@ -58,7 +58,7 @@ O dry-run e o push são feitos pelo Higor.
 ## 9. Verificação final
 
 - [x] 9.1 Rodar `python -m unittest discover -s tests`, `openspec validate minhas-doacoes --strict` e `reflex compile`, e mostrar o `git diff --stat`. Verificação: tudo passa.
-- [ ] 9.2 (manual) No navegador, em 1512 px e 360 px, conferir:
+- [x] 9.2 (manual) No navegador, em 1512 px e 360 px, conferir:
   - a entrada sem login (vai para `/login`);
   - o link no cabeçalho da home;
   - o cartão da pessoa, os contadores e a grade com os selos;
@@ -71,3 +71,15 @@ O dry-run e o push são feitos pelo Higor.
   - nenhuma rolagem horizontal e o contraste.
 
   Verificação: os itens conferidos e anotados.
+
+  - **Conferido pelo Higor no navegador, tudo OK:**
+    - lista, selos, menu, reservar e voltar a disponível;
+    - confirmação de concluir e de apagar, edição e estado vazio;
+    - doação concluída só com “Apagar” e edição bloqueada pela URL (MD14 e MD17);
+    - entrada sem login levando a `/login`;
+    - celular sem rolagem horizontal.
+  - **Não conferido no navegador:** a paginação, coberta só pelos testes automatizados de `tests/test_my_donations.py`.
+  - **Ajustes feitos durante o roteiro, sem mudar spec:**
+    - os selects da edição ganharam fundo branco, borda e altura dos campos de texto, texto `#1F1F1F` e foco visível;
+    - no cabeçalho da home, “Minhas doações” ganhou o espaçamento do menu;
+    - “Olá, <nome>” ficou sempre visível e numa linha só, com reticências. Entre 992 e 1279 px, o link vira só o ícone e o menu usa fonte de 14 px e 12 px entre os itens, para nada quebrar linha entre 768 e 1512 px.
