@@ -8,28 +8,36 @@ O dry-run e o push são feitos pelo Higor.
 
 ## 1. Preparação
 
-- [ ] 1.1 (manual) Responder às dúvidas 1 a 5 do `design.md` e ajustar a spec, o design e estas tarefas se alguma resposta mudar o comportamento. Verificação: o `design.md` tem as respostas e o `openspec validate editar-perfil --strict` passa.
-- [ ] 1.2 Pedir confirmação ao Higor e rodar `xano workspace pull -d ./xano`. Verificação: `git diff --ignore-all-space --ignore-cr-at-eol --stat -- xano` mostra só as divergências antigas e conhecidas.
+- [x] 1.1 (manual) Responder às dúvidas 1 a 5 do `design.md` e ajustar a spec, o design e estas tarefas se alguma resposta mudar o comportamento. Verificação: o `design.md` tem as respostas e o `openspec validate editar-perfil --strict` passa.
+- [x] 1.2 Pedir confirmação ao Higor e rodar `xano workspace pull -d ./xano`. Verificação: `git diff --ignore-all-space --ignore-cr-at-eol --stat -- xano` mostra só as divergências antigas e conhecidas.
+  - Pull feito pelo Higor. O diff sem espaços mostra só as divergências antigas, que não são desta change. Os `guid` da tabela `user`, do `profile_PATCH.xs`, do `profile_GET.xs`, do `donor_GET.xs` e do `mine_GET.xs` estão iguais aos de antes.
 
 ## 2. Xano (Parte A)
 
-- [ ] 2.1 Consultar no Xano Developer MCP a sintaxe de um campo novo opcional na tabela, do `text? about?` com `max:`, do enum com as 27 siglas, do `db.patch` com objeto montado no `stack` e do teste de “campo enviado” para o `about`. Verificação: as respostas anotadas no `design.md`.
-- [ ] 2.2 Acrescentar o `about` em `xano/table/user.xs` (decisão 1). Verificação: validação no MCP sem erros e o `guid` da tabela mantido.
-- [ ] 2.3 Alterar `profile_PATCH.xs` (decisão 2) e `profile_GET.xs` (decisão 3). Verificação: validação no MCP sem erros e os `guid` mantidos.
-- [ ] 2.4 Alterar `donations/donor_GET.xs` (decisão 4) e `donations/mine_GET.xs` (decisão 5). Verificação: validação no MCP sem erros, os `guid` mantidos e o `about` como único campo novo nas respostas.
-- [ ] 2.5 Mostrar ao Higor os arquivos e o `git diff -- xano` e parar antes do dry-run. Verificação: o diff tem só os arquivos desta change, além das divergências conhecidas.
-- [ ] 2.6 (manual) O Higor roda `xano workspace push -d ./xano --dry-run`, revisa e faz o push. Verificação: no dry-run, só a tabela `user` e os quatro endpoints como UPDATE.
-- [ ] 2.7 (manual) Pull pós-push. Verificação: os arquivos alterados ficaram sem mudança de lógica.
+- [x] 2.1 Consultar no Xano Developer MCP a sintaxe de um campo novo opcional na tabela, do `text? about?` com `max:`, do enum com as 27 siglas, do `db.patch` com objeto montado no `stack` e do teste de “campo enviado” para o `about`. Verificação: as respostas anotadas no `design.md`.
+- [x] 2.2 Acrescentar o `about` em `xano/table/user.xs` (decisão 1). Verificação: validação no MCP sem erros e o `guid` da tabela mantido.
+- [x] 2.3 Alterar `profile_PATCH.xs` (decisão 2) e `profile_GET.xs` (decisão 3). Verificação: validação no MCP sem erros e os `guid` mantidos.
+- [x] 2.4 Alterar `donations/donor_GET.xs` (decisão 4) e `donations/mine_GET.xs` (decisão 5). Verificação: validação no MCP sem erros, os `guid` mantidos e o `about` como único campo novo nas respostas.
+- [x] 2.5 Mostrar ao Higor os arquivos e o `git diff -- xano` e parar antes do dry-run. Verificação: o diff tem só os arquivos desta change, além das divergências conhecidas.
+- [x] 2.6 (manual) O Higor roda `xano workspace push -d ./xano --dry-run`, revisa e faz o push. Verificação: no dry-run, só a tabela `user` e os quatro endpoints como UPDATE.
+  - Dry-run conferido pelo Higor: UPDATE/ADD_FIELD na tabela `user` e UPDATE no `auth/profile` (GET e PATCH), no `donations/donor` (GET) e no `donations/mine` (GET). Com o OK do grupo, o push foi feito.
+- [x] 2.7 (manual) Pull pós-push. Verificação: os arquivos alterados ficaram sem mudança de lógica.
+  - Os cinco arquivos continuam válidos no MCP, com os mesmos `guid`. A única mudança foi o Xano reformatar o objeto `$updates` do `profile_PATCH.xs` em várias linhas.
+
+- [ ] 2.8 (manual) Correção depois do teste real 4.1: o `PATCH auth/profile` passa a gravar sempre o `about` (com `db.edit` e `$input.about ?? ""`). O Higor roda o dry-run e o push dessa correção e depois o pull. Verificação: no dry-run, só o UPDATE do `auth/profile` (PATCH); depois do pull, o arquivo sem mudança de lógica e com o mesmo `guid`.
 
 ## 3. Teste real e documentação do backend (Parte A)
 
-- [ ] 3.1 Escrever `scripts/teste_editar_perfil_real.py` com os cenários EP1 a EP12 (decisão 6), sem imprimir nomes, e-mails, cidades, textos de Sobre, URLs nem corpos de resposta, e restaurando o perfil original num `finally`. Verificação: `python -m py_compile scripts/teste_editar_perfil_real.py` e a leitura do script pelo Higor.
-- [ ] 3.2 Ajustar o PP1 de `scripts/teste_perfil_real.py` e o MD2 de `scripts/teste_minhas_doacoes_real.py` para aceitar o `about`. Verificação: `py_compile` dos dois e as chaves novas nas constantes.
-- [ ] 3.3 Documentar no `docs/guia-do-colaborador.md` o `about`, o contrato novo do `PATCH auth/profile`, o `about` no perfil público e no `mine`, e como rodar o teste real. Verificação: o texto bate com as decisões 1 a 6.
+- [x] 3.1 Escrever `scripts/teste_editar_perfil_real.py` com os cenários EP1 a EP12 (decisão 6), sem imprimir nomes, e-mails, cidades, textos de Sobre, URLs nem corpos de resposta, e restaurando o perfil original num `finally`. Verificação: `python -m py_compile scripts/teste_editar_perfil_real.py` e a leitura do script pelo Higor.
+- [x] 3.2 Ajustar o PP1 de `scripts/teste_perfil_real.py` e o MD2 de `scripts/teste_minhas_doacoes_real.py` para aceitar o `about`. Verificação: `py_compile` dos dois e as chaves novas nas constantes.
+- [x] 3.3 Documentar no `docs/guia-do-colaborador.md` o `about`, o contrato novo do `PATCH auth/profile`, o `about` no perfil público e no `mine`, e como rodar o teste real. Verificação: o texto bate com as decisões 1 a 6.
 
 ## 4. Verificação real (Parte A)
 
 - [ ] 4.1 (manual) O Higor roda o `teste_editar_perfil_real.py` e, de novo, o `teste_perfil_real.py` e o `teste_minhas_doacoes_real.py`. Verificação: todos os cenários OK, anotados aqui.
+  - **Primeira rodada do `teste_editar_perfil_real.py`:** 11 de 13. O EP8 e a restauração falharam pelo mesmo motivo: o Xano trata `""` de uma entrada opcional como omitida, e o Sobre antigo ficava.
+  - **Decisão do Higor:** o `PATCH` sempre grava o `about`. Com texto, grava o texto; vazio, nulo ou omitido gravam `""`. A tela sempre envia o formulário inteiro.
+  - Spec, design, guia, EP8 e restauração foram atualizados. É preciso rodar de novo depois da 2.8.
 
 ## 5. Sobre no perfil público e em Minhas doações (Parte B)
 

@@ -10,7 +10,7 @@ query "catalog/donations/mine" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $auth.id
-      output = ["name"]
+      output = ["name", "about"]
     } as $owner
   
     var $first_name {
@@ -111,6 +111,7 @@ query "catalog/donations/mine" verb=GET {
     owner     : ```
       {
         first_name: $first_name
+        about     : $owner.about
       }
       ```
     counts    : ```

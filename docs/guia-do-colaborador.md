@@ -330,7 +330,7 @@ O perfil é aberto **a partir de uma doação**, nunca por id de usuário. O fro
 - `GET /catalog/donations/donor`, **público** (sem login).
   - **Entradas:** `donation_id` e `page`, que é opcional e vale 1 por padrão. Uma página menor que 1 é tratada como 1.
   - **Erro:** doação inexistente, não disponível ou sem dono responde 404, com a mesma mensagem genérica do detalhe, “Doação não encontrada.”.
-  - **Resposta:** `{donor: {first_name, city, state, member_since}, items, page, per_page, total, page_total}`.
+  - **Resposta:** `{donor: {first_name, city, state, member_since, about}, items, page, per_page, total, page_total}`. O `about` é o Sobre de quem doa, texto ou nulo, e entrou na change editar-perfil.
 - **`donor`:**
   - `first_name` é o primeiro nome, calculado como no detalhe;
   - `city` e `state` vêm da doação de origem, não do cadastro da conta;
@@ -362,7 +362,7 @@ O script **não pede login nem senha**, só os IDs. Ele não cria nem altera dad
 
 | Cenário | O que confere |
 |---|---|
-| PP1 | 200 com só as chaves permitidas, no topo, em `donor` e em cada item |
+| PP1 | 200 com só as chaves permitidas, no topo, em `donor` (inclusive o `about`) e em cada item |
 | PP2 | os tipos dos campos, com o `first_name` numa palavra só |
 | PP3 | `member_since` no formato `AAAA-MM` |
 | PP4 | nenhuma chave proibida (`owner_id`, `email`, `name`, `status` e outras) em nenhum nível, e nenhum `@` |
@@ -384,7 +384,7 @@ Endpoints com login para quem doa ver e gerenciar as próprias doações. A pess
 
 - `GET /catalog/donations/mine`:
   - **Entrada:** `page`, que é opcional e vale 1 por padrão. Uma página menor que 1 é tratada como 1.
-  - **Resposta:** `{owner: {first_name}, counts: {active, completed}, items, page, per_page, total, page_total}`.
+  - **Resposta:** `{owner: {first_name, about}, counts: {active, completed}, items, page, per_page, total, page_total}`. O `about` é o Sobre da própria pessoa, texto ou nulo.
   - **`items`:** 6 por página, todas as doações da pessoa, de qualquer status, das mais novas para as mais antigas. Cada item tem `id`, `created_at`, `title`, `photo` (URL pública ou nula), `condition` e `status`.
   - **`counts`:** `active` soma as disponíveis e as reservadas, e `completed` conta as concluídas. Os dois consideram todas as doações da pessoa, não só a página.
   - **Página além da última:** vem com a lista vazia e os totais corretos.
@@ -437,7 +437,7 @@ O script pede o e-mail e a senha das duas contas e depois os IDs. **A senha não
 | Cenário | O que confere |
 |---|---|
 | MD1 | a lista sem token dá 401 |
-| MD2 | a lista da dona dá 200 com só as chaves permitidas e os tipos certos |
+| MD2 | a lista da dona dá 200 com só as chaves permitidas (inclusive `owner.about`) e os tipos certos |
 | MD3 | nenhuma chave proibida, `@` ou sobrenome; a lista da outra pessoa não traz a doação da dona |
 | MD4 | até 6 itens, página 1, mais novas primeiro, sem ids repetidos |
 | MD5 | os totais, as páginas e os contadores coerentes, com a doação informada na lista quando há até 6 |
@@ -485,6 +485,63 @@ O código fica em `doafacil/minhas_doacoes.py`, e o layout está descrito em `do
   - Um valor atual fora das opções do cadastro deixa o campo vazio.
   - No sucesso, a página volta à lista com o aviso “Alterações salvas.”, guardado em `MyDonationsState.flash` e mostrado uma vez.
 - **Testes:** `tests/test_my_donations.py` cobre o cliente, os estados, as páginas e o link no cabeçalho da home.
+
+### Perfil da conta (backend)
+
+O perfil da própria pessoa é lido e alterado pelo grupo Authentication (`XANO_AUTH_API_URL`), sempre a partir do token.
+
+- **Tabela `user`:** campo `about` (o Sobre), texto opcional e nulo nas contas antigas. O limite de 300 caracteres é validado no `PATCH`.
+- `GET /auth/profile`:
+  - **Resposta:** `id`, `created_at`, `name` (o nome completo), `email`, `city`, `state` e `about`.
+  - **Quem usa:** o cadastro de doação, que lê só a cidade e a UF.
+- `PATCH /auth/profile`:
+  - **Entradas:**
+    - `name` e `city`, obrigatórios, não vazios depois do `trim`;
+    - `state`, só uma das 27 siglas (outro valor dá 400);
+    - `about`, com até 300 caracteres depois do `trim`, **sempre gravado**. Com texto, grava o texto. Vazio, nulo ou omitido grava `""`, que apaga o Sobre. O Xano trata `""` de uma entrada opcional como omitida, por isso o endpoint grava `$input.about ?? ""`. A tela sempre envia o formulário inteiro. As quebras de linha são mantidas e o texto é guardado como veio, sem interpretar HTML.
+  - **O que não muda:** o e-mail, a senha e as doações já publicadas, que guardam a cidade e a UF do momento da publicação.
+  - **Gravação e resposta:** grava com `db.edit` e responde só com os campos do perfil, sem a senha.
+  - **Sem token:** 401.
+- **Onde o Sobre aparece:** no perfil público (`donor.about`) e em “Minhas doações” (`owner.about`). Ele nunca aparece no detalhe da doação.
+
+#### Testar a edição do perfil contra o Xano real
+
+O script `scripts/teste_editar_perfil_real.py` roda os cenários EP1 a EP12 contra o Xano publicado. Ele fica fora de `tests/`.
+
+Antes de rodar, tenha:
+
+- **uma conta de teste**, com o estado entre as 27 siglas;
+- **opcionalmente, o ID de uma doação disponível dessa conta**, para o EP11 e o EP12;
+- as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas no terminal (seção 4).
+
+Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_editar_perfil_real.py
+```
+
+O script pede o e-mail e a senha (a senha não aparece ao digitar) e depois o ID da doação; Enter pula. Ele não imprime nomes, e-mails, cidades, textos de Sobre, URLs nem corpos de resposta.
+
+| Cenário | O que confere |
+|---|---|
+| EP1 | `GET /auth/profile` sem token dá 401 |
+| EP2 | o `GET` dá 200 com só as chaves do perfil, inclusive o `about` |
+| EP3 | um `PATCH` válido dá 200 com a cidade, a UF e o Sobre (com quebra de linha) novos, e o mesmo e-mail |
+| EP4 | o `GET` reflete a edição, e o e-mail não muda |
+| EP5 | um Sobre com 300 “á” é aceito; com 301 dá 400 e não altera |
+| EP6 | o estado “XX” dá 400 |
+| EP7 | nome ou cidade vazios dão 400 e não alteram |
+| EP8 | um Sobre omitido e um Sobre vazio apagam o texto |
+| EP9 | um Sobre com marcação HTML volta igual |
+| EP10 | `GET /catalog/donations/mine` traz o `owner.about` atual |
+| EP11 | o perfil público traz o `about` atual, sem e-mail; Enter pula |
+| EP12 | mudar a cidade do perfil não muda a cidade da doação publicada; Enter pula |
+
+Cuidados:
+
+- **O script altera o perfil da conta:** a cidade, o estado e o Sobre. No fim, grava de novo os valores originais, mesmo se der erro no meio. Um Sobre original nulo volta como texto vazio, que o resto do site trata como Sobre não preenchido.
+- O script espera 2,5 s entre as requisições, o que dá cerca de 1 minuto e meio. A pausa pode ser trocada com a variável `TESTE_PERFIL_EDICAO_PAUSA`.
+- Depois desta change, rode também o `teste_perfil_real.py` e o `teste_minhas_doacoes_real.py`. O PP1 e o MD2 agora esperam o `about`.
 
 ## 9. Design
 

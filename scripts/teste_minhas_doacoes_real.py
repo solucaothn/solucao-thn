@@ -54,7 +54,8 @@ STATUS = {"disponível", "reservada", "concluída"}
 CONDICOES = {"Ótimo", "Bom", "Regular"}
 
 CHAVES_LISTA = {"owner", "counts", "items", "page", "per_page", "total", "page_total"}
-CHAVES_OWNER = {"first_name"}
+# O “about” (Sobre) entrou na change editar-perfil: texto ou nulo.
+CHAVES_OWNER = {"first_name", "about"}
 CHAVES_COUNTS = {"active", "completed"}
 CHAVES_ITEM_LISTA = {"id", "created_at", "title", "photo", "condition", "status"}
 CHAVES_ITEM_EDICAO = {
@@ -142,6 +143,8 @@ def tipos_lista_ok(dados: Any) -> tuple[bool, str]:
     nome = owner.get("first_name")
     if not isinstance(nome, str) or not nome.strip() or " " in nome.strip():
         problemas.append("first_name")
+    if owner.get("about") is not None and not isinstance(owner.get("about"), str):
+        problemas.append("about")
     for campo in ("active", "completed"):
         if not eh_int(counts.get(campo)) or counts[campo] < 0:
             problemas.append(campo)

@@ -64,8 +64,9 @@ O Xano permite 10 requisições a cada 20 s.
      - `name` e `city`: `trim|min:1`, como hoje e como no cadastro;
      - `state`: um enum com as 27 siglas (dúvida 2);
      - `about`: `text? about? filters=trim|max:300`, opcional.
-   - **Sobre omitido ou enviado:** se o `about` for omitido, o valor atual fica. Se vier `""`, o Sobre é apagado.
-   - **Gravação:** com `db.patch` e um objeto montado no `stack`, que só inclui o `about` quando ele foi enviado. A sintaxe (`set` e o teste de nulo) será confirmada no Xano Developer MCP.
+   - **Sobre sempre gravado:** com texto, grava o texto (sem os espaços das pontas, até 300 caracteres). Vazio, nulo ou omitido grava `""`, que apaga o Sobre. A tela sempre envia o formulário inteiro.
+   - **Gravação:** com `db.edit`, com `about: $input.about ?? ""` no `data` e o `output` só com os campos do perfil.
+   - Esta decisão foi revista depois do teste real 4.1: a primeira versão (omitido mantém, `""` apaga) não funcionava, porque o Xano trata `""` de uma entrada opcional como omitida.
    - **Resposta:** os campos de hoje mais o `about`. O e-mail continua na resposta, porque é da própria pessoa.
    - **Log de evento:** nenhum, como no `GET`.
 3. **`GET auth/profile`:** a saída ganha o `about`.
@@ -82,7 +83,7 @@ O Xano permite 10 requisições a cada 20 s.
      - EP5: um Sobre com 300 “á” é aceito, e com 301 dá 400;
      - EP6: uma UF “XX” dá 400;
      - EP7: nome ou cidade vazios dão 400, sem alterar;
-     - EP8: um Sobre `""` apaga o texto;
+     - EP8: um Sobre omitido e um Sobre `""` apagam o texto;
      - EP9: um Sobre com `<b>` volta igual;
      - EP10: o `mine` traz o `owner.about` igual;
      - EP11: o `donor` traz o `about` igual, sem e-mail;
@@ -150,3 +151,22 @@ O Xano permite 10 requisições a cada 20 s.
 
    Usamos esse texto ou outro?
 5. **Depois de salvar:** recomendo voltar a `/minhas-doacoes`, com o aviso “Alterações salvas.” no topo, como já acontece na edição da doação. A outra opção é ficar em `/perfil/editar`, com o aviso acima dos botões.
+
+### Respostas do Higor
+
+1. O campo Nome edita o nome completo, com a ajuda “Só o primeiro nome aparece para outras pessoas.”
+2. O `PATCH auth/profile` aceita só as 27 siglas e recusa o resto com 400.
+3. O Sobre mantém as quebras de linha e mostra a dica “Não coloque telefone, endereço ou e-mail: este texto é público.”
+4. O quadro usa o texto proposto na dúvida 4. O texto original estava errado sobre o e-mail. O cenário da spec foi atualizado com o texto exato.
+5. Depois de salvar, a página volta a `/minhas-doacoes` com “Alterações salvas.”, pelo `MyDonationsState.set_flash`.
+
+## Consulta ao Xano Developer MCP (tarefa 2.1)
+
+- **Campo novo na tabela:** `text? about? filters=trim`, nulo e opcional, como o `city` e o `state` da tabela `donation`. As contas existentes ficam com o valor nulo.
+- **Entrada do `PATCH`:** `text? about? filters=trim|max:300`.
+  - Na doc, um campo nulo e opcional aceita `""` e `null` e pode ser omitido.
+  - **Correção depois do teste real 4.1:** o Xano trata `""` de uma entrada opcional como omitida (vira nulo no `stack`). Por isso, a regra final é: vazio, nulo ou omitido gravam `""`.
+  - O `max:300` conta caracteres, como o MD11 da change minhas-doacoes mostrou com o `max:100`.
+- **Enum:** a lista com as 27 siglas, uma por linha, em `values`.
+- **Primeira versão (substituída):** `var` com `|set:"about":...` num `conditional` e `db.patch`. O `db.patch` não aceita `output` e devolveria a conta inteira, com a senha, e por isso era seguido de um `db.get`.
+- **Versão final:** sem o `conditional`, o `PATCH` volta ao `db.edit` com `output`, como era antes da change. Isso tira a consulta extra e não devolve a senha. O `??` já é usado no `detail_GET.xs` (`$owner.name ?? ""`), e o arquivo passa no validador do MCP.

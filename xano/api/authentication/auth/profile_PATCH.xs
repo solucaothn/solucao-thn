@@ -5,7 +5,42 @@ query "auth/profile" verb=PATCH {
   input {
     text name filters=trim|min:1
     text city filters=trim|min:1
-    text state filters=trim|min:1
+    enum state {
+      values = [
+        "AC"
+        "AL"
+        "AP"
+        "AM"
+        "BA"
+        "CE"
+        "DF"
+        "ES"
+        "GO"
+        "MA"
+        "MT"
+        "MS"
+        "MG"
+        "PA"
+        "PB"
+        "PR"
+        "PE"
+        "PI"
+        "RJ"
+        "RN"
+        "RS"
+        "RO"
+        "RR"
+        "SC"
+        "SP"
+        "SE"
+        "TO"
+      ]
+    }
+  
+    // Sempre gravado: com texto, grava (trim, até 300 caracteres); vazio,
+    // nulo ou omitido grava "" e apaga o Sobre. O Xano trata "" de uma
+    // entrada opcional como omitida, por isso o `?? ""` no db.edit.
+    text? about? filters=trim|max:300
   }
 
   stack {
@@ -16,9 +51,10 @@ query "auth/profile" verb=PATCH {
         name : $input.name
         city : $input.city
         state: $input.state
+        about: $input.about ?? ""
       }
     
-      output = ["id", "created_at", "name", "email", "city", "state"]
+      output = ["id", "created_at", "name", "email", "city", "state", "about"]
     } as $user
   }
 

@@ -21,9 +21,10 @@ O sistema SHALL permitir que uma pessoa autenticada consulte e atualize apenas o
 - **WHEN** uma pessoa autenticada envia um estado que não é uma das 27 siglas de unidades federativas do Brasil
 - **THEN** o sistema rejeita a atualização com HTTP 400 e mantém os valores existentes
 
-#### Scenario: Sobre opcional e limitado
-- **WHEN** uma pessoa autenticada envia o Sobre vazio
-- **THEN** o sistema grava o Sobre vazio, apagando o texto anterior
+#### Scenario: Sobre sempre gravado
+- **WHEN** uma pessoa autenticada envia uma atualização do perfil
+- **THEN** o sistema MUST gravar o Sobre em toda atualização: com texto, grava o texto sem os espaços das pontas
+- **AND** com o Sobre vazio, nulo ou omitido, MUST gravar o Sobre vazio, apagando o texto anterior
 - **AND** um Sobre com mais de 300 caracteres, depois de tirar os espaços das pontas, MUST ser rejeitado com HTTP 400 sem alterar o perfil
 
 #### Scenario: Atualização sem sessão válida
@@ -51,6 +52,8 @@ A página `/perfil/editar` MUST exigir login e permitir editar nome, Sobre, cida
 #### Scenario: Formulário preenchido
 - **WHEN** a página carrega o perfil com sucesso
 - **THEN** MUST mostrar os campos Nome, Sobre, Cidade e Estado preenchidos com os valores atuais
+- **AND** o campo Nome MUST conter o nome completo da conta, com a ajuda “Só o primeiro nome aparece para outras pessoas.”
+- **AND** o campo Sobre MUST aceitar quebras de linha e mostrar a dica “Não coloque telefone, endereço ou e-mail: este texto é público.”
 - **AND** Estado MUST permitir selecionar uma das 27 siglas de unidades federativas do Brasil
 - **AND** MUST mostrar o e-mail num campo só de leitura, com o texto “O e-mail é usado para entrar e não pode ser alterado.”
 - **AND** MUST NOT apresentar campo ou ação de foto de perfil
@@ -68,7 +71,7 @@ A página `/perfil/editar` MUST exigir login e permitir editar nome, Sobre, cida
 
 #### Scenario: Quem vê estas informações
 - **WHEN** a página está com o formulário
-- **THEN** MUST mostrar o quadro “Quem vê estas informações”, explicando que o primeiro nome, a cidade, o estado e o Sobre são públicos e em que situação o e-mail é mostrado a outras pessoas, de forma coerente com a preferência de contato “E-mail” das doações
+- **THEN** MUST mostrar o quadro “Quem vê estas informações” com o texto: “Seu primeiro nome, cidade, estado e o texto de Sobre aparecem no seu perfil público. Suas doações mostram o primeiro nome e a cidade e o estado do momento em que foram publicadas. Seu e-mail é usado para entrar e só é mostrado a pessoas logadas que pedirem contato numa doação sua com a preferência “E-mail”.”
 
 #### Scenario: Validação antes de enviar
 - **WHEN** a pessoa salva com nome ou cidade vazios, estado não selecionado ou Sobre com mais de 300 caracteres
@@ -76,7 +79,7 @@ A página `/perfil/editar` MUST exigir login e permitir editar nome, Sobre, cida
 
 #### Scenario: Salvar com sucesso
 - **WHEN** a pessoa salva valores válidos
-- **THEN** a página MUST enviar a atualização e mostrar “Alterações salvas.”
+- **THEN** a página MUST enviar o formulário inteiro (nome, cidade, estado e Sobre, mesmo vazio) e voltar a `/minhas-doacoes`, que mostra o aviso “Alterações salvas.”
 - **AND** o cabeçalho da home MUST passar a mostrar o primeiro nome novo, sem novo login
 
 #### Scenario: Mudar a cidade não altera doações publicadas
