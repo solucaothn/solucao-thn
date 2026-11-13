@@ -113,7 +113,7 @@ query "catalog/chat/conversations" verb=GET {
         db.query user {
           where = $db.user.id in $other_user_ids
           return = {type: "list"}
-          output = ["id", "name"]
+          output = ["id", "name", "photo"]
         } as $found_users
       
         var.update $other_users {
@@ -189,6 +189,27 @@ query "catalog/chat/conversations" verb=GET {
           }
         }
       
+        var $other_user_photo {
+          value = null
+        }
+      
+        conditional {
+          if ($other_user != null && $other_user.photo != null) {
+            conditional {
+              if ($env.PUBLIC_BASE_URL == null || $env.PUBLIC_BASE_URL == "") {
+                throw {
+                  name = "ConfigurationError"
+                  value = "PUBLIC_BASE_URL não está configurada."
+                }
+              }
+            }
+          
+            var.update $other_user_photo {
+              value = $env.PUBLIC_BASE_URL ~ $other_user.photo.path
+            }
+          }
+        }
+      
         var $donation {
           value = $donations|find:$$.id == $conversation.donation_id
         }
@@ -221,6 +242,7 @@ query "catalog/chat/conversations" verb=GET {
                 donation_id: $conversation.donation_id,
                 last_message_at: $conversation.last_message_at,
                 other_user_first_name: $other_user_first_name,
+                other_user_photo: $other_user_photo,
                 donation_title: $donation_title,
                 donation_status: $donation_status,
                 unread_count: $unread_count

@@ -331,7 +331,7 @@ O perfil é aberto **a partir de uma doação**, nunca por id de usuário. O fro
 - `GET /catalog/donations/donor`, **público** (sem login).
   - **Entradas:** `donation_id` e `page`, que é opcional e vale 1 por padrão. Uma página menor que 1 é tratada como 1.
   - **Erro:** doação inexistente, não disponível ou sem dono responde 404, com a mesma mensagem genérica do detalhe, “Doação não encontrada.”.
-  - **Resposta:** `{donor: {first_name, city, state, member_since, about}, items, page, per_page, total, page_total}`. O `about` é o Sobre de quem doa, texto ou nulo, e entrou na change editar-perfil.
+  - **Resposta:** `{donor: {first_name, city, state, member_since, about, photo}, items, page, per_page, total, page_total}`. O `about` é o Sobre de quem doa, texto ou nulo, e entrou na change editar-perfil. O `photo` é a URL pública da foto de perfil, ou nula, e entrou na change foto-perfil.
 - **`donor`:**
   - `first_name` é o primeiro nome, calculado como no detalhe;
   - `city` e `state` vêm da doação de origem, não do cadastro da conta;
@@ -363,7 +363,7 @@ O script **não pede login nem senha**, só os IDs. Ele não cria nem altera dad
 
 | Cenário | O que confere |
 |---|---|
-| PP1 | 200 com só as chaves permitidas, no topo, em `donor` (inclusive o `about`) e em cada item |
+| PP1 | 200 com só as chaves permitidas, no topo, em `donor` (inclusive o `about` e o `photo`) e em cada item |
 | PP2 | os tipos dos campos, com o `first_name` numa palavra só |
 | PP3 | `member_since` no formato `AAAA-MM` |
 | PP4 | nenhuma chave proibida (`owner_id`, `email`, `name`, `status` e outras) em nenhum nível, e nenhum `@` |
@@ -385,7 +385,7 @@ Endpoints com login para quem doa ver e gerenciar as próprias doações. A pess
 
 - `GET /catalog/donations/mine`:
   - **Entrada:** `page`, que é opcional e vale 1 por padrão. Uma página menor que 1 é tratada como 1.
-  - **Resposta:** `{owner: {first_name, about}, counts: {active, completed}, items, page, per_page, total, page_total}`. O `about` é o Sobre da própria pessoa, texto ou nulo.
+  - **Resposta:** `{owner: {first_name, about, photo}, counts: {active, completed}, items, page, per_page, total, page_total}`. O `about` é o Sobre da própria pessoa, texto ou nulo, e o `photo` é a URL pública da foto de perfil, ou nula.
   - **`items`:** 6 por página, todas as doações da pessoa, de qualquer status, das mais novas para as mais antigas. Cada item tem `id`, `created_at`, `title`, `photo` (URL pública ou nula), `condition` e `status`.
   - **`counts`:** `active` soma as disponíveis e as reservadas, e `completed` conta as concluídas. Os dois consideram todas as doações da pessoa, não só a página.
   - **Página além da última:** vem com a lista vazia e os totais corretos.
@@ -438,7 +438,7 @@ O script pede o e-mail e a senha das duas contas e depois os IDs. **A senha não
 | Cenário | O que confere |
 |---|---|
 | MD1 | a lista sem token dá 401 |
-| MD2 | a lista da dona dá 200 com só as chaves permitidas (inclusive `owner.about`) e os tipos certos |
+| MD2 | a lista da dona dá 200 com só as chaves permitidas (inclusive `owner.about` e `owner.photo`) e os tipos certos |
 | MD3 | nenhuma chave proibida, `@` ou sobrenome; a lista da outra pessoa não traz a doação da dona |
 | MD4 | até 6 itens, página 1, mais novas primeiro, sem ids repetidos |
 | MD5 | os totais, as páginas e os contadores coerentes, com a doação informada na lista quando há até 6 |
@@ -493,7 +493,7 @@ O perfil da própria pessoa é lido e alterado pelo grupo Authentication (`XANO_
 
 - **Tabela `user`:** campo `about` (o Sobre), texto opcional e nulo nas contas antigas. O limite de 300 caracteres é validado no `PATCH`.
 - `GET /auth/profile`:
-  - **Resposta:** `id`, `created_at`, `name` (o nome completo), `email`, `city`, `state` e `about`.
+  - **Resposta:** `id`, `created_at`, `name` (o nome completo), `email`, `city`, `state`, `about` e `photo` (a URL pública da foto de perfil, ou nula). A resposta é montada campo a campo, porque o campo guardado é o objeto do armazenamento, não a URL. O `PATCH` continua sem `photo` na resposta.
   - **Quem usa:** o cadastro de doação, que lê só a cidade e a UF.
 - `PATCH /auth/profile`:
   - **Entradas:**
@@ -541,7 +541,7 @@ O script pede o e-mail e a senha (a senha não aparece ao digitar) e depois o ID
 | Cenário | O que confere |
 |---|---|
 | EP1 | `GET /auth/profile` sem token dá 401 |
-| EP2 | o `GET` dá 200 com só as chaves do perfil, inclusive o `about` |
+| EP2 | o `GET` dá 200 com só as chaves do perfil, inclusive o `about` e o `photo` |
 | EP3 | um `PATCH` válido dá 200 com a cidade, a UF e o Sobre (com quebra de linha) novos, e o mesmo e-mail |
 | EP4 | o `GET` reflete a edição, e o e-mail não muda |
 | EP5 | um Sobre com 300 “á” é aceito; com 301 dá 400 e não altera |
@@ -550,7 +550,7 @@ O script pede o e-mail e a senha (a senha não aparece ao digitar) e depois o ID
 | EP8 | um Sobre omitido e um Sobre vazio apagam o texto |
 | EP9 | um Sobre com marcação HTML volta igual |
 | EP10 | `GET /catalog/donations/mine` traz o `owner.about` atual |
-| EP11 | o perfil público traz o `about` atual, sem e-mail; Enter pula |
+| EP11 | o perfil público traz o `about` atual, sem e-mail; Enter pula. As chaves de `donor` incluem o `photo` |
 | EP12 | mudar a cidade do perfil não muda a cidade da doação publicada; Enter pula |
 
 Cuidados:
@@ -558,6 +558,80 @@ Cuidados:
 - **O script altera o perfil da conta:** a cidade, o estado e o Sobre. No fim, grava de novo os valores originais, mesmo se der erro no meio. Um Sobre original nulo volta como texto vazio, que o resto do site trata como Sobre não preenchido.
 - O script espera 2,5 s entre as requisições, o que dá cerca de 1 minuto e meio. A pausa pode ser trocada com a variável `TESTE_PERFIL_EDICAO_PAUSA`.
 - Depois desta change, rode também o `teste_perfil_real.py` e o `teste_minhas_doacoes_real.py`. O PP1 e o MD2 agora esperam o `about`.
+
+### Foto de perfil (backend)
+
+A foto de perfil é da própria pessoa: os endpoints usam sempre o token, nunca um id enviado pelo cliente.
+
+- **Tabela `user`:** campo `photo` (`image?`), com o objeto do armazenamento, guardado com acesso público.
+- `POST /auth/profile/photo`, com login e `multipart/form-data`, no campo `photo`:
+  - **Sem arquivo:** 400. O Xano recusa antes de executar o endpoint, com a própria mensagem (“Missing param: photo”). A precondição “Escolha uma foto.” fica como defesa. A tela só envia com um arquivo escolhido.
+  - **Formatos aceitos:** JPG, PNG, GIF e WEBP.
+    - O arquivo é guardado com `storage.create_image`, com os mesmos parâmetros do `publish`, dentro de um `try_catch`. Se ele der erro (o `create_image` responde 500 para arquivos que não são imagem), a resposta é 400 de formato.
+    - Depois de guardar, o tipo é conferido pelo `mime` do arquivo **guardado** (`image/jpeg`, `image/png`, `image/gif` ou `image/webp`).
+    - **O plano gratuito do Xano não tem `storage.create_attachment`.** Ele responde 403 “Not supported. Please upgrade your Xano instance.”. Para guardar imagens, use sempre o `storage.create_image`.
+    - A doc do Xano não garante as propriedades do arquivo de entrada antes de guardar. Uma checagem pela extensão do nome, antes de guardar, recusava PNGs válidos no teste real.
+    - Outro formato dá 400 com “Envie uma imagem JPG, PNG, GIF ou WEBP.”.
+  - **Limite: 5 MB** (5 242 880 bytes), conferido pelo `size` do arquivo guardado.
+    - Acima disso, a resposta é 400 com “A foto pode ter no máximo 5 MB.”.
+    - Nos dois casos de recusa (formato e tamanho), o arquivo novo é apagado antes da resposta.
+  - **Troca:** grava a foto nova e apaga do armazenamento o arquivo da foto anterior (`storage.delete_file`).
+  - **Resposta:** `{photo: <URL pública>}`.
+- `DELETE /auth/profile/photo`, com login: grava a foto como nula e apaga o arquivo do armazenamento. Responde `{photo: null}`, inclusive quando não havia foto.
+- **Onde a URL da foto aparece:** sempre a URL pública (`PUBLIC_BASE_URL` + caminho), ou nula. Nunca o objeto do armazenamento, o e-mail ou ids.
+
+  | Endpoint | Campo |
+  |---|---|
+  | `GET /auth/profile` | `photo` |
+  | `GET /catalog/donations/mine` | `owner.photo` |
+  | `GET /catalog/donations/donor` | `donor.photo` |
+  | `GET /catalog/donations/detail` | `donor_photo` |
+  | `GET /catalog/chat/conversations` | `other_user_photo`, em cada item |
+  | `GET /catalog/chat/messages` | `other_user_photo`, só da **outra** pessoa |
+
+  A foto vem nas respostas que já existiam, sem requisição a mais e sem consulta nova ao banco. O `start` do chat e o envio e a edição de mensagens não trazem a foto.
+- **Fotos de doação:** continuam sem limite de tamanho. Esse limite vale só para a foto de perfil.
+
+#### Testar a foto de perfil contra o Xano real
+
+O script `scripts/teste_foto_perfil_real.py` roda os cenários FP1 a FP12 contra o Xano publicado. Ele fica fora de `tests/`.
+
+Antes de rodar, tenha:
+
+- **duas contas:** a dona de uma doação e outra pessoa;
+- **o ID de uma doação disponível da dona, com contato “Chat do DoaFácil”.** O FP10 inicia ou reabre a conversa da outra pessoa sobre ela;
+- as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas no terminal (seção 4).
+
+Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_foto_perfil_real.py
+```
+
+O script gera as imagens de teste na memória: um PNG pequeno, um PNG com mais de 5 MB, um `.txt` e um PDF. Nada é gravado em arquivo, e ele não imprime nomes, e-mails, URLs nem corpos de resposta.
+
+| Cenário | O que confere |
+|---|---|
+| FP1 | o envio sem token dá 401 |
+| FP2 | um PNG válido dá 200 só com a URL |
+| FP3 | o `GET /auth/profile` traz a mesma URL e só as chaves do perfil |
+| FP4 | o envio sem arquivo dá 400 (com a mensagem da plataforma); `.txt` e PDF dão 400 com a mensagem de formato; a foto não muda |
+| FP5 | um PNG de mais de 5 MB dá 400 com a mensagem de tamanho, e a foto não muda |
+| FP6 | trocar a foto dá uma URL nova; a antiga deixa de abrir e a nova abre |
+| FP7 | `mine` traz `owner.photo` |
+| FP8 | `donor` traz `donor.photo`, sem e-mail |
+| FP9 | `detail` traz `donor_photo`, sem e-mail |
+| FP10 | a outra pessoa vê a foto na lista de conversas e na leitura das mensagens; a dona não recebe a própria foto |
+| FP11 | o `DELETE` dá 200, a foto fica nula no perfil, em `mine`, `donor` e `detail`, e o arquivo deixa de abrir. A foto removida é uma nova, que o script nunca abriu antes |
+| FP12 | o `DELETE` sem foto dá 200 |
+
+Cuidados:
+
+- **O script altera a foto de perfil da dona.** No fim, mesmo se der erro no meio, a conta volta como estava: sem foto, ou com a foto original reenviada (o script a baixa antes de começar). Se não conseguir baixar a original, ele avisa e deixa a conta sem foto.
+- **O FP10 cria a conversa da outra pessoa sobre a doação, se ela ainda não existir.**
+- **As URLs do armazenamento respondem 303 (redirecionamento).** O script segue o redirecionamento. “Abre” é 200 no final, e “não abre” é 403, 404 ou 410 no final, ou erro. Uma URL já aberta pode ter o redirecionamento guardado em cache. Por isso o FP11 confere uma foto nova, nunca aberta antes.
+- O script espera 2,5 s entre as requisições, o que dá cerca de 1 minuto e meio. A pausa pode ser trocada com a variável `TESTE_FOTO_PAUSA`. O FP5 envia cerca de 5 MB.
+- Depois desta change, rode também o `teste_perfil_real.py`, o `teste_minhas_doacoes_real.py` e o `teste_editar_perfil_real.py`. O PP1, o MD2, o EP2 e o EP11 agora esperam o `photo`. O EP3 confere a resposta do `PATCH`, que continua sem `photo`.
 
 ## 9. Design
 

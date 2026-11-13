@@ -41,8 +41,11 @@ from teste_chat_real import (
 )
 
 PAUSA_SEGUNDOS = float(os.getenv("TESTE_PERFIL_EDICAO_PAUSA", "2.5"))
-CHAVES_PERFIL = {"id", "created_at", "name", "email", "city", "state", "about"}
-CHAVES_DONOR = {"first_name", "city", "state", "member_since", "about"}
+# O GET devolve também a URL da foto (change foto-perfil); a resposta do PATCH
+# não muda e continua sem “photo”.
+CHAVES_PERFIL_PATCH = {"id", "created_at", "name", "email", "city", "state", "about"}
+CHAVES_PERFIL = CHAVES_PERFIL_PATCH | {"photo"}
+CHAVES_DONOR = {"first_name", "city", "state", "member_since", "about", "photo"}
 SOBRE_TESTE = "Teste de Sobre.\nSegunda linha."
 SOBRE_HTML = "<b>oi</b> & <script>x</script>"
 CIDADE_TESTE = "Cidade de Teste"
@@ -137,7 +140,7 @@ def main() -> None:
             d = json_ou_none(r)
             gravou = (
                 isinstance(d, dict)
-                and set(d) == CHAVES_PERFIL
+                and set(d) == CHAVES_PERFIL_PATCH
                 and d.get("city") == CIDADE_TESTE
                 and d.get("state") == estado_teste
                 and d.get("about") == SOBRE_TESTE

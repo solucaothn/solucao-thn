@@ -44,7 +44,7 @@ query "catalog/donations/detail" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $donation.owner_id
-      output = ["name"]
+      output = ["name", "photo"]
     } as $owner
   
     precondition ($category != null && $owner != null) {
@@ -54,6 +54,27 @@ query "catalog/donations/detail" verb=GET {
   
     var $donor_first_name {
       value = (($owner.name ?? "")|trim|split:" "|first)
+    }
+  
+    var $donor_photo {
+      value = null
+    }
+  
+    conditional {
+      if ($owner != null && $owner.photo != null) {
+        conditional {
+          if ($env.PUBLIC_BASE_URL == null || $env.PUBLIC_BASE_URL == "") {
+            throw {
+              name = "ConfigurationError"
+              value = "PUBLIC_BASE_URL não está configurada."
+            }
+          }
+        }
+      
+        var.update $donor_photo {
+          value = $env.PUBLIC_BASE_URL ~ $owner.photo.path
+        }
+      }
     }
   
     var $photo_urls {
@@ -137,6 +158,7 @@ query "catalog/donations/detail" verb=GET {
     contact_preference: $donation.contact_preference
     photos            : $photo_urls
     donor_first_name  : $donor_first_name
+    donor_photo       : $donor_photo
   }
 
   guid = "4fMeGBKAefzsbLsPbgpmV6tA7FM"

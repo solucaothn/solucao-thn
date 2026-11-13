@@ -15,6 +15,9 @@ table user {
     // validado no PATCH auth/profile).
     text? about? filters=trim
   
+    // Foto de perfil pública (opcional), enviada por POST auth/profile/photo.
+    image? photo?
+  
     // The role of the user within their company (e.g., 'admin', 'member').
     enum role? {
       values = ["admin", "member"]
