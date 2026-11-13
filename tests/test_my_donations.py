@@ -748,26 +748,34 @@ class HomeHeaderLinkTests(unittest.TestCase):
             authenticated,
         )
         self.assertIn('["marginRight"] : "0px"', authenticated)
-        # O menu da home: 16 px abaixo de 1280 px e 32 px a partir dele
+        # O menu da home: 12 px abaixo de 1280 px e 32 px a partir dele
         # (gap responsivo do Radix; o lg do Radix é 1280 px).
         rendered = str(index())
-        self.assertIn('gap:({ ["initial"] : "4", ["lg"] : "6" })', rendered)
+        self.assertIn('gap:({ ["initial"] : "3", ["lg"] : "6" })', rendered)
 
     def test_header_never_wraps_between_768_and_1512(self) -> None:
         authenticated = str(self._header_cond().children[0])
         start = authenticated.index('className:"home-greeting"')
         greeting_css = authenticated[start : authenticated.index("})},", start)]
-        # “Olá, <nome>” sempre numa linha só, com reticências num nome longo.
+        # “Olá, <nome>” sempre visível (spec user-account), numa linha só e
+        # com reticências num nome longo.
         self.assertIn('["whiteSpace"] : "nowrap"', greeting_css)
         self.assertIn('["textOverflow"] : "ellipsis"', greeting_css)
         self.assertIn('["overflow"] : "hidden"', greeting_css)
         self.assertNotIn("overflowWrap", greeting_css)
-        # Oculto entre 768 (48em) e 1279 px; visível abaixo e a partir de
-        # 1280 (80em). As regras precisam vir em ordem crescente, senão a de
-        # 48em venceria a de 80em.
-        rule_48 = greeting_css.index('(min-width: 48em)"] : ({ ["maxWidth"] : "110px", ["display"] : "none" })')
-        rule_80 = greeting_css.index('(min-width: 80em)"] : ({ ["maxWidth"] : "160px", ["display"] : "block" })')
-        self.assertLess(rule_48, rule_80)
+        self.assertNotIn('"display"', greeting_css)
+        self.assertIn('(min-width: 0px)"] : ({ ["maxWidth"] : "100px" })', greeting_css)
+        self.assertIn('(min-width: 80em)"] : ({ ["maxWidth"] : "120px" })', greeting_css)
+
+        # Entre 992 e 1279 px, o espaço sai do menu: fonte de 14 px e 12 px
+        # entre os itens; a partir de 1280 px, 16 px e 32 px.
+        rendered = str(index())
+        nav_rule = (
+            '["@media screen and (min-width: 0px)"] : ({ ["fontSize"] : "0.875rem" }), '
+            '["@media screen and (min-width: 80em)"] : ({ ["fontSize"] : "1rem" })'
+        )
+        self.assertEqual(rendered.count(nav_rule), 3)
+        self.assertIn('gap:({ ["initial"] : "3", ["lg"] : "6" })', rendered)
         # O texto do link “Minhas doações” só aparece a partir de 1280 px.
         self.assertIn(
             '["@media screen and (min-width: 80em)"] : ({ ["display"] : "inline" })',
