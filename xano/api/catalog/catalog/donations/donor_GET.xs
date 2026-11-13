@@ -26,12 +26,33 @@ query "catalog/donations/donor" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $donation.owner_id
-      output = ["name", "created_at", "about"]
+      output = ["name", "created_at", "about", "photo"]
     } as $owner
   
     precondition ($owner != null) {
       error_type = "notfound"
       error = "Doação não encontrada."
+    }
+  
+    var $owner_photo {
+      value = null
+    }
+  
+    conditional {
+      if ($owner != null && $owner.photo != null) {
+        conditional {
+          if ($env.PUBLIC_BASE_URL == null || $env.PUBLIC_BASE_URL == "") {
+            throw {
+              name = "ConfigurationError"
+              value = "PUBLIC_BASE_URL não está configurada."
+            }
+          }
+        }
+      
+        var.update $owner_photo {
+          value = $env.PUBLIC_BASE_URL ~ $owner.photo.path
+        }
+      }
     }
   
     var $first_name {
@@ -130,6 +151,7 @@ query "catalog/donations/donor" verb=GET {
         state       : $donation.state
         member_since: $member_since
         about       : $owner.about
+        photo       : $owner_photo
       }
       ```
     items     : $items

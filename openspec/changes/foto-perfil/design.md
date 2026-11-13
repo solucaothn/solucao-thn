@@ -126,3 +126,73 @@
 5. **“Quem doa” e cabeçalho do chat:** hoje nenhum dos dois tem círculo com a inicial, só o nome. Recomendo acrescentar o avatar, com a foto ou a inicial: 48 px no cartão “Quem doa” e 38 px no cabeçalho da conversa, igual ao da lista. A outra opção é mostrar só a foto quando ela existir, sem nada quando não houver foto. A spec já está escrita com a recomendação.
 6. **Foto no `start` do chat:** recomendo não mudar esse endpoint, nem o envio e a edição de mensagens, porque a tela não usa esses dados. A foto vem só na lista e na leitura das mensagens.
 7. **Nome do módulo compartilhado:** recomendo renomear `doafacil/sobre.py` para `doafacil/perfil_publico.py`, com o Sobre e o avatar juntos. Outra opção é um módulo novo só para o avatar.
+
+### Respostas do Higor
+
+As sete recomendações foram aceitas:
+
+1. A foto de perfil tem limite de 5 MB, conferido na tela e no Xano. As fotos de doação continuam sem limite.
+2. O arquivo antigo é apagado do armazenamento (`storage.delete_file`) ao trocar ou remover a foto.
+3. O quadro “Quem vê estas informações” usa o texto novo, que cita a foto.
+4. “Remover foto” não pede confirmação.
+5. O avatar entra no “Quem doa” do detalhe (48 px) e no cabeçalho da conversa (38 px).
+6. O `start` do chat e o envio e a edição de mensagens não mudam.
+7. `doafacil/sobre.py` passa a se chamar `doafacil/perfil_publico.py`.
+
+## Consulta ao Xano Developer MCP (tarefa 2.1)
+
+- **Entrada do arquivo:** `file? photo`. O `.name` do arquivo de entrada já é usado no `publish_POST.xs` (`filename = $file.name`).
+- **Extensão:** `($input.photo.name ?? "")|to_lower|split:"."|last` e `["jpg", "jpeg", "png", "gif", "webp"]|in:$extension`.
+  - O validador recusou o alias `lower` (como recusou o `div` antes) e aceitou `to_lower`.
+  - A checagem vem antes do `storage.create_image`, que responde 500 para outros tipos.
+- **Tamanho:** o `.size`, em bytes, do objeto que o `storage.create_image` devolve. A doc não garante essa propriedade no arquivo de entrada.
+  - Acima de 5 MB (`5242880` bytes), um `conditional` apaga o arquivo novo, e uma `precondition` com `inputerror` responde 400. O teste real já mostrou que esse padrão dá 400.
+- **Apagar:** `storage.delete_file { pathname = <path> }`, confirmado na doc (seção “Deleting & Replacing Files”).
+- **Campo na tabela:** `image? photo?`, como o `photo` da tabela `donation`.
+- **URL nas respostas:** o mesmo bloco do `recent_GET.xs`, que monta `$env.PUBLIC_BASE_URL ~ photo.path` e lança `ConfigurationError` sem a variável. Ele foi repetido nos seis endpoints, por ser o padrão já validado no projeto.
+- **`GET auth/profile`:** passou a montar a resposta campo a campo. Antes ele devolvia o registro inteiro, e o campo `photo` do registro é o objeto do armazenamento, não a URL. O `PATCH auth/profile` não muda e continua sem `photo` na resposta.
+
+## Correção depois do teste real 4.1 (FP2)
+
+- **Sintoma:** um PNG válido, enviado no campo `photo` com o nome `foto-teste.png` e o tipo `image/png`, recebia 400 “Envie uma imagem JPG, PNG, GIF ou WEBP.”. A mesma mensagem servia para “sem arquivo” e para “formato inválido”, então não dava para saber qual checagem falhou.
+- **Comparação com o `publish_POST.xs`, que funciona:**
+  - lá, a entrada é `file[]? photos?`, enviada como `photos[]`. O endpoint não *confere* nenhuma propriedade do arquivo antes de guardar; só repassa `$file.name` como `filename`;
+  - o script e o frontend enviam igual: o nome do campo bate com a entrada, e vão o nome do arquivo com extensão e o tipo do arquivo.
+- **Causa mais provável:** a checagem da extensão **antes** de guardar, feita com `$input.photo.name|to_lower|split:"."|last` e `["jpg", …]|in:$extension`.
+  - A doc do MCP não garante nenhuma propriedade do arquivo de entrada além do `.path`. A tabela de uploads lista a leitura de propriedades da entrada (como `.tmp_name`) entre os erros comuns.
+  - A doc também não garante esse uso do `in`. Ela só garante `name`, `size`, `mime` e `type` no objeto que o armazenamento devolve.
+  - Sem rodar no Xano, não dá para dizer qual das duas falhou. As mensagens agora separadas vão mostrar isso se o problema voltar.
+- **Correção:**
+  - sem arquivo, a resposta é 400 com “Escolha uma foto.”;
+  - o arquivo é guardado primeiro com `storage.create_attachment`, que aceita qualquer tipo e não dá o 500 do `create_image`;
+  - o tipo é conferido pelo `.mime` do objeto guardado, com comparações diretas (`image/jpeg`, `image/png`, `image/gif` e `image/webp`), sem o `in`;
+  - o tamanho é conferido pelo `.size`;
+  - fora das regras, o arquivo novo é apagado e a resposta é 400 com a mensagem de formato ou de tamanho.
+  - A coluna `image?` aceita o objeto do `create_attachment`, como a doc confirma (“verified live”).
+- **Script:** o FP4 passou a conferir também o envio sem arquivo (“Escolha uma foto.”).
+
+## Segunda correção: o plano gratuito do Xano não tem `create_attachment`
+
+- **Sintoma:** com a primeira correção publicada, o FP2 passou a receber **403 “Not supported. Please upgrade your Xano instance.”**. O `storage.create_attachment` **não existe no plano gratuito** do Xano. O `storage.create_image`, usado no `publish_POST.xs`, funciona.
+- **Regra para o projeto:** nos endpoints, usar só o `storage.create_image` para guardar imagens. O `create_attachment`, que a doc do MCP recomenda como padrão, não está disponível na nossa instância.
+- **Correção no `photo_POST.xs`:**
+  - sem arquivo, continua o 400 com “Escolha uma foto.”;
+  - guarda com `storage.create_image`, com os mesmos parâmetros do `publish_POST.xs` (`value = $input.photo`, `access = "public"`, `filename = $input.photo.name`), dentro de um `try_catch` (sintaxe `try_catch { try { … } catch { … } }`, confirmada na doc do MCP, tópico `syntax`, “Error Handling”);
+  - se o `create_image` der erro (ele responde 500 para arquivos que não são imagem), o `catch` só marca a falha numa variável, e uma `precondition` com `inputerror` responde 400 com “Envie uma imagem JPG, PNG, GIF ou WEBP.”;
+  - depois de guardar, o tipo é conferido pelo `.mime` (`image/jpeg`, `image/png`, `image/gif` ou `image/webp`) e o tamanho pelo `.size` (até 5 242 880 bytes). Fora disso, o arquivo novo é apagado e a resposta é 400 com a mensagem de formato ou de tamanho;
+  - nenhuma propriedade da entrada é conferida antes de guardar.
+
+## Terceira rodada do teste real (10 de 13)
+
+- **FP4:** o Xano recusa o envio sem arquivo **antes** de executar o endpoint, com 400 “Missing param: photo”.
+  - O FP4 passou a aceitar qualquer 400 nesse caso.
+  - A precondição “Escolha uma foto.” fica como defesa, e a tela só envia com um arquivo escolhido.
+  - A spec foi ajustada.
+- **FP6 e FP11:** as URLs do armazenamento respondem **303** (redirecionamento). O script passou a seguir os redirecionamentos: “abre” é 200 no final, e “não abre” é 403, 404 ou 410 no final, ou erro.
+- **FP11 (o arquivo parecia continuar existindo depois do `DELETE`):**
+  - **Comparação:** o `photo_DELETE.xs` e o trecho do `photo_POST.xs` que apaga a foto antiga são **iguais**. Os dois leem a foto com `db.get user` **antes** de gravar e apagam com `storage.delete_file { pathname = $current.photo.path }`, no mesmo `conditional`. Não há diferença de ordem nem de formato.
+  - **Diferença no teste:**
+    - no FP6, o script conferiu a URL antiga, **nunca aberta antes**, e ela deu 404;
+    - no FP11, conferiu a URL atual, que **já tinha sido aberta no FP6**, e recebeu 303 sem seguir o redirecionamento;
+    - o 303 não prova que o arquivo existe, e um redirecionamento já visto pode ter ficado em cache.
+  - **Decisão:** sem evidência de bug, o `photo_DELETE.xs` **não foi alterado**. O FP11 agora envia uma foto nova, nunca aberta, remove essa foto e confere a URL dela seguindo os redirecionamentos. Se ela ainda abrir, o bug é real e será corrigido com essa evidência.

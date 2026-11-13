@@ -304,13 +304,13 @@ query "catalog/chat/messages" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $conversation.donor_id
-      output = ["name"]
+      output = ["name", "photo"]
     } as $donor_user
   
     db.get user {
       field_name = "id"
       field_value = $conversation.interested_user_id
-      output = ["name"]
+      output = ["name", "photo"]
     } as $interested_user
   
     var $donor_first_name {
@@ -333,6 +333,40 @@ query "catalog/chat/messages" verb=GET {
       if ($interested_user != null) {
         var.update $interested_first_name {
           value = (($interested_user.name ?? "")|trim|split:" "|first)
+        }
+      }
+    }
+  
+    // Foto só da OUTRA pessoa participante (nunca a de quem consulta).
+    var $other_user {
+      value = $donor_user
+    }
+  
+    conditional {
+      if ($conversation.donor_id == $auth.id) {
+        var.update $other_user {
+          value = $interested_user
+        }
+      }
+    }
+  
+    var $other_user_photo {
+      value = null
+    }
+  
+    conditional {
+      if ($other_user != null && $other_user.photo != null) {
+        conditional {
+          if ($env.PUBLIC_BASE_URL == null || $env.PUBLIC_BASE_URL == "") {
+            throw {
+              name = "ConfigurationError"
+              value = "PUBLIC_BASE_URL não está configurada."
+            }
+          }
+        }
+      
+        var.update $other_user_photo {
+          value = $env.PUBLIC_BASE_URL ~ $other_user.photo.path
         }
       }
     }
@@ -425,6 +459,7 @@ query "catalog/chat/messages" verb=GET {
     has_older                 : $has_older
     has_newer                 : $has_newer
     other_last_read_message_id: $other_last_read_message_id
+    other_user_photo          : $other_user_photo
     edited_messages           : $edited_with_names
     server_time               : $server_time
   }

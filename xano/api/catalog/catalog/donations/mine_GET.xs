@@ -10,8 +10,29 @@ query "catalog/donations/mine" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $auth.id
-      output = ["name", "about"]
+      output = ["name", "about", "photo"]
     } as $owner
+  
+    var $owner_photo {
+      value = null
+    }
+  
+    conditional {
+      if ($owner != null && $owner.photo != null) {
+        conditional {
+          if ($env.PUBLIC_BASE_URL == null || $env.PUBLIC_BASE_URL == "") {
+            throw {
+              name = "ConfigurationError"
+              value = "PUBLIC_BASE_URL não está configurada."
+            }
+          }
+        }
+      
+        var.update $owner_photo {
+          value = $env.PUBLIC_BASE_URL ~ $owner.photo.path
+        }
+      }
+    }
   
     var $first_name {
       value = (($owner.name ?? "")|trim|split:" "|first)
@@ -112,6 +133,7 @@ query "catalog/donations/mine" verb=GET {
       {
         first_name: $first_name
         about     : $owner.about
+        photo     : $owner_photo
       }
       ```
     counts    : ```

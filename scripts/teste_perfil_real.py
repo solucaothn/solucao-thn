@@ -43,8 +43,9 @@ ID_INEXISTENTE = 2_000_000_000
 MENSAGEM_404 = "Doação não encontrada."
 
 CHAVES_RESPOSTA = {"donor", "items", "page", "per_page", "total", "page_total"}
-# O “about” (Sobre) entrou na change editar-perfil: texto ou nulo.
-CHAVES_DONOR = {"first_name", "city", "state", "member_since", "about"}
+# O “about” (Sobre) entrou na change editar-perfil e o “photo” (URL da foto
+# de perfil) na change foto-perfil: os dois são texto ou nulo.
+CHAVES_DONOR = {"first_name", "city", "state", "member_since", "about", "photo"}
 CHAVES_ITEM = {"id", "created_at", "title", "photo", "condition"}
 # Chaves que não podem aparecer em nenhum nível da resposta.
 CHAVES_PROIBIDAS = {
@@ -127,6 +128,8 @@ def tipos_ok(dados: Any) -> tuple[bool, str]:
             problemas.append(campo)
     if donor.get("about") is not None and not isinstance(donor.get("about"), str):
         problemas.append("about")
+    if donor.get("photo") is not None and not isinstance(donor.get("photo"), str):
+        problemas.append("photo")
     for campo in ("page", "per_page", "total", "page_total"):
         if not eh_int(dados.get(campo)):
             problemas.append(campo)

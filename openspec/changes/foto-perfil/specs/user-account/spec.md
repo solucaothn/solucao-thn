@@ -159,6 +159,7 @@ O sistema MUST permitir que a pessoa autenticada envie e remova somente a própr
 #### Scenario: Envio sem arquivo
 - **WHEN** a requisição de envio não traz arquivo
 - **THEN** o endpoint MUST responder HTTP 400 sem alterar a foto atual
+- **AND** a mensagem MAY ser a da própria plataforma, que recusa a requisição antes de executar o endpoint; a página só envia com um arquivo escolhido
 
 #### Scenario: Remover a foto
 - **WHEN** uma pessoa autenticada remove a foto de perfil
