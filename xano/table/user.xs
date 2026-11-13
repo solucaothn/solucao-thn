@@ -11,6 +11,10 @@ table user {
     text city filters=trim
     text state filters=trim
   
+    // Texto público “Sobre” do perfil (opcional, até 300 caracteres,
+    // validado no PATCH auth/profile).
+    text? about? filters=trim
+  
     // The role of the user within their company (e.g., 'admin', 'member').
     enum role? {
       values = ["admin", "member"]

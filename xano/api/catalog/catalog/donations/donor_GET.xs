@@ -26,7 +26,7 @@ query "catalog/donations/donor" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $donation.owner_id
-      output = ["name", "created_at"]
+      output = ["name", "created_at", "about"]
     } as $owner
   
     precondition ($owner != null) {
@@ -129,6 +129,7 @@ query "catalog/donations/donor" verb=GET {
         city        : $donation.city
         state       : $donation.state
         member_since: $member_since
+        about       : $owner.about
       }
       ```
     items     : $items

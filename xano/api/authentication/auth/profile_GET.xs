@@ -9,7 +9,7 @@ query "auth/profile" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $auth.id
-      output = ["id", "created_at", "name", "email", "city", "state"]
+      output = ["id", "created_at", "name", "email", "city", "state", "about"]
     } as $user
   }
 
