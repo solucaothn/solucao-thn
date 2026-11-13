@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from doafacil.doafacil import app
+from doafacil.doafacil import FIELD_PLACEHOLDER_SELECTOR, FIELD_TEXT_SELECTOR, app
 from doafacil.login import (
     AUTH_API_ENV,
     RECOVERY_CODE_ERROR,
@@ -762,7 +762,10 @@ class RecoveryPageTests(unittest.TestCase):
             "recovery-password-confirmation",
         ):
             self.assertIn(f"#{field_id}:-webkit-autofill", source)
-            self.assertIn(f"#{field_id}::placeholder", source)
+            # Placeholder e texto digitado vêm das regras globais dos campos.
+            self.assertNotIn(f"#{field_id}::placeholder", source)
+        self.assertIn(FIELD_PLACEHOLDER_SELECTOR, app.style)
+        self.assertIn(FIELD_TEXT_SELECTOR, app.style)
 
         readme = (
             Path(__file__).parents[1] / "docs" / "design" / "README.md"

@@ -23,6 +23,7 @@ from doafacil.detalhe_doacao import (
     DonationDetailState,
     donation_detail_page,
 )
+from doafacil.editar_perfil import EditProfileState, edit_profile_page
 from doafacil.login import LoginState, login_page
 from doafacil.minhas_doacoes import (
     EditDonationState,
@@ -949,26 +950,35 @@ def index() -> rx.Component:
     )
 
 
+# Campos de texto legíveis em todo o site, em qualquer tema do sistema: o
+# texto digitado ou colado fica #1F1F1F opaco, e o texto de exemplo #6B6B6B.
+# O Radix pinta o <input> e o <textarea> pela classe (.rt-TextFieldInput,
+# .rt-TextAreaInput), que vence um seletor só de elemento; por isso o
+# !important. O placeholder herda o -webkit-text-fill-color do campo, que
+# vence o color, então a cor dele também vai no -webkit-text-fill-color.
+# Exceções: campos desativados (como o do chat somente leitura) mantêm o
+# visual de desativado do Radix, e o <input type="file"> escondido do upload,
+# hidden, checkbox e radio ficam de fora.
+FIELD_TEXT_SELECTOR = (
+    "input:not([type='file']):not([type='hidden']):not([type='checkbox'])"
+    ":not([type='radio']):not(:disabled), "
+    "textarea:not(:disabled)"
+)
+FIELD_PLACEHOLDER_SELECTOR = "input::placeholder, textarea::placeholder"
+FIELD_TEXT_COLOR = "#1F1F1F"
+FIELD_PLACEHOLDER_COLOR = "#6B6B6B"
+
 app = rx.App(
     style={
-        # O placeholder herda o -webkit-text-fill-color do campo, que vence o
-        # color; por isso a cor dele também vai no -webkit-text-fill-color.
-        "#donation-title::placeholder": {
-            "color": "#6B6B6B",
-            "WebkitTextFillColor": "#6B6B6B",
-            "opacity": "1",
+        FIELD_TEXT_SELECTOR: {
+            "color": f"{FIELD_TEXT_COLOR} !important",
+            "WebkitTextFillColor": f"{FIELD_TEXT_COLOR} !important",
+            "opacity": "1 !important",
         },
-        "#donation-description::placeholder": {
-            "color": "#6B6B6B",
-            "WebkitTextFillColor": "#6B6B6B",
-            "opacity": "1",
-        },
-        # Texto digitado ou colado: cor aplicada direto no <input>/<textarea>
-        # pelo id, sem depender da herança do tema do Radix.
-        "#donation-title, #donation-description": {
-            "color": "#1F1F1F",
-            "WebkitTextFillColor": "#1F1F1F",
-            "opacity": "1",
+        FIELD_PLACEHOLDER_SELECTOR: {
+            "color": f"{FIELD_PLACEHOLDER_COLOR} !important",
+            "WebkitTextFillColor": f"{FIELD_PLACEHOLDER_COLOR} !important",
+            "opacity": "1 !important",
         },
         (
             "#donation-category, "
@@ -987,58 +997,6 @@ app = rx.App(
             ".rt-SelectTriggerInner"
         ): {
             "color": "#333333",
-        },
-        "#public-home-search::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#chat-message-input::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#login-email::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#login-password::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#signup-name::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#signup-email::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#signup-city::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#signup-password::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#signup-confirm-password::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#recovery-email::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#recovery-code::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#recovery-password::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
-        },
-        "#recovery-password-confirmation::placeholder": {
-            "color": "#6b6b6b",
-            "opacity": "1",
         },
         (
             "#login-email:-webkit-autofill, "
@@ -1075,8 +1033,8 @@ app = rx.App(
             "#recovery-password-confirmation:-webkit-autofill:hover, "
             "#recovery-password-confirmation:-webkit-autofill:focus"
         ): {
+            # A cor do texto vem da regra global dos campos.
             "background_color": "white",
-            "WebkitTextFillColor": "#2b2b2b",
             "box_shadow": "0 0 0 1000px white inset",
         },
         ".recent-donations-carousel::-webkit-scrollbar": {
@@ -1145,6 +1103,11 @@ app.add_page(
     edit_donation_page,
     route="/minhas-doacoes/[id]/editar",
     on_load=EditDonationState.load_edit,
+)
+app.add_page(
+    edit_profile_page,
+    route="/perfil/editar",
+    on_load=EditProfileState.load_profile,
 )
 app.add_page(
     chat_page,

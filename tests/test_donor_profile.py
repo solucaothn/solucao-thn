@@ -262,7 +262,7 @@ class DonorProfileClientTests(unittest.TestCase):
         profile = _parse_donor_profile(payload, NOW)
         self.assertEqual(
             set(profile),
-            {"first_name", "city", "state", "member_since", "items", "page", "total", "page_total"},
+            {"first_name", "city", "state", "member_since", "about", "items", "page", "total", "page_total"},
         )
         self.assertEqual(
             set(profile["items"][0]), {"id", "title", "photo", "condition_label", "is_new"}
@@ -596,6 +596,43 @@ class DonorProfilePageTests(unittest.TestCase):
         rendered = str(donor_profile_page())
         self.assertIn("24px 16px 48px", rendered)
         self.assertIn('"1396px"', rendered)
+
+
+class DonorProfileAboutTests(unittest.TestCase):
+    """Sobre de quem doa (change editar-perfil)."""
+
+    def test_about_is_read_trimmed_and_null_becomes_empty(self) -> None:
+        with_about = _parse_donor_profile(
+            _profile(donor={**PROFILE_PAYLOAD["donor"], "about": "  Gosto de doar.\nAté breve.  "}),
+            NOW,
+        )
+        self.assertEqual(with_about["about"], "Gosto de doar.\nAté breve.")
+        null_about = _parse_donor_profile(_profile(donor={**PROFILE_PAYLOAD["donor"], "about": None}), NOW)
+        self.assertEqual(null_about["about"], "")
+        missing = _parse_donor_profile(_profile(), NOW)
+        self.assertEqual(missing["about"], "")
+        with self.assertRaises(ValueError):
+            _parse_donor_profile(_profile(donor={**PROFILE_PAYLOAD["donor"], "about": 5}), NOW)
+
+    def test_load_profile_sets_about(self) -> None:
+        state = _state("17", about="")
+        parsed = _parse_donor_profile(
+            _profile(donor={**PROFILE_PAYLOAD["donor"], "about": "Gosto de doar."}), NOW
+        )
+        with patch("doafacil.perfil_doador.fetch_donor_profile", new_callable=AsyncMock, return_value=parsed):
+            asyncio.run(DonorProfileState.load_profile.fn(state))
+        self.assertEqual(state.about, "Gosto de doar.")
+
+    def test_identity_card_shows_about_as_plain_text_only_when_filled(self) -> None:
+        rendered = str(_identity_card()).replace("?.", ".")
+        self.assertIn("about_rx_state_", rendered)
+        self.assertIn('["whiteSpace"] : "pre-wrap"', rendered)
+        # Vazio: nada no lugar (o texto fica dentro de um cond com fragmento vazio).
+        self.assertIn("about_rx_state_.valueOf", rendered)
+        self.assertIn('=== ""', rendered)
+        self.assertIn("(jsx(Fragment,{},))", rendered)
+        self.assertNotIn("dangerouslySetInnerHTML", rendered)
+        self.assertNotIn("Sobre", _component_contents(_identity_card()))
 
 
 if __name__ == "__main__":

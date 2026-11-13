@@ -28,7 +28,7 @@ from doafacil.cadastro_doacao import (
     donation_creation_page,
     _wizard_content,
 )
-from doafacil.doafacil import app
+from doafacil.doafacil import FIELD_PLACEHOLDER_SELECTOR, FIELD_TEXT_SELECTOR, app
 
 
 class DonationCreationTests(unittest.TestCase):
@@ -959,23 +959,27 @@ class DonationCreationTests(unittest.TestCase):
                     _literal(field.style["color"]),
                     "#333333",
                 )
-                self.assertEqual(
-                    app.style[f"#{field_id}::placeholder"],
-                    {
-                        "color": "#6B6B6B",
-                        "WebkitTextFillColor": "#6B6B6B",
-                        "opacity": "1",
-                    },
-                )
+                # Placeholder e texto digitado vêm das regras globais dos
+                # campos (texto #1F1F1F e exemplo #6B6B6B, opacos).
+                self.assertNotIn(f"#{field_id}::placeholder", app.style)
 
         self.assertEqual(
-            app.style["#donation-title, #donation-description"],
+            app.style[FIELD_PLACEHOLDER_SELECTOR],
             {
-                "color": "#1F1F1F",
-                "WebkitTextFillColor": "#1F1F1F",
-                "opacity": "1",
+                "color": "#6B6B6B !important",
+                "WebkitTextFillColor": "#6B6B6B !important",
+                "opacity": "1 !important",
             },
         )
+        self.assertEqual(
+            app.style[FIELD_TEXT_SELECTOR],
+            {
+                "color": "#1F1F1F !important",
+                "WebkitTextFillColor": "#1F1F1F !important",
+                "opacity": "1 !important",
+            },
+        )
+        self.assertNotIn("#donation-title, #donation-description", app.style)
 
         select_triggers = {
             _literal(node.id): node

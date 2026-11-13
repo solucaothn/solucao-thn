@@ -6,7 +6,7 @@ Permite que quem doa veja todas as próprias doações, com o status e os contad
 ## Requirements
 
 ### Requirement: Listagem das próprias doações
-O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisição, uma página das doações da pessoa autenticada, de qualquer status, os contadores dela e o primeiro nome. A pessoa é sempre derivada da sessão, nunca de um identificador enviado pelo cliente.
+O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisição, uma página das doações da pessoa autenticada, de qualquer status, os contadores dela, o primeiro nome e o texto de Sobre. A pessoa é sempre derivada da sessão, nunca de um identificador enviado pelo cliente.
 
 #### Scenario: Página das próprias doações
 - **WHEN** uma pessoa autenticada pede uma página das suas doações
@@ -19,6 +19,7 @@ O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisiç
 - **THEN** a resposta MUST incluir o contador de doações ativas, que soma as disponíveis e as reservadas, e o contador de doações concluídas
 - **AND** os contadores MUST considerar todas as doações da pessoa, não só as da página pedida
 - **AND** a resposta MUST incluir o primeiro nome da pessoa autenticada como único dado nominal
+- **AND** a resposta MUST incluir o texto de Sobre da pessoa autenticada, vazio ou nulo quando não preenchido
 
 #### Scenario: Somente dados da própria pessoa
 - **WHEN** a consulta é respondida
@@ -134,7 +135,9 @@ A página `/minhas-doacoes` MUST exigir login e apresentar o cartão da pessoa e
 #### Scenario: Cartão da pessoa
 - **WHEN** a página carrega com sucesso
 - **THEN** MUST mostrar um círculo com a inicial, o primeiro nome, “Doações” com o contador de ativas e “Doações realizadas” com o contador de concluídas
-- **AND** MUST NOT apresentar foto de perfil, e-mail, “Sobre”, “Compartilhar”, “Editar perfil”, avaliações, selo de verificação ou botão de chat, nem como “Em breve”
+- **AND** MUST mostrar o botão “Editar perfil”, que leva a `/perfil/editar`, com área de toque de pelo menos 44 px
+- **AND** quando a pessoa preencheu o Sobre, MUST mostrá-lo como texto simples, preservando as quebras de linha; com o Sobre vazio, MUST NOT mostrar nada no lugar dele
+- **AND** MUST NOT apresentar foto de perfil, e-mail, “Compartilhar”, avaliações, selo de verificação ou botão de chat, nem como “Em breve”
 
 #### Scenario: Grade das doações
 - **WHEN** a pessoa tem doações

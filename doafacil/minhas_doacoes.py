@@ -31,6 +31,7 @@ from doafacil.detalhe_doacao import (
     _positive_donation_id,
 )
 from doafacil.login import LoginState
+from doafacil.sobre import about_text, parse_about
 
 
 MY_DONATIONS_PATH = "/catalog/donations/mine"
@@ -217,11 +218,17 @@ def _parse_my_donations(payload: object) -> dict[str, Any]:
     ):
         raise MyDonationsServiceError
 
+    try:
+        about = parse_about(owner.get("about"))
+    except ValueError:
+        raise MyDonationsServiceError from None
+
     items = [parsed for item in raw_items if (parsed := _parse_my_donation_item(item))]
     if raw_items and not items:
         raise MyDonationsServiceError
     return {
         "first_name": first_name.strip(),
+        "about": about,
         "active": active,
         "completed": completed,
         "items": items,
@@ -347,6 +354,7 @@ def _clear_session(state: Any) -> None:
 
 def _clear_list(state: Any) -> None:
     state.first_name = ""
+    state.about = ""
     state.initial = ""
     state.active_count = 0
     state.completed_count = 0
@@ -358,6 +366,7 @@ def _clear_list(state: Any) -> None:
 
 def _apply_list(state: Any, data: dict[str, Any]) -> None:
     state.first_name = data["first_name"]
+    state.about = data["about"]
     state.initial = avatar_initial(data["first_name"])
     state.active_count = data["active"]
     state.completed_count = data["completed"]
@@ -426,6 +435,7 @@ class MyDonationsState(LoginState):
     view_state: str = "loading"
     load_error: str = ""
     first_name: str = ""
+    about: str = ""
     initial: str = ""
     active_count: int = 0
     completed_count: int = 0
@@ -1037,8 +1047,9 @@ def _stat(value: rx.Var, label: rx.Var) -> rx.Component:
 
 
 def _owner_card() -> rx.Component:
-    """Círculo com a inicial, primeiro nome e os dois contadores. Sem foto,
-    e-mail, “Sobre”, “Compartilhar”, “Editar perfil”, avaliações, selo ou chat."""
+    """Círculo com a inicial, primeiro nome, os dois contadores, o Sobre (só
+    quando preenchido) e “Editar perfil”. Sem foto, e-mail, “Compartilhar”,
+    avaliações, selo ou chat."""
     return rx.vstack(
         rx.box(
             rx.text(
@@ -1071,6 +1082,24 @@ def _owner_card() -> rx.Component:
             spacing="6",
             justify="center",
             width="100%",
+        ),
+        about_text(MyDonationsState.about, text_align="center"),
+        rx.link(
+            "Editar perfil",
+            href="/perfil/editar",
+            class_name="my-donations-edit-profile",
+            display="inline-flex",
+            align_items="center",
+            justify_content="center",
+            min_height="44px",
+            width="100%",
+            padding="0 16px",
+            border=f"1px solid {LINK_GREEN}",
+            border_radius="999px",
+            color=LINK_GREEN,
+            font_weight="700",
+            _hover={"background": "#F1F8F3", "textDecoration": "none"},
+            _focus_visible={"outline": f"2px solid {LINK_GREEN}", "outlineOffset": "2px"},
         ),
         class_name="my-donations-owner",
         align="center",

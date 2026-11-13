@@ -279,7 +279,7 @@ class MyDonationsClientTests(unittest.TestCase):
         data = _parse_my_donations(payload)
         self.assertEqual(
             set(data),
-            {"first_name", "active", "completed", "items", "page", "total", "page_total"},
+            {"first_name", "about", "active", "completed", "items", "page", "total", "page_total"},
         )
         self.assertEqual(
             set(data["items"][0]),
@@ -630,7 +630,8 @@ class MyDonationsPageTests(unittest.TestCase):
         page = my_donations_page()
         contents = _contents(page)
         rendered = str(page)
-        for excluded in ("Sobre", "Compartilhar", "Editar perfil", "Avaliação", "Verificado", "Chat", "Email", "E-mail", "Em breve", "NOVO"):
+        # “Editar perfil” entrou na change editar-perfil (o botão do cartão).
+        for excluded in ("Sobre", "Compartilhar", "Avaliação", "Verificado", "Chat", "Email", "E-mail", "Em breve", "NOVO"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
         for excluded in ("email", "owner_id", "LucideMessageCircle"):
@@ -1003,6 +1004,34 @@ class EditDonationPageTests(unittest.TestCase):
         self.assertIn("foi conclu\\u00edda e n\\u00e3o pode mais ser editada.", rendered)
         self.assertNotIn("chat-fab", rendered)
         self.assertEqual(DONATION_NOT_FOUND_MESSAGE, "Doação não encontrada")
+
+
+class MyDonationsAboutAndEditProfileTests(unittest.TestCase):
+    """Sobre e “Editar perfil” no cartão da pessoa (change editar-perfil)."""
+
+    def test_owner_about_is_read(self) -> None:
+        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {"first_name": "Ana", "about": " Oi.\nTchau. "}})
+        self.assertEqual(data["about"], "Oi.\nTchau.")
+        self.assertEqual(_parse_my_donations(LIST_PAYLOAD)["about"], "")
+        with self.assertRaises(MyDonationsServiceError):
+            _parse_my_donations({**LIST_PAYLOAD, "owner": {"first_name": "Ana", "about": []}})
+
+    def test_load_page_sets_about(self) -> None:
+        state = _list_state(about="")
+        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {"first_name": "Ana", "about": "Oi."}})
+        with patch("doafacil.minhas_doacoes.fetch_my_donations", new_callable=AsyncMock, return_value=data):
+            _events(MyDonationsState.load_page.fn(state))
+        self.assertEqual(state.about, "Oi.")
+
+    def test_owner_card_has_about_and_edit_profile_button(self) -> None:
+        card = _owner_card()
+        rendered = str(card).replace("?.", ".")
+        self.assertIn("about_rx_state_", rendered)
+        self.assertIn('["whiteSpace"] : "pre-wrap"', rendered)
+        self.assertIn("Editar perfil", _contents(card))
+        self.assertIn('to:"/perfil/editar"', rendered)
+        self.assertIn('["minHeight"] : "44px"', rendered)
+        self.assertIn('"1px solid #007A42"', rendered)
 
 
 if __name__ == "__main__":

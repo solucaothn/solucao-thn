@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 
 from doafacil.doafacil import (
+    FIELD_PLACEHOLDER_SELECTOR,
     HomeState,
     _fetch_donation_count,
     _fetch_recent_donations,
@@ -383,9 +384,11 @@ class PublicHomeTests(unittest.TestCase):
             search_input._placeholder,
             {"color": "#6b6b6b", "opacity": 1},
         )
+        # O placeholder da busca vem da regra global dos campos.
+        self.assertNotIn("#public-home-search::placeholder", app.style)
         self.assertEqual(
-            app.style["#public-home-search::placeholder"],
-            {"color": "#6b6b6b", "opacity": "1"},
+            app.style[FIELD_PLACEHOLDER_SELECTOR]["color"],
+            "#6B6B6B !important",
         )
         search_selects = [
             node
