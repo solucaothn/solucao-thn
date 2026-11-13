@@ -7,7 +7,7 @@ import httpx
 import reflex as rx
 
 from doafacil.cadastro import BRAZILIAN_STATES, signup_page
-from doafacil.doafacil import app
+from doafacil.doafacil import FIELD_TEXT_SELECTOR, app
 from doafacil.login import (
     AUTH_API_ENV,
     AUTH_SIGNUP_PATH,
@@ -981,7 +981,12 @@ class SignupPageTests(unittest.TestCase):
             self.assertIn(f"#{field_id}:-webkit-autofill:hover", selector)
             self.assertIn(f"#{field_id}:-webkit-autofill:focus", selector)
         self.assertEqual(styles["background_color"], "white")
-        self.assertEqual(styles["WebkitTextFillColor"], "#2b2b2b")
+        # A cor do texto (também no autofill) vem da regra global dos campos.
+        self.assertNotIn("WebkitTextFillColor", styles)
+        self.assertEqual(
+            app.style[FIELD_TEXT_SELECTOR]["WebkitTextFillColor"],
+            "#1F1F1F !important",
+        )
         self.assertIn("white inset", styles["box_shadow"])
         self.assertNotIn("public-home-search", selector)
 

@@ -56,6 +56,7 @@ A página `/perfil/editar` MUST exigir login e permitir editar nome, Sobre, cida
 - **AND** o campo Sobre MUST aceitar quebras de linha e mostrar a dica “Não coloque telefone, endereço ou e-mail: este texto é público.”
 - **AND** Estado MUST permitir selecionar uma das 27 siglas de unidades federativas do Brasil
 - **AND** MUST mostrar o e-mail num campo só de leitura, com o texto “O e-mail é usado para entrar e não pode ser alterado.”
+- **AND** o campo de e-mail MUST ser somente leitura e não desativado, para permitir selecionar e copiar, com texto `#1F1F1F` sobre fundo `#F1F1F1`, um ícone de cadeado `#6B6B6B` dentro do campo à direita, o rótulo acessível “E-mail (não pode ser alterado)” e cursor padrão
 - **AND** MUST NOT apresentar campo ou ação de foto de perfil
 
 #### Scenario: Contador do Sobre
@@ -98,6 +99,11 @@ A página `/perfil/editar` MUST exigir login e permitir editar nome, Sobre, cida
 #### Scenario: Texto de Sobre literal
 - **WHEN** o Sobre contém marcação HTML ou quebras de linha
 - **THEN** a prévia, o perfil público e o cartão de Minhas doações MUST apresentá-lo como texto simples, preservando as quebras de linha, sem interpretar HTML
+
+#### Scenario: Texto digitado legível
+- **WHEN** a pessoa digita ou cola um texto em Nome, Sobre ou Cidade, inclusive com o tema escuro do sistema
+- **THEN** o texto MUST aparecer em `#1F1F1F`, com opacidade total
+- **AND** os textos de exemplo MUST aparecer em `#6B6B6B`, com opacidade total
 
 #### Scenario: Layout, contraste e movimento
 - **WHEN** a página é exibida numa largura de 360 px

@@ -116,7 +116,8 @@ O Xano permite 10 requisições a cada 20 s.
     - **Formulário:** um cartão branco com `auth-card-enter`.
       - **“Dados públicos”:** Nome (`input`), com a ajuda “Só o primeiro nome aparece para outras pessoas.” (dúvida 1), e Sobre (`text_area` com `max_length=300`, o placeholder “Conte um pouco sobre você” e o contador “N/300” com `aria-live="polite"`).
       - **“Localização”:** Cidade e Estado (`_edit_select` com as 27 siglas), lado a lado a partir de `md` e um abaixo do outro no celular.
-      - **“Conta”:** E-mail num `input` `read_only` com fundo `#F2F2F2` e texto `#555555` (6,7:1), com `aria-describedby` apontando para “O e-mail é usado para entrar e não pode ser alterado.”.
+      - **“Conta”:** E-mail num `input` `read_only` (não desativado, para poder selecionar e copiar), com fundo `#F1F1F1`, texto `#1F1F1F` (14,6:1), cursor padrão, um cadeado `lock` `#6B6B6B` num `rx.input.slot` à direita, o `aria-label` “E-mail (não pode ser alterado)” e o `aria-describedby` apontando para “O e-mail é usado para entrar e não pode ser alterado.”. Ajustado no roteiro 9.2: a primeira versão, com `#555555` sobre `#F2F2F2`, ficou quase invisível no navegador.
+      - **Texto digitado nos campos:** coberto pela regra global do `app.style`, criada no roteiro 9.2 para todo o site. Ela deixa o texto `#1F1F1F` e o placeholder `#6B6B6B`, os dois opacos, e substitui as regras por campo.
     - **Quadro “Quem vê estas informações”:** fundo `#FFF3D6`, borda `#2A2A2A`, título `#166B3B` e texto `#2A2A2A`. O texto depende da dúvida 4.
     - **Ações:** “Cancelar”, um link com contorno para `/minhas-doacoes`, e “Salvar alterações” (`#007A42`).
     - **Ids próprios:** os campos usam `profile-*`, com o estilo no próprio componente. Não reaproveitam ids do cadastro, que carregam regras do `app.style`.

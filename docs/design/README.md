@@ -10,6 +10,11 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 - Logotipo "doafácil" (coração com mãos) e ilustração de pessoas no rodapé da home.
 - As cores exatas e as fontes devem ser extraídas do Figma ao implementar.
 - Páginas novas usam `auth-card-enter` no cartão central de formulários ou `page-fade-enter` no conteúdo principal das demais; ambas respeitam `prefers-reduced-motion`, sem animar cabeçalho, rodapé ou dados carregados do Xano.
+- **Campos de texto em todo o site:** o texto digitado ou colado é `#1F1F1F` opaco, e o texto de exemplo (placeholder) é `#6B6B6B` opaco, em qualquer tema do sistema.
+  - A regra é global, no `app.style` de `doafacil/doafacil.py`, para todo `input` e `textarea`, com `-webkit-text-fill-color` e `!important`, porque as classes do Radix venceriam um seletor só de elemento.
+  - Ficam de fora os campos desativados (como o do chat somente leitura), o `input type="file"` escondido do upload, `hidden`, `checkbox` e `radio`.
+  - Não há regras por campo: elas foram removidas quando a regra global entrou (change editar-perfil).
+  - Os selects são botões, não campos, e mantêm regra própria para o prompt (`#333333`).
 
 ## Telas prontas
 
@@ -250,6 +255,7 @@ O que segue o Figma:
   - branco, com borda `#D9D9D9` e cantos de 8 px;
   - à esquerda, um círculo `#F2F2F2` com a inicial do primeiro nome em `#555555`, de 120 px no computador e 72 px no celular;
   - o primeiro nome como título (`h1`) em `#166B3B`, “Cidade, UF” em `#2A2A2A` e “No DoaFácil desde <mês> de <ano>” em `#555555`, com o mês por extenso.
+  - abaixo, o **Sobre** de quem doa, que entrou na change editar-perfil. Vai em `#2A2A2A`, como texto simples, com as quebras de linha. Com o Sobre vazio, não aparece nada: nem título, nem espaço reservado.
   - No celular, o círculo fica acima do texto, e tudo fica centralizado.
 - **“Doações disponíveis”** (`h2` em `#166B3B`), com o contador “1 item” ou “N itens” em `#555555` ao lado.
 - **Cartões iguais aos da home:** foto (ou a imagem genérica), título, “Condição: …”, NOVO para doações de até 7 dias e “Acessar”, que leva a `/doacao/<id>` do item.
@@ -290,6 +296,8 @@ O que segue o Figma:
   - branco, com borda `#D9D9D9` e cantos de 8 px;
   - o círculo `#F2F2F2` com a inicial em `#555555` e o primeiro nome;
   - os dois números em `#166B3B`: “Doações”, que soma as disponíveis e as reservadas, e “Doações realizadas”, que conta as concluídas. O rótulo fica no singular com 1.
+  - o **Sobre** da pessoa, centralizado, em `#2A2A2A`, como texto simples com as quebras de linha. Vazio, não aparece;
+  - o botão **“Editar perfil”**, com contorno `#007A42`, 44 px de altura e toda a largura do cartão, que leva a `/perfil/editar`.
 - **Grade à direita, com 6 doações por página:** 3 colunas em telas largas (`lg`), o 3 × 2 do Figma; 2 colunas em telas médias; 1 no celular.
 - **Cartão da doação:** como o da home, com a foto (ou a imagem genérica), o degradê e, em branco, o título e “Condição: …”.
 - **Paginação:** “Página N de M”.
@@ -298,7 +306,7 @@ Diferenças aprovadas em relação ao Figma:
 
 - **Cabeçalho com o logotipo:** “Voltar ao início” fica na linha do logotipo, em `#007A42`, com o mesmo cabeçalho das outras páginas (`back_link_header()`). Os 44 px de área de toque e o rótulo acessível valem também no celular, onde aparece só a seta.
 - **Título à esquerda,** em negrito e `#166B3B`, no lugar do título centralizado e preto.
-- **Cartão da pessoa só com o essencial:** sem foto de perfil, e-mail, “Sobre”, “Compartilhar link do perfil”, “Editar perfil”, avaliações, selo “Verificado” e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”.
+- **Cartão da pessoa só com o essencial:** sem foto de perfil, e-mail, “Compartilhar link do perfil”, avaliações, selo “Verificado” e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”. O Sobre e o “Editar perfil” entraram com a change editar-perfil.
 - **Selo de status no lugar do NOVO,** no canto superior esquerdo da foto. O fundo é opaco, então o contraste não depende da foto:
 
   | Selo | Fundo | Texto | Contraste |
@@ -354,6 +362,52 @@ Diferenças aprovadas em relação ao Figma:
   - “Doação não encontrada”, para um id inválido (sem consultar o Xano) ou para uma doação de outra pessoa ou inexistente;
   - “Esta doação foi concluída e não pode mais ser editada.”;
   - uma mensagem de erro simples.
+
+## Editar perfil
+
+### Frame `Group 7` (`editar-perfil-1`) do Figma — página `/perfil/editar`
+
+A referência é o frame `Group 7` do arquivo do Figma, ainda sem PNG em `docs/design`. Esta seção prevalece sobre ele. A página só abre com login; sem login, leva a `/login`. Chega-se a ela pelo botão “Editar perfil” do cartão da pessoa em `/minhas-doacoes`.
+
+O que segue o Figma:
+
+- **Título “Editar perfil”** em `#166B3B`, negrito, à esquerda.
+- **Prévia à esquerda** (até 280 px no computador) e **formulário à direita**, num cartão branco com borda `#D9D9D9`. No celular, uma coluna, com a prévia em cima.
+- **Seções do formulário:**
+  - **“Dados públicos”:**
+    - Nome, com o nome completo da conta;
+    - Sobre: uma área de texto com o placeholder “Conte um pouco sobre você”, o limite de 300 caracteres e o contador “N/300”.
+  - **“Localização”:** Cidade e Estado lado a lado no computador e um abaixo do outro no celular.
+  - **“Conta”:** o E-mail num campo só de leitura.
+- **Quadro “Quem vê estas informações”**, em amarelo-claro com borda escura, e os botões “Cancelar” e “Salvar alterações” no fim.
+
+Diferenças aprovadas em relação ao Figma:
+
+- **Cabeçalho com o logotipo:** “Voltar a Minhas doações” em `#007A42`, no lugar de “Voltar ao perfil”, com o mesmo cabeçalho das outras páginas (`back_link_header()`).
+- **Sem foto:** a seção “Foto” (“Alterar foto”, “Remover foto”) e a foto da prévia ficam para uma change própria.
+- **Prévia só com o que é público:** o círculo `#F2F2F2` com a inicial em `#555555`, o primeiro nome, “Cidade, UF” e o Sobre.
+  - Ela acompanha a digitação.
+  - Não mostra e-mail, contadores, “Editar perfil”, “Compartilhar” nem selo.
+  - A legenda é “Prévia — é assim que seu perfil aparece para outras pessoas.”, em `#555555`.
+- **Ajudas abaixo dos campos,** em `#555555`, com 0,8 rem:
+  - no Nome, “Só o primeiro nome aparece para outras pessoas.”;
+  - no Sobre, o contador “N/300” (anunciado ao leitor de tela com `aria-live="polite"`) e a dica “Não coloque telefone, endereço ou e-mail: este texto é público.”;
+  - no E-mail, “O e-mail é usado para entrar e não pode ser alterado.”, ligada ao campo por `aria-describedby`.
+- **Campos:**
+  - **Nome, Cidade e Sobre:** fundo branco, borda `#C8C8C8`, cantos de 8 px e texto `#1F1F1F`.
+  - **Estado:** o select branco da edição de doação, com as 27 siglas e foco visível em `#007A42`.
+  - **E-mail:** somente leitura (`readOnly`, não desativado, para poder selecionar e copiar), com fundo `#F1F1F1`, texto `#1F1F1F` (14,6:1), cursor padrão e um cadeado (`lock`, `#6B6B6B`) dentro do campo, à direita. O rótulo acessível é “E-mail (não pode ser alterado)”, e a ajuda continua ligada por `aria-describedby`.
+- **Texto do quadro, corrigido em relação ao Figma:** “Seu primeiro nome, cidade, estado e o texto de Sobre aparecem no seu perfil público. Suas doações mostram o primeiro nome e a cidade e o estado do momento em que foram publicadas. Seu e-mail é usado para entrar e só é mostrado a pessoas logadas que pedirem contato numa doação sua com a preferência “E-mail”.”
+  - O fundo é `#FFF3D6`, com borda `#2A2A2A`.
+  - O título vai em `#166B3B` (6,0:1) e o texto em `#2A2A2A` (13,0:1).
+- **Ações:**
+  - “Cancelar”, com contorno `#85858D`, volta a `/minhas-doacoes` sem salvar;
+  - “Salvar alterações” (`#007A42`) envia o formulário inteiro e volta a `/minhas-doacoes` com o aviso “Alterações salvas.”;
+  - um erro aparece em `#9B2C2C` acima dos botões, com os valores mantidos.
+- **Cabeçalho da home:** depois de salvar, o “Olá, <primeiro nome>” já mostra o nome novo.
+- **Mudar a cidade** não muda as doações já publicadas.
+- **Animação:** `page-fade-enter` no título e `auth-card-enter` no cartão do formulário, as duas desligadas com `prefers-reduced-motion`.
+- **Sem o botão flutuante do chat.**
 
 ## Chat
 

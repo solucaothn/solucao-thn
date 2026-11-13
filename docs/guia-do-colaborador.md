@@ -80,12 +80,13 @@ python -m unittest discover -s tests -v
 - Cadastro de doação em 5 etapas (`/cadastro-doacao`) e endpoint `catalog/donations/publish`.
 - Chat da doação: página `/chat` (lista de conversas e mensagens), botão “Chat” no detalhe da doação e link “Mensagens” no cabeçalho logado da home. Veja “Chat da doação” na seção 8.
 - Minhas doações: `/minhas-doacoes` (lista com status, contadores e ações) e `/minhas-doacoes/<id>/editar`, com o link “Minhas doações” no cabeçalho logado da home. Veja “Minhas doações” na seção 8.
+- Editar perfil: `/perfil/editar` (nome, Sobre, cidade e estado; e-mail só de leitura), pelo botão “Editar perfil” de “Minhas doações”. O Sobre aparece no perfil público e em “Minhas doações”. Veja “Perfil da conta” na seção 8.
 
 ## 7. O que ainda falta
 
 - Explorar Doações (ainda sem design).
 - Detalhe da doação.
-- Minhas doações: editar as fotos e o perfil da pessoa (e-mail, “Sobre”, compartilhar, avaliações) ficam para outras changes.
+- Perfil: foto de perfil, editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
 - **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
 - Páginas "Como funciona" e "Categorias".
@@ -503,6 +504,21 @@ O perfil da própria pessoa é lido e alterado pelo grupo Authentication (`XANO_
   - **Gravação e resposta:** grava com `db.edit` e responde só com os campos do perfil, sem a senha.
   - **Sem token:** 401.
 - **Onde o Sobre aparece:** no perfil público (`donor.about`) e em “Minhas doações” (`owner.about`). Ele nunca aparece no detalhe da doação.
+
+#### Tela “Editar perfil”
+
+O código fica em `doafacil/editar_perfil.py`, e o layout está descrito em `docs/design/README.md` (seção “Editar perfil”).
+
+- **Login:** sem token, a página leva a `/login` sem consultar o Xano. Um 401 limpa a sessão e também leva a `/login`.
+- **Requisições:** 1 para abrir (`GET /auth/profile`) e 1 para salvar (`PATCH`).
+- **Validação antes de enviar:** as mesmas regras e mensagens do cadastro de conta (“Informe seu nome.”, “Informe sua cidade.”, “Selecione seu estado.”) e o Sobre com até 300 caracteres. O campo do Sobre também corta no 300º caractere.
+- **Salvar:**
+  - envia sempre o formulário inteiro, com o Sobre mesmo vazio (que apaga o texto);
+  - atualiza o `account_name` do `LoginState`, e o “Olá” da home passa a mostrar o primeiro nome novo;
+  - volta a `/minhas-doacoes` com o aviso “Alterações salvas.”, guardado em `MyDonationsState.flash`.
+- **Estado:** uma UF que não esteja entre as 27 siglas deixa o campo Estado vazio, para ser escolhido.
+- **Sobre na tela:** o componente `about_text`, em `doafacil/sobre.py`, mostra o Sobre como texto simples, com as quebras de linha, e não mostra nada quando ele está vazio. É usado na prévia, no perfil público e em “Minhas doações”.
+- **Testes:** `tests/test_edit_profile.py`. O Sobre no perfil público e em “Minhas doações” está em `tests/test_donor_profile.py` e em `tests/test_my_donations.py`.
 
 #### Testar a edição do perfil contra o Xano real
 

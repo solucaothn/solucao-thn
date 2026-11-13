@@ -20,6 +20,7 @@ import reflex as rx
 
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
+from doafacil.sobre import about_text, parse_about
 from doafacil.detalhe_doacao import (
     DONATION_NOT_FOUND_MESSAGE,
     DonationNotFoundError,
@@ -127,6 +128,7 @@ def _parse_donor_profile(
         or _MEMBER_SINCE_PATTERN.fullmatch(member_since) is None
     ):
         raise ValueError("A resposta do perfil contém dados inválidos.")
+    about = parse_about(donor.get("about"))
 
     page = payload.get("page")
     total = payload.get("total")
@@ -146,6 +148,7 @@ def _parse_donor_profile(
         "city": city,
         "state": state,
         "member_since": member_since,
+        "about": about,
         "items": _parse_donations(payload.get("items"), now),
         "page": page,
         "total": total,
@@ -183,6 +186,7 @@ class DonorProfileState(rx.State):
     initial: str = ""
     location: str = ""
     member_since_label: str = ""
+    about: str = ""
     items: list[dict[str, Any]] = []
     total: int = 0
     count_label: str = ""
@@ -196,6 +200,7 @@ class DonorProfileState(rx.State):
         self.initial = avatar_initial(profile["first_name"])
         self.location = location_label(profile["city"], profile["state"])
         self.member_since_label = member_since_label(profile["member_since"])
+        self.about = profile["about"]
         self.items = profile["items"]
         self.total = profile["total"]
         self.count_label = items_count_label(profile["total"])
@@ -207,6 +212,7 @@ class DonorProfileState(rx.State):
         self.initial = ""
         self.location = ""
         self.member_since_label = ""
+        self.about = ""
         self.items = []
         self.total = 0
         self.count_label = ""
@@ -368,6 +374,8 @@ def _identity_card() -> rx.Component:
                 color=TEXT_MUTED,
                 font_size="0.95rem",
             ),
+            # Sobre de quem doa: texto simples; vazio, nada.
+            about_text(DonorProfileState.about, padding_top="4px"),
             spacing="2",
             align=rx.breakpoints(initial="center", md="start"),
             text_align=rx.breakpoints(initial="center", md="left"),

@@ -22,13 +22,14 @@ O sistema MUST permitir consultar, sem autenticação, o perfil público de quem
 - **THEN** o frontend MUST fazer uma única requisição ao endpoint do perfil, que traz a identificação e a página pedida da lista
 
 ### Requirement: Resposta do perfil sem dados privados
-A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês e o ano de cadastro de quem doa e a página pedida das doações disponíveis. Ela MUST NOT expor dados privados nem identificadores de usuário.
+A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês e o ano de cadastro e o texto de Sobre de quem doa e a página pedida das doações disponíveis. Ela MUST NOT expor dados privados nem identificadores de usuário.
 
 #### Scenario: Dados de identificação retornados
 - **WHEN** a consulta do perfil é respondida com sucesso
-- **THEN** a resposta MUST incluir o primeiro nome, a cidade, a UF e o mês e o ano de cadastro de quem doa
+- **THEN** a resposta MUST incluir o primeiro nome, a cidade, a UF, o mês e o ano de cadastro e o texto de Sobre de quem doa
 - **AND** o primeiro nome MUST ser o único dado nominal
 - **AND** a data de cadastro MUST ser reduzida a mês e ano, sem dia nem horário
+- **AND** um Sobre não preenchido MUST vir vazio ou nulo
 
 #### Scenario: Campos privados excluídos
 - **WHEN** a resposta do perfil é construída
@@ -58,6 +59,11 @@ A página `/doacao/<id>/quem-doa` MUST apresentar a identificação de quem doa 
 #### Scenario: Identificação de quem doa
 - **WHEN** o perfil carrega com sucesso
 - **THEN** a página MUST mostrar, num cartão, um círculo com a inicial do primeiro nome, o primeiro nome, “Cidade, UF” e “No DoaFácil desde <mês> de <ano>”, com o mês por extenso em português
+
+#### Scenario: Sobre de quem doa
+- **WHEN** o perfil carrega com sucesso e quem doa preencheu o Sobre
+- **THEN** o cartão de identificação MUST mostrar o texto de Sobre abaixo de “No DoaFácil desde …”, como texto simples, preservando as quebras de linha e sem interpretar HTML
+- **AND** com o Sobre vazio, o cartão MUST NOT mostrar título, espaço reservado nem texto no lugar dele
 
 #### Scenario: Itens fora do escopo
 - **WHEN** a página do perfil é exibida

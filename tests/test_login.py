@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import reflex as rx
 
-from doafacil.doafacil import app, index
+from doafacil.doafacil import FIELD_PLACEHOLDER_SELECTOR, app, index
 from doafacil.login import (
     ACCOUNT_FALLBACK_NAME,
     AUTH_API_ENV,
@@ -571,9 +571,11 @@ class LoginPageTests(unittest.TestCase):
                     field_id,
                 )
                 self.assertEqual(field.color, "#333333")
+                # O placeholder vem da regra global dos campos.
+                self.assertNotIn(f"#{field_id}::placeholder", app.style)
                 self.assertEqual(
-                    app.style[f"#{field_id}::placeholder"],
-                    {"color": "#6b6b6b", "opacity": "1"},
+                    app.style[FIELD_PLACEHOLDER_SELECTOR]["color"],
+                    "#6B6B6B !important",
                 )
         self.assertNotIn("CPF", contents)
         self.assertIn("login", app._unevaluated_pages)
