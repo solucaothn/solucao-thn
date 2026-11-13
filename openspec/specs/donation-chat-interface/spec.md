@@ -18,12 +18,12 @@ A aplicação MUST oferecer a página `/chat` somente a pessoas com sessão vál
 - **THEN** a aplicação MUST limpar a sessão transitória e redirecionar para `/login`
 
 ### Requirement: Lista de conversas
-A página `/chat` MUST listar as conversas da pessoa autenticada, da mais recente para a mais antiga. Cada item MUST mostrar o primeiro nome da outra pessoa, o título da doação e um círculo verde com a inicial desse nome, sem foto, sobrenome, e-mail ou indicador “Online”. Conversas com mensagens não lidas MUST mostrar o número delas num círculo verde.
+A página `/chat` MUST listar as conversas da pessoa autenticada, da mais recente para a mais antiga. Cada item MUST mostrar o primeiro nome da outra pessoa, o título da doação e a foto de perfil dela (redonda, com `object-fit: cover` e texto alternativo com o primeiro nome) ou, sem foto, um círculo verde com a inicial desse nome, sem sobrenome, e-mail ou indicador “Online”. Conversas com mensagens não lidas MUST mostrar o número delas num círculo verde.
 
 #### Scenario: Pessoa com conversas
 - **WHEN** a pessoa autenticada abre `/chat` e participa de conversas
-- **THEN** a lista MUST mostrar cada conversa com o primeiro nome da outra pessoa, o título da doação e o círculo com a inicial
-- **AND** MUST NOT mostrar foto de perfil, sobrenome, e-mail ou status de presença
+- **THEN** a lista MUST mostrar cada conversa com o primeiro nome da outra pessoa, o título da doação e a foto dela ou, sem foto, o círculo com a inicial, no mesmo tamanho
+- **AND** MUST NOT mostrar sobrenome, e-mail ou status de presença
 
 #### Scenario: Pessoa sem conversas
 - **WHEN** a pessoa autenticada não participa de nenhuma conversa
@@ -303,3 +303,19 @@ Toda mensagem editada MUST mostrar “(editada)” ao lado do horário de envio,
 #### Scenario: Edição feita pela outra pessoa
 - **WHEN** a outra pessoa edita uma mensagem já exibida e a conversa está aberta
 - **THEN** a próxima atualização automática MUST trocar o texto da bolha e mostrar “(editada)”, sem requisição a mais
+
+### Requirement: Foto da outra pessoa no cabeçalho da conversa
+O cabeçalho da conversa aberta MUST mostrar, antes do primeiro nome da outra pessoa, a foto de perfil dela, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo verde com a inicial. A foto vem na resposta da leitura das mensagens, sem requisição a mais.
+
+#### Scenario: Conversa com pessoa que tem foto
+- **WHEN** a pessoa abre uma conversa e a outra pessoa tem foto de perfil
+- **THEN** o cabeçalho MUST mostrar a foto, no mesmo tamanho do círculo da lista
+- **AND** MUST NOT fazer requisição além da leitura das mensagens
+
+#### Scenario: Conversa com pessoa sem foto
+- **WHEN** a outra pessoa não tem foto
+- **THEN** o cabeçalho MUST mostrar o círculo verde com a inicial
+
+#### Scenario: Celular
+- **WHEN** a conversa é exibida numa largura de 360 px
+- **THEN** a foto, o nome e o título da doação MUST caber no cabeçalho, junto com “Voltar às conversas”, sem rolagem horizontal

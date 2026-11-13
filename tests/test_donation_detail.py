@@ -408,6 +408,7 @@ class DonationDetailTests(unittest.TestCase):
                 "delivery_method",
                 "contact_preference",
                 "donor_first_name",
+                "donor_photo",
                 "photos",
             },
         )

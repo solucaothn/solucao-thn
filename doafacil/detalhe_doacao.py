@@ -12,11 +12,13 @@ from doafacil.chat import (
     ChatNotFoundError,
     ChatRateLimitError,
     ChatUnauthorizedError,
+    avatar_initial,
     back_home_header,
     rate_limit_message,
     start_conversation,
 )
 from doafacil.login import LoginState
+from doafacil.perfil_publico import avatar, parse_photo_url
 
 
 DONATION_DETAIL_PATH = "/catalog/donations/detail"
@@ -124,6 +126,9 @@ def _parse_donation_detail(
     ):
         raise ValueError("A resposta do detalhe contém dados inválidos.")
 
+    # Foto de perfil de quem doa: URL pública ou nula (sem foto → "").
+    donor_photo = parse_photo_url(payload.get("donor_photo"))
+
     unique_photos = list(dict.fromkeys(photos))
     if not unique_photos:
         unique_photos = [GENERIC_DETAIL_IMAGE]
@@ -139,6 +144,7 @@ def _parse_donation_detail(
         "delivery_method": delivery_method,
         "contact_preference": contact_preference,
         "donor_first_name": donor_first_name,
+        "donor_photo": donor_photo,
         "photos": unique_photos,
     }
 
@@ -197,6 +203,7 @@ class DonationDetailState(LoginState):
     delivery_method: str = ""
     contact_preference: str = ""
     donor_first_name: str = ""
+    donor_photo: str = ""
     photos: list[str] = []
     view_state: str = "loading"
     contact_message: str = ""
@@ -206,6 +213,10 @@ class DonationDetailState(LoginState):
     viewer_open: bool = False
     viewer_index: int = 0
     viewer_zoomed: bool = False
+
+    @rx.var
+    def donor_initial(self) -> str:
+        return avatar_initial(self.donor_first_name)
 
     @rx.event
     def open_viewer(self, index: int) -> None:
@@ -264,6 +275,7 @@ class DonationDetailState(LoginState):
         self.delivery_method = ""
         self.contact_preference = ""
         self.donor_first_name = ""
+        self.donor_photo = ""
         self.photos = []
         self.view_state = "loading"
         self.contact_message = ""
@@ -298,6 +310,7 @@ class DonationDetailState(LoginState):
             self.delivery_method = donation["delivery_method"]
             self.contact_preference = donation["contact_preference"]
             self.donor_first_name = donation["donor_first_name"]
+            self.donor_photo = donation["donor_photo"]
             self.photos = donation["photos"]
             self.view_state = "loaded"
 
@@ -386,6 +399,7 @@ PRIMARY_GREEN = "#007A42"
 PRIMARY_GREEN_HOVER = "#006B39"
 CREAM = "#FFF6E8"
 PHOTO_PLACEHOLDER = "#EEEEEE"
+DONOR_AVATAR_BACKGROUND = "#F2F2F2"
 DETAIL_ICON = "/detalhe-atributo.svg"
 LOCATION_ICON = "/detalhe-localizacao.svg"
 MAX_THUMBNAILS = 4
@@ -1022,11 +1036,26 @@ def _donor_card_content() -> rx.Component:
             color=TEXT_DONOR,
             class_name="page-fade-enter",
         ),
-        rx.text(
-            DonationDetailState.donor_first_name,
-            color=TEXT_DONOR,
-            font_size="1.2rem",
-            font_weight="600",
+        # Foto de perfil (ou a inicial) de 48 px ao lado do primeiro nome.
+        rx.hstack(
+            avatar(
+                DonationDetailState.donor_photo,
+                DonationDetailState.donor_initial,
+                DonationDetailState.donor_first_name,
+                "48px",
+                background=DONOR_AVATAR_BACKGROUND,
+                color=TEXT_LABEL,
+                font_size="1.3rem",
+            ),
+            rx.text(
+                DonationDetailState.donor_first_name,
+                color=TEXT_DONOR,
+                font_size="1.2rem",
+                font_weight="600",
+                overflow_wrap="anywhere",
+            ),
+            spacing="3",
+            align="center",
         ),
         rx.hstack(
             rx.icon("map-pin", size=18, color=TEXT_DONOR, aria_hidden="true"),

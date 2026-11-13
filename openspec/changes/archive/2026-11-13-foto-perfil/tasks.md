@@ -24,10 +24,11 @@ O dry-run e o push são feitos pelo Higor.
 - [x] 2.7 (manual) Pull pós-push. Verificação: os endpoints novos ganharam só o `guid`, e os alterados não mudaram de lógica.
   - Os dois endpoints novos ganharam o `guid` (`zg2NVqsaRsxoYbwROPSIVL8HUCg` no POST e `bOuUm83kecK6ENuEw8HCQxNnUY0` no DELETE), mantiveram os comentários e continuam válidos no MCP. A única outra diferença foi o Xano juntar a cadeia da extensão numa linha só.
 
-- [ ] 2.8 (manual) Correção depois do teste real 4.1 (FP2): o `photo_POST.xs` passa a guardar com `create_attachment` e conferir o tipo pelo `.mime` e o tamanho pelo `.size` do objeto guardado, com “Escolha uma foto.” para o envio sem arquivo. O Higor roda o dry-run e o push e depois o pull. Verificação: no dry-run, só o UPDATE do `auth/profile/photo` (POST); depois do pull, o arquivo sem mudança de lógica e com o mesmo `guid`.
+- [x] 2.8 (manual) **Substituída pela 2.9:** o `storage.create_attachment` não existe no plano gratuito do Xano. Texto original: correção depois do teste real 4.1 (FP2): o `photo_POST.xs` passa a guardar com `create_attachment` e conferir o tipo pelo `.mime` e o tamanho pelo `.size` do objeto guardado, com “Escolha uma foto.” para o envio sem arquivo. O Higor roda o dry-run e o push e depois o pull. Verificação: no dry-run, só o UPDATE do `auth/profile/photo` (POST); depois do pull, o arquivo sem mudança de lógica e com o mesmo `guid`.
 
   - **Resultado da 2.8:** com o `create_attachment` publicado, o FP2 passou a dar 403 “Not supported. Please upgrade your Xano instance.”. O plano gratuito do Xano não tem esse recurso. A correção segue na 2.9.
-- [ ] 2.9 (manual) Segunda correção: o `photo_POST.xs` volta ao `storage.create_image` (os mesmos parâmetros do `publish_POST.xs`) dentro de um `try_catch`, que dá 400 de formato quando ele falha, e confere o `.mime` e o `.size` do arquivo guardado. O Higor roda o dry-run e o push e depois o pull. Verificação: no dry-run, só o UPDATE do `auth/profile/photo` (POST); depois do pull, o mesmo `guid`.
+- [x] 2.9 (manual) Segunda correção: o `photo_POST.xs` volta ao `storage.create_image` (os mesmos parâmetros do `publish_POST.xs`) dentro de um `try_catch`, que dá 400 de formato quando ele falha, e confere o `.mime` e o `.size` do arquivo guardado. O Higor roda o dry-run e o push e depois o pull. Verificação: no dry-run, só o UPDATE do `auth/profile/photo` (POST); depois do pull, o mesmo `guid`.
+  - Publicado pelo Higor. O teste real da 4.1 rodou contra essa versão, com `create_image` e `try_catch`, e passou com 13 de 13.
 
 ## 3. Teste real e documentação do backend (Parte A)
 
@@ -37,42 +38,45 @@ O dry-run e o push são feitos pelo Higor.
 
 ## 4. Verificação real (Parte A)
 
-- [ ] 4.1 (manual) O Higor roda o `teste_foto_perfil_real.py` e, de novo, os três scripts ajustados. Verificação: todos os cenários OK, anotados aqui.
+- [x] 4.1 (manual) O Higor roda o `teste_foto_perfil_real.py` e, de novo, os três scripts ajustados. Verificação: todos os cenários OK, anotados aqui.
   - **Primeira rodada:** perfil público com 9 de 9, Minhas doações com 20 de 20 e editar perfil com 13 de 13.
   - **Foto:** o FP1 passou, mas o FP2 falhou. Um PNG válido recebeu 400 “Envie uma imagem JPG, PNG, GIF ou WEBP.”. A correção está na 2.8 e na seção “Correção depois do teste real 4.1” do design. É preciso rodar o `teste_foto_perfil_real.py` de novo depois da 2.8.
   - **Terceira rodada da foto, depois da 2.9:** 10 de 13. FP2, FP3, FP5, FP7 a FP10 e FP12 passaram.
     - O FP4 falhou porque o Xano recusa o envio sem arquivo antes do endpoint (“Missing param: photo”).
     - O FP6 e o FP11 falharam porque as URLs respondem 303 e o script não seguia o redirecionamento.
     - O script foi ajustado (veja “Terceira rodada do teste real” no design). O `photo_DELETE.xs` não mudou. É preciso rodar de novo.
+  - **Rodada final:**
+    - `teste_foto_perfil_real.py` com 13 de 13. O FP11, com uma foto nunca aberta antes, confirmou que o `DELETE` apaga o arquivo;
+    - perfil público com 9 de 9, Minhas doações com 20 de 20 e editar perfil com 13 de 13.
 
 ## 5. Avatar e leitura da foto (Parte B)
 
-- [ ] 5.1 Criar o componente `avatar` e o `parse_photo_url` (decisão 6) e fazer o `_avatar` do chat delegar para ele. Verificação: testes da foto (redonda, `cover`, `alt` com o primeiro nome), da inicial sem foto, do tamanho e das URLs inválidas.
-- [ ] 5.2 Ler a foto nos parsers e estados do perfil público, de “Minhas doações”, do detalhe e do chat (decisão 7). Verificação: testes de cada parser (foto, nulo e tipo inválido) e de cada estado.
+- [x] 5.1 Criar o componente `avatar` e o `parse_photo_url` (decisão 6) e fazer o `_avatar` do chat delegar para ele. Verificação: testes da foto (redonda, `cover`, `alt` com o primeiro nome), da inicial sem foto, do tamanho e das URLs inválidas.
+- [x] 5.2 Ler a foto nos parsers e estados do perfil público, de “Minhas doações”, do detalhe e do chat (decisão 7). Verificação: testes de cada parser (foto, nulo e tipo inválido) e de cada estado.
 
 ## 6. Foto nas telas que já existem (Parte B)
 
-- [ ] 6.1 Trocar o círculo pelo avatar no perfil público e no cartão de “Minhas doações”. Verificação: testes de componente com e sem foto.
-- [ ] 6.2 Acrescentar o avatar de 48 px ao cartão “Quem doa” do detalhe e o de 38 px ao cabeçalho da conversa, e usar o avatar na lista do chat (dúvida 5). Verificação: testes de componente e os testes atuais do detalhe e do chat atualizados.
+- [x] 6.1 Trocar o círculo pelo avatar no perfil público e no cartão de “Minhas doações”. Verificação: testes de componente com e sem foto.
+- [x] 6.2 Acrescentar o avatar de 48 px ao cartão “Quem doa” do detalhe e o de 38 px ao cabeçalho da conversa, e usar o avatar na lista do chat (dúvida 5). Verificação: testes de componente e os testes atuais do detalhe e do chat atualizados.
 
 ## 7. Seção “Foto” em /perfil/editar (Parte B)
 
-- [ ] 7.1 Criar o cliente e os eventos `upload_photo` e `remove_photo` no `EditProfileState` (decisão 8). Verificação:
+- [x] 7.1 Criar o cliente e os eventos `upload_photo` e `remove_photo` no `EditProfileState` (decisão 8). Verificação:
   - testes do `multipart` com o token;
   - de 200, 400 (as duas mensagens), 401 e 429;
   - da prévia atualizada;
   - dos valores do formulário mantidos;
   - do arquivo recusado sem requisição.
-- [ ] 7.2 Montar a seção “Foto” (decisões 8 e 9), com o aviso, “Alterar foto”, “Remover foto” só com foto, as mensagens acessíveis e o texto novo do quadro. Verificação: testes de componente, `reflex compile` sem erros e os testes atuais do formulário atualizados.
+- [x] 7.2 Montar a seção “Foto” (decisões 8 e 9), com o aviso, “Alterar foto”, “Remover foto” só com foto, as mensagens acessíveis e o texto novo do quadro. Verificação: testes de componente, `reflex compile` sem erros e os testes atuais do formulário atualizados.
 
 ## 8. Documentação (Parte B)
 
-- [ ] 8.1 Atualizar no `docs/design/README.md` a “Editar perfil” (a seção Foto e a diferença do Figma), o perfil público, “Minhas doações”, o detalhe e o chat. Atualizar também o `docs/guia-do-colaborador.md`. Verificação: o texto bate com as specs delta.
+- [x] 8.1 Atualizar no `docs/design/README.md` a “Editar perfil” (a seção Foto e a diferença do Figma), o perfil público, “Minhas doações”, o detalhe e o chat. Atualizar também o `docs/guia-do-colaborador.md`. Verificação: o texto bate com as specs delta.
 
 ## 9. Verificação final
 
-- [ ] 9.1 Rodar `python -m unittest discover -s tests`, `openspec validate foto-perfil --strict` e `reflex compile`, e mostrar o `git diff --stat`. Verificação: tudo passa.
-- [ ] 9.2 (manual) No navegador, em 1512 px e 360 px, conferir:
+- [x] 9.1 Rodar `python -m unittest discover -s tests`, `openspec validate foto-perfil --strict` e `reflex compile`, e mostrar o `git diff --stat`. Verificação: tudo passa.
+- [x] 9.2 (manual) No navegador, em 1512 px e 360 px, conferir:
   - enviar uma foto, pelo mouse e pelo teclado, com a prévia atualizada;
   - um arquivo grande ou de outro formato, recusado com a mensagem;
   - “Remover foto”;
@@ -81,3 +85,9 @@ O dry-run e o push são feitos pelo Higor.
   - nenhuma rolagem horizontal e o contraste.
 
   Verificação: os itens conferidos e anotados.
+  - **Resultado (Higor):** OK.
+    - A foto é alterada na hora.
+    - O arquivo inválido é recusado.
+    - A foto aparece em “Minhas doações”, no “Quem doa”, no perfil público e no chat, na lista e no cabeçalho.
+    - “Remover foto” volta à inicial.
+    - No celular, tudo OK.

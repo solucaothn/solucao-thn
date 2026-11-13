@@ -207,7 +207,7 @@ O que segue o Figma:
 - **Título e descrição logo abaixo da galeria:** o título em negrito, em caixa alta e preto; a descrição em texto corrido, mantendo as quebras de linha. O título aparece nos dois lugares, como no Figma.
 - **“Detalhes”:** uma grade em que cada item tem o ícone verde do Figma (`assets/detalhe-atributo.svg`), um rótulo pequeno e o valor logo abaixo. Os itens são Categoria, Condição, Forma de entrega e Preferência de contato. A grade tem 4 colunas em telas largas, 2 em médias e 1 no celular.
 - **“Localização”:** a ilustração de edifícios do Figma (`assets/detalhe-localizacao.svg`, 56 px) e “Cidade, UF”.
-- **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, o primeiro nome e o ícone de local com “Cidade, UF”. O cartão inteiro é o link para o perfil público (veja “Perfil público de quem doa”).
+- **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, a foto de perfil de 48 px (ou o círculo `#F2F2F2` com a inicial) ao lado do primeiro nome, e o ícone de local com “Cidade, UF”. A foto entrou com a change foto-perfil. O cartão inteiro é o link para o perfil público (veja “Perfil público de quem doa”).
 - **No celular:** uma coluna, na ordem galeria → resumo → título e descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
 
 Diferenças aprovadas em relação ao Figma:
@@ -238,7 +238,7 @@ Diferenças aprovadas em relação ao Figma:
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações, presença online, indicadores de verificação e foto de perfil dependem de dados ou funcionalidades que ainda não existem. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
+Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações, presença online e indicadores de verificação dependem de dados ou funcionalidades que ainda não existem. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
 
 ## Perfil público de quem doa
 
@@ -253,7 +253,7 @@ O que segue o Figma:
 - **Fundo creme `#FFF6E8`**, com conteúdo de até 1396 px e 16 px de margem lateral no celular.
 - **Cartão de identificação:**
   - branco, com borda `#D9D9D9` e cantos de 8 px;
-  - à esquerda, um círculo `#F2F2F2` com a inicial do primeiro nome em `#555555`, de 120 px no computador e 72 px no celular;
+  - à esquerda, a foto de perfil redonda (ou, sem foto, o círculo `#F2F2F2` com a inicial do primeiro nome em `#555555`), de 120 px no computador e 72 px no celular;
   - o primeiro nome como título (`h1`) em `#166B3B`, “Cidade, UF” em `#2A2A2A` e “No DoaFácil desde <mês> de <ano>” em `#555555`, com o mês por extenso.
   - abaixo, o **Sobre** de quem doa, que entrou na change editar-perfil. Vai em `#2A2A2A`, como texto simples, com as quebras de linha. Com o Sobre vazio, não aparece nada: nem título, nem espaço reservado.
   - No celular, o círculo fica acima do texto, e tudo fica centralizado.
@@ -268,7 +268,7 @@ Diferenças aprovadas em relação ao Figma:
 - **“Voltar à doação”** na linha do logotipo, à esquerda, em `#007A42`, no lugar do verde claro do Figma, que não tinha contraste AA. É o mesmo cabeçalho do chat e do detalhe (`back_link_header()`), com rótulo acessível e área de toque de 44 px; em telas estreitas aparece só a seta.
   - Leva a `/doacao/<id>` da doação de origem. Com um id inválido na rota, leva a `/`.
   - Os frames não têm a linha do logotipo; ela entra para o perfil ficar igual às outras páginas.
-- **Sem foto de perfil:** fica só o círculo com a inicial.
+- **Foto de perfil:** entrou com a change foto-perfil. A foto é cortada em círculo (`object-fit: cover`), tem o texto alternativo “Foto de <primeiro nome>” e é a foto **atual** da pessoa. Sem foto, fica o círculo com a inicial, do mesmo tamanho.
 - **Sem o selo “E-mail verificado”, sem o botão de chat e sem avaliações.** Esses itens não aparecem nem como “Em breve”. O botão flutuante do chat também não aparece no perfil.
 - **Só o primeiro nome:** nada de sobrenome ou e-mail. A cidade e a UF são as da doação de origem, o mesmo dado que o detalhe já mostra.
 - **Paginação, que não está no Figma:** de 12 em 12, só quando há mais de uma página.
@@ -294,7 +294,7 @@ O que segue o Figma:
 - **Fundo creme `#FFF6E8`,** com o título “Minhas doações” acima do conteúdo.
 - **Cartão da pessoa, à esquerda:**
   - branco, com borda `#D9D9D9` e cantos de 8 px;
-  - o círculo `#F2F2F2` com a inicial em `#555555` e o primeiro nome;
+  - a foto de perfil de 80 px (ou o círculo `#F2F2F2` com a inicial em `#555555`) e o primeiro nome;
   - os dois números em `#166B3B`: “Doações”, que soma as disponíveis e as reservadas, e “Doações realizadas”, que conta as concluídas. O rótulo fica no singular com 1.
   - o **Sobre** da pessoa, centralizado, em `#2A2A2A`, como texto simples com as quebras de linha. Vazio, não aparece;
   - o botão **“Editar perfil”**, com contorno `#007A42`, 44 px de altura e toda a largura do cartão, que leva a `/perfil/editar`.
@@ -306,7 +306,7 @@ Diferenças aprovadas em relação ao Figma:
 
 - **Cabeçalho com o logotipo:** “Voltar ao início” fica na linha do logotipo, em `#007A42`, com o mesmo cabeçalho das outras páginas (`back_link_header()`). Os 44 px de área de toque e o rótulo acessível valem também no celular, onde aparece só a seta.
 - **Título à esquerda,** em negrito e `#166B3B`, no lugar do título centralizado e preto.
-- **Cartão da pessoa só com o essencial:** sem foto de perfil, e-mail, “Compartilhar link do perfil”, avaliações, selo “Verificado” e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”. O Sobre e o “Editar perfil” entraram com a change editar-perfil.
+- **Cartão da pessoa só com o essencial:** sem e-mail, “Compartilhar link do perfil”, avaliações, selo “Verificado” e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”. O Sobre e o “Editar perfil” entraram com a change editar-perfil, e a foto de perfil, com a change foto-perfil.
 - **Selo de status no lugar do NOVO,** no canto superior esquerdo da foto. O fundo é opaco, então o contraste não depende da foto:
 
   | Selo | Fundo | Texto | Contraste |
@@ -374,6 +374,7 @@ O que segue o Figma:
 - **Título “Editar perfil”** em `#166B3B`, negrito, à esquerda.
 - **Prévia à esquerda** (até 280 px no computador) e **formulário à direita**, num cartão branco com borda `#D9D9D9`. No celular, uma coluna, com a prévia em cima.
 - **Seções do formulário:**
+  - **“Foto”** (entrou com a change foto-perfil), antes de “Dados públicos”: veja “Seção Foto” abaixo.
   - **“Dados públicos”:**
     - Nome, com o nome completo da conta;
     - Sobre: uma área de texto com o placeholder “Conte um pouco sobre você”, o limite de 300 caracteres e o contador “N/300”.
@@ -384,8 +385,7 @@ O que segue o Figma:
 Diferenças aprovadas em relação ao Figma:
 
 - **Cabeçalho com o logotipo:** “Voltar a Minhas doações” em `#007A42`, no lugar de “Voltar ao perfil”, com o mesmo cabeçalho das outras páginas (`back_link_header()`).
-- **Sem foto:** a seção “Foto” (“Alterar foto”, “Remover foto”) e a foto da prévia ficam para uma change própria.
-- **Prévia só com o que é público:** o círculo `#F2F2F2` com a inicial em `#555555`, o primeiro nome, “Cidade, UF” e o Sobre.
+- **Prévia só com o que é público:** a foto de perfil de 80 px (ou o círculo `#F2F2F2` com a inicial em `#555555`), o primeiro nome, “Cidade, UF” e o Sobre.
   - Ela acompanha a digitação.
   - Não mostra e-mail, contadores, “Editar perfil”, “Compartilhar” nem selo.
   - A legenda é “Prévia — é assim que seu perfil aparece para outras pessoas.”, em `#555555`.
@@ -397,7 +397,7 @@ Diferenças aprovadas em relação ao Figma:
   - **Nome, Cidade e Sobre:** fundo branco, borda `#C8C8C8`, cantos de 8 px e texto `#1F1F1F`.
   - **Estado:** o select branco da edição de doação, com as 27 siglas e foco visível em `#007A42`.
   - **E-mail:** somente leitura (`readOnly`, não desativado, para poder selecionar e copiar), com fundo `#F1F1F1`, texto `#1F1F1F` (14,6:1), cursor padrão e um cadeado (`lock`, `#6B6B6B`) dentro do campo, à direita. O rótulo acessível é “E-mail (não pode ser alterado)”, e a ajuda continua ligada por `aria-describedby`.
-- **Texto do quadro, corrigido em relação ao Figma:** “Seu primeiro nome, cidade, estado e o texto de Sobre aparecem no seu perfil público. Suas doações mostram o primeiro nome e a cidade e o estado do momento em que foram publicadas. Seu e-mail é usado para entrar e só é mostrado a pessoas logadas que pedirem contato numa doação sua com a preferência “E-mail”.”
+- **Texto do quadro, corrigido em relação ao Figma:** “Seu primeiro nome, sua foto, cidade, estado e o texto de Sobre aparecem no seu perfil público. Suas doações mostram o primeiro nome, a foto atual e a cidade e o estado do momento em que foram publicadas. Seu e-mail é usado para entrar e só é mostrado a pessoas logadas que pedirem contato numa doação sua com a preferência “E-mail”.”
   - O fundo é `#FFF3D6`, com borda `#2A2A2A`.
   - O título vai em `#166B3B` (6,0:1) e o texto em `#2A2A2A` (13,0:1).
 - **Ações:**
@@ -408,6 +408,19 @@ Diferenças aprovadas em relação ao Figma:
 - **Mudar a cidade** não muda as doações já publicadas.
 - **Animação:** `page-fade-enter` no título e `auth-card-enter` no cartão do formulário, as duas desligadas com `prefers-reduced-motion`.
 - **Sem o botão flutuante do chat.**
+
+#### Seção Foto (change foto-perfil)
+
+- **Foto atual** de 96 px, redonda, ou o círculo `#F2F2F2` com a inicial, ao lado dos botões. Em telas estreitas, os botões descem para baixo da foto.
+- **“Alterar foto”:** botão branco com contorno `#007A42` e 44 px de altura, que abre a escolha de arquivo (com o clique ou com Enter ou Espaço).
+  - A foto é enviada **na hora**, sem depender de “Salvar alterações”. Os valores digitados no formulário ficam como estão, sem serem salvos.
+  - Enquanto envia, o botão mostra “Enviando...” e fica desativado.
+  - Abaixo, a ajuda “JPG, PNG, GIF ou WEBP, até 5 MB”, em `#555555`.
+- **Conferência na tela, antes de enviar:** um arquivo só, no formato JPG, PNG, GIF ou WEBP e com até 5 MB. Fora disso, nada é enviado e aparece “Envie uma imagem JPG, PNG, GIF ou WEBP.” ou “A foto pode ter no máximo 5 MB.”. O Xano confere de novo.
+- **“Remover foto”:** botão de texto em `#007A42`, que só aparece quando há foto. Remove na hora, **sem confirmação**, porque basta enviar a foto de novo.
+- **Aviso fixo** “Sua foto aparece para outras pessoas.”, em `#555555`, abaixo da seção.
+- **Mensagens:** “Foto atualizada.” ou “Foto removida.” em `#166B3B`, anunciadas ao leitor de tela (`role="status"`); erros em `#9B2C2C`, com `role="alert"`. Num erro, a foto atual continua a mesma.
+- **Diferenças do Figma:** o Figma não mostra a ajuda de formatos, o aviso nem as mensagens. Não há área de arrastar e soltar: o arquivo é escolhido pelo botão.
 
 ## Chat
 
@@ -427,7 +440,7 @@ O que segue o Figma:
 
 Diferenças aprovadas em relação ao Figma:
 
-- **Sem foto e sem “Online”:** cada pessoa aparece com um círculo verde `#00A859` com a inicial do primeiro nome. Não há indicador de presença.
+- **Foto de perfil e sem “Online”:** cada pessoa aparece com a foto de perfil atual, de 38 px, na lista e no cabeçalho da conversa, ao lado do nome. Sem foto, fica o círculo verde `#00A859` com a inicial do primeiro nome. A foto entrou com a change foto-perfil. Não há indicador de presença.
 - **Título da doação:** na lista, abaixo do primeiro nome, e no cabeçalho da conversa, no lugar da prévia da última mensagem (que o backend não fornece) e do “Online”.
 - **Botão “Enviar”** ao lado do campo; Enter também envia. O ícone de imagem do frame (anexar fotos) não foi implementado: o chat só aceita texto.
 - **Cores com contraste AA:** o Figma usa texto branco sobre cinza `#CDD2DF` e sobre verde `#32C470`, o que fica abaixo do contraste mínimo. As bolhas recebidas usam fundo `#E9ECEF` com texto `#1F1F1F`; as enviadas, `#007A42` (o verde dos botões primários) com texto branco. A pílula do dia também usa `#007A42`.

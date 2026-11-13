@@ -20,6 +20,7 @@ from doafacil.cadastro_doacao import (
     _api_endpoint,
 )
 from doafacil.login import LoginState
+from doafacil.perfil_publico import avatar, parse_photo_url
 
 
 # Endpoints do grupo Catalog.
@@ -275,6 +276,10 @@ def _parse_conversation(
         or not (last_message_at is None or _is_int(last_message_at))
     ):
         raise ChatServiceError
+    try:
+        photo = parse_photo_url(payload.get("other_user_photo"))
+    except ValueError:
+        raise ChatServiceError from None
     # Só os campos esperados; qualquer outro campo da resposta é descartado.
     item = {
         "conversation_id": conversation_id,
@@ -284,6 +289,7 @@ def _parse_conversation(
         "donation_status": status,
         "last_message_at": last_message_at or 0,
         "initial": avatar_initial(name),
+        "other_user_photo": photo,
     }
     return _with_unread(item, unread)
 
@@ -340,8 +346,13 @@ def _parse_messages_page(payload: object) -> dict[str, Any]:
         or not isinstance(edited, list)
     ):
         raise ChatServiceError
+    try:
+        other_photo = parse_photo_url(payload.get("other_user_photo"))
+    except ValueError:
+        raise ChatServiceError from None
     return {
         "messages": [_parse_message(item) for item in messages],
+        "other_user_photo": other_photo,
         "donation_title": title,
         "donation_status": status,
         "has_older": has_older,
@@ -629,6 +640,7 @@ def _clear_session(state: Any) -> None:
 def _reset_conversation(state: Any) -> None:
     state.active_conversation_id = 0
     state.active_other_name = ""
+    state.active_other_photo = ""
     state.active_donation_title = ""
     state.active_donation_status = ""
     state.chat_messages = []
@@ -706,6 +718,8 @@ async def _load_list(state: Any, client: httpx.AsyncClient) -> None:
 
 def _apply_page_metadata(state: Any, page: dict[str, Any]) -> None:
     state.active_donation_title = page["donation_title"]
+    # Foto da outra pessoa: vem na mesma leitura, sem requisição a mais.
+    state.active_other_photo = page.get("other_user_photo", "")
     state.active_donation_status = page["donation_status"]
     if page["donation_status"] == DONATION_STATUS_COMPLETED:
         state.read_only = True
@@ -783,7 +797,13 @@ class ChatState(LoginState):
 
     active_conversation_id: int = 0
     active_other_name: str = ""
+    active_other_photo: str = ""
     active_donation_title: str = ""
+
+    @rx.var
+    def active_other_initial(self) -> str:
+        return avatar_initial(self.active_other_name)
+
     active_donation_status: str = ""
     chat_messages: list[dict[str, Any]] = []
     has_older: bool = False
@@ -1190,15 +1210,19 @@ def _show_on_mobile_when(view: str) -> rx.Var:
     )
 
 
-def _avatar(initial: rx.Var, size: str = "38px") -> rx.Component:
-    return rx.center(
-        rx.text(initial, color="white", font_weight="700", font_size="1rem"),
-        width=size,
-        height=size,
-        min_width=size,
-        border_radius="50%",
+def _avatar(
+    photo: rx.Var, initial: rx.Var, first_name: rx.Var, size: str = "38px"
+) -> rx.Component:
+    """Foto de perfil da outra pessoa ou, sem foto, o círculo verde com a
+    inicial (componente compartilhado de doafacil.perfil_publico)."""
+    return avatar(
+        photo,
+        initial,
+        first_name,
+        size,
         background=GREEN_AVATAR,
-        aria_hidden="true",
+        color="white",
+        font_size="1rem",
     )
 
 
@@ -1355,7 +1379,7 @@ def _conversation_item(item: rx.Var) -> rx.Component:
     selected = ChatState.active_conversation_id == item["conversation_id"]
     return rx.el.button(
         rx.hstack(
-            _avatar(item["initial"]),
+            _avatar(item["other_user_photo"], item["initial"], item["other_user_first_name"]),
             rx.vstack(
                 rx.text(
                     item["other_user_first_name"],
@@ -1640,21 +1664,38 @@ def _conversation_header() -> rx.Component:
         ),
         rx.cond(
             ChatState.active_conversation_id > 0,
-            rx.vstack(
-                rx.text(
+            rx.hstack(
+                _avatar(
+                    ChatState.active_other_photo,
+                    ChatState.active_other_initial,
                     ChatState.active_other_name,
-                    color=TEXT_DARK,
-                    font_weight="700",
-                    font_size="1rem",
                 ),
-                rx.text(
-                    ChatState.active_donation_title,
-                    color=TEXT_MUTED,
-                    font_size="0.8rem",
+                rx.vstack(
+                    rx.text(
+                        ChatState.active_other_name,
+                        color=TEXT_DARK,
+                        font_weight="700",
+                        font_size="1rem",
+                    ),
+                    rx.text(
+                        ChatState.active_donation_title,
+                        color=TEXT_MUTED,
+                        font_size="0.8rem",
+                        overflow="hidden",
+                        text_overflow="ellipsis",
+                        white_space="nowrap",
+                        max_width="100%",
+                    ),
+                    spacing="0",
+                    align="start",
+                    min_width="0",
                 ),
-                spacing="0",
+                class_name="chat-conversation-identity",
+                spacing="2",
                 align="center",
+                justify="center",
                 flex="1",
+                min_width="0",
             ),
             rx.spacer(),
         ),

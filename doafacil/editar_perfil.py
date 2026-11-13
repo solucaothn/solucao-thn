@@ -9,13 +9,20 @@ sem HTML.
 
 from __future__ import annotations
 
+from pathlib import PurePath
 from typing import Any
 
 import httpx
 import reflex as rx
 
 from doafacil.cadastro import BRAZILIAN_STATES
-from doafacil.cadastro_doacao import AUTH_API_ENV, DonationServiceError, _api_endpoint
+from doafacil.cadastro_doacao import (
+    AUTH_API_ENV,
+    IMAGE_ACCEPT,
+    IMAGE_TYPES,
+    DonationServiceError,
+    _api_endpoint,
+)
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
 from doafacil.login import LoginState
 from doafacil.minhas_doacoes import (
@@ -26,7 +33,13 @@ from doafacil.minhas_doacoes import (
     _state_message,
 )
 from doafacil.perfil_doador import location_label
-from doafacil.sobre import ABOUT_MAX_LENGTH, about_text, parse_about
+from doafacil.perfil_publico import (
+    ABOUT_MAX_LENGTH,
+    about_text,
+    avatar,
+    parse_about,
+    parse_photo_url,
+)
 
 
 PROFILE_PATH = "/auth/profile"
@@ -45,12 +58,25 @@ EMAIL_ARIA_LABEL = "E-mail (não pode ser alterado)"
 PREVIEW_CAPTION = "Prévia — é assim que seu perfil aparece para outras pessoas."
 VISIBILITY_TITLE = "Quem vê estas informações"
 VISIBILITY_TEXT = (
-    "Seu primeiro nome, cidade, estado e o texto de Sobre aparecem no seu perfil "
-    "público. Suas doações mostram o primeiro nome e a cidade e o estado do "
-    "momento em que foram publicadas. Seu e-mail é usado para entrar e só é "
+    "Seu primeiro nome, sua foto, cidade, estado e o texto de Sobre aparecem no "
+    "seu perfil público. Suas doações mostram o primeiro nome, a foto atual e a "
+    "cidade e o estado do momento em que foram publicadas. Seu e-mail é usado para entrar e só é "
     "mostrado a pessoas logadas que pedirem contato numa doação sua com a "
     "preferência “E-mail”."
 )
+
+
+PHOTO_PATH = "/auth/profile/photo"
+PHOTO_UPLOAD_ID = "profile-photo-upload"
+PHOTO_MAX_BYTES = 5 * 1024 * 1024
+PHOTO_FORMATS_TEXT = "JPG, PNG, GIF ou WEBP, até 5 MB"
+PHOTO_PUBLIC_NOTICE = "Sua foto aparece para outras pessoas."
+PHOTO_MISSING_MESSAGE = "Escolha uma foto."
+PHOTO_FORMAT_MESSAGE = "Envie uma imagem JPG, PNG, GIF ou WEBP."
+PHOTO_SIZE_MESSAGE = "A foto pode ter no máximo 5 MB."
+PHOTO_SAVED_MESSAGE = "Foto atualizada."
+PHOTO_REMOVED_MESSAGE = "Foto removida."
+PHOTO_ERROR_MESSAGE = "Não foi possível atualizar a foto. Tente novamente."
 
 
 class ProfileError(Exception):
@@ -71,6 +97,14 @@ class ProfileRateLimitError(ProfileError):
 
 class ProfileServiceError(ProfileError):
     pass
+
+
+class ProfilePhotoRejectedError(ProfileError):
+    """400 no envio da foto, com a mensagem a mostrar (formato ou tamanho)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
 
 
 def _endpoint() -> str:
@@ -100,6 +134,8 @@ def _parse_profile(payload: object) -> dict[str, str]:
         raise ProfileServiceError
     try:
         about = parse_about(payload.get("about"))
+        # A resposta do PATCH não traz a foto (só o GET); ausente vira "".
+        photo = parse_photo_url(payload.get("photo"))
     except ValueError:
         raise ProfileServiceError from None
     return {
@@ -108,6 +144,7 @@ def _parse_profile(payload: object) -> dict[str, str]:
         "city": fields["city"].strip(),
         "state": fields["state"].strip(),
         "about": about,
+        "photo": photo,
     }
 
 
@@ -136,6 +173,87 @@ async def update_profile(
     )
     _raise_for_status(response)
     return _parse_profile(_json(response))
+
+
+def _photo_endpoint() -> str:
+    try:
+        return _api_endpoint(AUTH_API_ENV, PHOTO_PATH)
+    except DonationServiceError:
+        raise ProfileServiceError from None
+
+
+def _photo_rejection_message(response: httpx.Response) -> str:
+    """Mensagem do 400 do envio: tamanho, quando o Xano fala em MB; formato,
+    nos demais casos (inclusive o 400 da plataforma para envio sem arquivo)."""
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    message = payload.get("message") if isinstance(payload, dict) else None
+    if isinstance(message, str) and "MB" in message:
+        return PHOTO_SIZE_MESSAGE
+    return PHOTO_FORMAT_MESSAGE
+
+
+async def upload_profile_photo(
+    client: httpx.AsyncClient,
+    auth_token: str,
+    filename: str,
+    contents: bytes,
+    mime_type: str,
+) -> str:
+    """Envia a foto (multipart, campo “photo”) e devolve a URL pública nova."""
+    response = await client.post(
+        _photo_endpoint(),
+        files={"photo": (filename, contents, mime_type)},
+        headers={"Authorization": f"Bearer {auth_token}"},
+    )
+    if response.status_code == 400:
+        raise ProfilePhotoRejectedError(_photo_rejection_message(response))
+    _raise_for_status(response)
+    payload = _json(response)
+    if not isinstance(payload, dict):
+        raise ProfileServiceError
+    try:
+        url = parse_photo_url(payload.get("photo"))
+    except ValueError:
+        raise ProfileServiceError from None
+    if not url:
+        raise ProfileServiceError
+    return url
+
+
+async def remove_profile_photo(client: httpx.AsyncClient, auth_token: str) -> None:
+    response = await client.delete(
+        _photo_endpoint(), headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    _raise_for_status(response)
+
+
+def validate_photo_file(filename: str, content_type: str, size: int) -> str:
+    """Mesmas regras do Xano, antes de enviar: formato pela extensão e pelo
+    tipo do arquivo (as do cadastro de doação) e até 5 MB."""
+    expected = IMAGE_TYPES.get(PurePath(filename or "").suffix.lower())
+    if expected is None or (content_type and content_type != expected):
+        return PHOTO_FORMAT_MESSAGE
+    if size <= 0:
+        return PHOTO_MISSING_MESSAGE
+    if size > PHOTO_MAX_BYTES:
+        return PHOTO_SIZE_MESSAGE
+    return ""
+
+
+def rejection_message(rejections: object) -> str:
+    """Mensagem para um arquivo recusado pelo rx.upload (on_drop_rejected)."""
+    codes: set[str] = set()
+    for item in rejections if isinstance(rejections, list) else []:
+        errors = item.get("errors") if isinstance(item, dict) else None
+        for error in errors if isinstance(errors, list) else []:
+            if isinstance(error, dict) and isinstance(error.get("code"), str):
+                codes.add(error["code"])
+    if "file-too-large" in codes:
+        return PHOTO_SIZE_MESSAGE
+    return PHOTO_FORMAT_MESSAGE
 
 
 def first_name_of(name: str) -> str:
@@ -171,6 +289,10 @@ def _clear_form(state: Any) -> None:
     state.city = ""
     state.uf = ""
     state.about = ""
+    state.photo = ""
+    state.photo_busy = False
+    state.photo_notice = ""
+    state.photo_error = ""
     state.form_error = ""
     state.is_saving = False
 
@@ -184,6 +306,10 @@ class EditProfileState(LoginState):
     # “uf”, e não “state”, para não confundir com o estado do Reflex.
     uf: str = ""
     about: str = ""
+    photo: str = ""
+    photo_busy: bool = False
+    photo_notice: str = ""
+    photo_error: str = ""
     form_error: str = ""
     is_saving: bool = False
 
@@ -236,7 +362,91 @@ class EditProfileState(LoginState):
         # Uma UF fora das 27 siglas deixa o campo vazio, para ser escolhida.
         self.uf = profile["state"] if profile["state"] in BRAZILIAN_STATES else ""
         self.about = profile["about"]
+        self.photo = profile["photo"]
         self.view_state = "ready"
+
+    @rx.event
+    async def upload_photo(self, files: list[rx.UploadFile]):
+        """Envia a foto na hora (sem depender de “Salvar alterações”). Os
+        valores digitados no formulário ficam como estão, sem serem salvos."""
+        if self.photo_busy or self.view_state != "ready":
+            return
+        self.photo_notice = ""
+        self.photo_error = ""
+        if not files:
+            self.photo_error = PHOTO_MISSING_MESSAGE
+            return
+        file = files[0]
+        try:
+            contents = await file.read()
+        except OSError:
+            self.photo_error = PHOTO_ERROR_MESSAGE
+            yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
+            return
+        filename = file.name or ""
+        error = validate_photo_file(filename, file.content_type or "", len(contents))
+        if error:
+            self.photo_error = error
+            yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
+            return
+
+        self.photo_busy = True
+        yield
+        mime_type = IMAGE_TYPES[PurePath(filename).suffix.lower()]
+        try:
+            async with _new_client() as client:
+                url = await upload_profile_photo(
+                    client, self.auth_token, PurePath(filename).name, contents, mime_type
+                )
+        except ProfileUnauthorizedError:
+            _clear_session(self)
+            self.photo_busy = False
+            yield rx.redirect("/login")
+            return
+        except ProfilePhotoRejectedError as rejected:
+            self.photo_error = rejected.message
+        except ProfileRateLimitError:
+            self.photo_error = RATE_LIMIT_MESSAGE
+        except (ProfileError, httpx.HTTPError, ValueError):
+            self.photo_error = PHOTO_ERROR_MESSAGE
+        else:
+            self.photo = url
+            self.photo_notice = PHOTO_SAVED_MESSAGE
+        self.photo_busy = False
+        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
+
+    @rx.event
+    def photo_rejected(self, rejections: list[dict[str, Any]]) -> None:
+        """Arquivo recusado pela própria tela (formato ou mais de 5 MB): nenhuma
+        requisição."""
+        self.photo_notice = ""
+        self.photo_error = rejection_message(rejections)
+
+    @rx.event
+    async def remove_photo(self):
+        """Remove a foto na hora, sem confirmação (basta enviar de novo)."""
+        if self.photo_busy or self.view_state != "ready" or not self.photo:
+            return
+        self.photo_notice = ""
+        self.photo_error = ""
+        self.photo_busy = True
+        yield
+        try:
+            async with _new_client() as client:
+                await remove_profile_photo(client, self.auth_token)
+        except ProfileUnauthorizedError:
+            _clear_session(self)
+            self.photo_busy = False
+            yield rx.redirect("/login")
+            return
+        except ProfileRateLimitError:
+            self.photo_error = RATE_LIMIT_MESSAGE
+        except (ProfileError, httpx.HTTPError, ValueError):
+            self.photo_error = PHOTO_ERROR_MESSAGE
+        else:
+            self.photo = ""
+            self.photo_notice = PHOTO_REMOVED_MESSAGE
+        self.photo_busy = False
 
     @rx.event
     def set_name(self, value: str) -> None:
@@ -358,26 +568,18 @@ def _section_title(text: str) -> rx.Component:
 
 
 def _preview() -> rx.Component:
-    """Prévia: inicial, primeiro nome, “Cidade, UF” e Sobre. Sem e-mail,
-    contadores, foto, “Editar perfil” ou “Compartilhar”."""
+    """Prévia: foto (ou inicial), primeiro nome, “Cidade, UF” e Sobre. Sem
+    e-mail, contadores, “Editar perfil” ou “Compartilhar”."""
     return rx.vstack(
         rx.vstack(
-            rx.box(
-                rx.text(
-                    EditProfileState.preview_initial,
-                    color=TEXT_MUTED,
-                    font_weight="700",
-                    font_size="2rem",
-                    line_height="1",
-                ),
-                aria_hidden="true",
-                display="flex",
-                align_items="center",
-                justify_content="center",
-                width="80px",
-                height="80px",
-                border_radius="999px",
+            avatar(
+                EditProfileState.photo,
+                EditProfileState.preview_initial,
+                EditProfileState.preview_first_name,
+                "80px",
                 background=AVATAR_BACKGROUND,
+                color=TEXT_MUTED,
+                font_size="2rem",
             ),
             rx.text(
                 EditProfileState.preview_first_name,
@@ -424,8 +626,114 @@ def _visibility_notice() -> rx.Component:
     )
 
 
+def _photo_section() -> rx.Component:
+    """Seção “Foto” (Figma): foto atual ou inicial, “Alterar foto” (envio na
+    hora, com formato e tamanho conferidos na tela) e “Remover foto” (só com
+    foto). O resultado é anunciado ao leitor de tela."""
+    return rx.vstack(
+        _section_title("Foto"),
+        rx.hstack(
+            avatar(
+                EditProfileState.photo,
+                EditProfileState.preview_initial,
+                EditProfileState.preview_first_name,
+                "96px",
+                background=AVATAR_BACKGROUND,
+                color=TEXT_MUTED,
+                font_size="2.4rem",
+            ),
+            rx.vstack(
+                rx.upload(
+                    rx.button(
+                        rx.cond(EditProfileState.photo_busy, "Enviando...", "Alterar foto"),
+                        type="button",
+                        disabled=EditProfileState.photo_busy,
+                        min_height="44px",
+                        padding="0 20px",
+                        background=WHITE,
+                        color=LINK_GREEN,
+                        border=f"1px solid {LINK_GREEN}",
+                        border_radius="999px",
+                        font_weight="600",
+                        cursor="pointer",
+                        _hover={"background": "#F1F8F3"},
+                        _focus_visible={"outline": f"2px solid {LINK_GREEN}", "outlineOffset": "2px"},
+                    ),
+                    id=PHOTO_UPLOAD_ID,
+                    accept=IMAGE_ACCEPT,
+                    max_files=1,
+                    max_size=PHOTO_MAX_BYTES,
+                    multiple=False,
+                    no_keyboard=True,
+                    disabled=EditProfileState.photo_busy,
+                    on_drop=EditProfileState.upload_photo(
+                        rx.upload_files(upload_id=PHOTO_UPLOAD_ID)
+                    ),
+                    on_drop_rejected=EditProfileState.photo_rejected,
+                    class_name="edit-profile-photo-upload",
+                    border="none",
+                    padding="0",
+                    width="auto",
+                ),
+                _help(PHOTO_FORMATS_TEXT),
+                rx.cond(
+                    EditProfileState.photo != "",
+                    rx.button(
+                        "Remover foto",
+                        type="button",
+                        on_click=EditProfileState.remove_photo,
+                        disabled=EditProfileState.photo_busy,
+                        variant="ghost",
+                        min_height="44px",
+                        padding="0 8px",
+                        color=LINK_GREEN,
+                        font_weight="600",
+                        cursor="pointer",
+                        _focus_visible={"outline": f"2px solid {LINK_GREEN}", "outlineOffset": "2px"},
+                    ),
+                    rx.fragment(),
+                ),
+                align="start",
+                spacing="2",
+            ),
+            spacing="5",
+            align="center",
+            wrap="wrap",
+        ),
+        _help(PHOTO_PUBLIC_NOTICE),
+        rx.cond(
+            EditProfileState.photo_error != "",
+            rx.text(
+                EditProfileState.photo_error,
+                role="alert",
+                color=TEXT_ERROR,
+                font_size="0.9rem",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            EditProfileState.photo_notice != "",
+            rx.text(
+                EditProfileState.photo_notice,
+                role="status",
+                color=TITLE_GREEN,
+                font_size="0.9rem",
+                font_weight="600",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        class_name="edit-profile-photo",
+        align="start",
+        spacing="2",
+        width="100%",
+    )
+
+
 def _form() -> rx.Component:
     return rx.vstack(
+        _photo_section(),
         _section_title("Dados públicos"),
         _field_label("Nome", "profile-name"),
         _input(

@@ -13,27 +13,43 @@ from doafacil.editar_perfil import (
     EMAIL_HELP,
     LOAD_ERROR_MESSAGE,
     NAME_HELP,
+    PHOTO_ERROR_MESSAGE,
+    PHOTO_FORMAT_MESSAGE,
+    PHOTO_FORMATS_TEXT,
+    PHOTO_MAX_BYTES,
+    PHOTO_MISSING_MESSAGE,
+    PHOTO_PUBLIC_NOTICE,
+    PHOTO_REMOVED_MESSAGE,
+    PHOTO_SAVED_MESSAGE,
+    PHOTO_SIZE_MESSAGE,
+    PHOTO_UPLOAD_ID,
     RATE_LIMIT_MESSAGE,
     SAVE_ERROR_MESSAGE,
     SAVE_REJECTED_MESSAGE,
     VISIBILITY_TEXT,
     VISIBILITY_TITLE,
     EditProfileState,
+    ProfilePhotoRejectedError,
     ProfileRateLimitError,
     ProfileRejectedError,
     ProfileServiceError,
     ProfileUnauthorizedError,
     _form,
     _parse_profile,
+    _photo_section,
     _preview,
     edit_profile_page,
     fetch_profile,
     first_name_of,
+    rejection_message,
+    remove_profile_photo,
     update_profile,
+    upload_profile_photo,
+    validate_photo_file,
     validate_profile,
 )
 from doafacil.minhas_doacoes import SAVED_MESSAGE, MyDonationsState
-from doafacil.sobre import about_text, parse_about
+from doafacil.perfil_publico import about_text, parse_about
 
 
 AUTH_URL = "https://xano.example/api:auth"
@@ -47,6 +63,20 @@ PROFILE_PAYLOAD = {
     "state": "SP",
     "about": "Gosto de doar.\nAté breve.",
 }
+PHOTO_URL = "https://xano.example/vault/abc/foto.png"
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+
+
+class _FakeUpload:
+    """Arquivo como o Reflex entrega ao evento de upload."""
+
+    def __init__(self, name: str, content_type: str, contents: bytes) -> None:
+        self.name = name
+        self.content_type = content_type
+        self._contents = contents
+
+    async def read(self) -> bytes:
+        return self._contents
 
 
 def _call(handler, function, *args):
@@ -76,6 +106,10 @@ def _state(**fields) -> SimpleNamespace:
         city="",
         uf="",
         about="",
+        photo="",
+        photo_busy=False,
+        photo_notice="",
+        photo_error="",
         form_error="",
         is_saving=False,
     )
@@ -177,9 +211,15 @@ class EditProfileClientTests(unittest.TestCase):
     def test_null_about_becomes_empty_and_extra_fields_are_ignored(self) -> None:
         profile = _parse_profile({**PROFILE_PAYLOAD, "about": None, "role": "admin", "password": "x"})
         self.assertEqual(profile["about"], "")
-        self.assertEqual(set(profile), {"name", "email", "city", "state", "about"})
+        self.assertEqual(set(profile), {"name", "email", "city", "state", "about", "photo"})
         profile = _parse_profile({k: v for k, v in PROFILE_PAYLOAD.items() if k != "about"})
         self.assertEqual(profile["about"], "")
+        # A resposta do PATCH não traz a foto: ausente ou nula → "".
+        self.assertEqual(profile["photo"], "")
+        self.assertEqual(_parse_profile({**PROFILE_PAYLOAD, "photo": None})["photo"], "")
+        self.assertEqual(
+            _parse_profile({**PROFILE_PAYLOAD, "photo": PHOTO_URL})["photo"], PHOTO_URL
+        )
 
     def test_invalid_responses(self) -> None:
         for label, payload in {
@@ -187,6 +227,8 @@ class EditProfileClientTests(unittest.TestCase):
             "nome nulo": {**PROFILE_PAYLOAD, "name": None},
             "cidade número": {**PROFILE_PAYLOAD, "city": 1},
             "about número": {**PROFILE_PAYLOAD, "about": 2},
+            "foto número": {**PROFILE_PAYLOAD, "photo": 3},
+            "foto sem http": {**PROFILE_PAYLOAD, "photo": "javascript:alert(1)"},
         }.items():
             with self.subTest(case=label):
                 with self.assertRaises(ProfileServiceError):
@@ -382,6 +424,211 @@ class EditProfileStateTests(unittest.TestCase):
         self.assertEqual(state.auth_token, "")
 
 
+class ProfilePhotoClientTests(unittest.TestCase):
+    def test_upload_sends_multipart_with_token_and_returns_url(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.method, "POST")
+            self.assertEqual(request.url.path, "/api:auth/auth/profile/photo")
+            self.assertEqual(request.headers.get("Authorization"), f"Bearer {TOKEN}")
+            self.assertTrue(request.headers["content-type"].startswith("multipart/form-data"))
+            body = request.read()
+            self.assertIn(b'name="photo"; filename="foto.png"', body)
+            self.assertIn(b"Content-Type: image/png", body)
+            self.assertIn(PNG_BYTES, body)
+            return httpx.Response(200, json={"photo": PHOTO_URL})
+
+        url = _call(handler, upload_profile_photo, "foto.png", PNG_BYTES, "image/png")
+        self.assertEqual(url, PHOTO_URL)
+
+    def test_upload_400_messages(self) -> None:
+        for message, expected in (
+            ("A foto pode ter no máximo 5 MB.", PHOTO_SIZE_MESSAGE),
+            ("Envie uma imagem JPG, PNG, GIF ou WEBP.", PHOTO_FORMAT_MESSAGE),
+            ("Missing param: photo", PHOTO_FORMAT_MESSAGE),
+        ):
+            with self.subTest(message=message):
+                with self.assertRaises(ProfilePhotoRejectedError) as caught:
+                    _call(
+                        lambda r, m=message: httpx.Response(400, json={"message": m}),
+                        upload_profile_photo,
+                        "foto.png",
+                        PNG_BYTES,
+                        "image/png",
+                    )
+                self.assertEqual(caught.exception.message, expected)
+
+    def test_upload_other_statuses_and_invalid_response(self) -> None:
+        cases = {
+            "401": (lambda r: httpx.Response(401, json={}), ProfileUnauthorizedError),
+            "429": (lambda r: httpx.Response(429, json={}), ProfileRateLimitError),
+            "500": (lambda r: httpx.Response(500, json={}), ProfileServiceError),
+            "sem foto": (lambda r: httpx.Response(200, json={"photo": None}), ProfileServiceError),
+            "não http": (lambda r: httpx.Response(200, json={"photo": "data:x"}), ProfileServiceError),
+            "html": (lambda r: httpx.Response(200, text="<html>"), ProfileServiceError),
+        }
+        for label, (handler, error) in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(error):
+                    _call(handler, upload_profile_photo, "foto.png", PNG_BYTES, "image/png")
+
+    def test_remove_sends_delete_with_token(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.method, "DELETE")
+            self.assertEqual(request.url.path, "/api:auth/auth/profile/photo")
+            self.assertEqual(request.headers.get("Authorization"), f"Bearer {TOKEN}")
+            return httpx.Response(200, json={"photo": None})
+
+        self.assertIsNone(_call(handler, remove_profile_photo))
+        for status, error in ((401, ProfileUnauthorizedError), (429, ProfileRateLimitError), (500, ProfileServiceError)):
+            with self.subTest(status=status):
+                with self.assertRaises(error):
+                    _call(lambda r, s=status: httpx.Response(s, json={}), remove_profile_photo)
+
+
+class ProfilePhotoValidationTests(unittest.TestCase):
+    def test_validate_photo_file(self) -> None:
+        self.assertEqual(validate_photo_file("foto.PNG", "image/png", PHOTO_MAX_BYTES), "")
+        self.assertEqual(validate_photo_file("foto.jpeg", "image/jpeg", 10), "")
+        self.assertEqual(validate_photo_file("foto.webp", "", 10), "")
+        self.assertEqual(validate_photo_file("foto.png", "image/png", PHOTO_MAX_BYTES + 1), PHOTO_SIZE_MESSAGE)
+        self.assertEqual(validate_photo_file("foto.pdf", "application/pdf", 10), PHOTO_FORMAT_MESSAGE)
+        self.assertEqual(validate_photo_file("foto.png", "image/jpeg", 10), PHOTO_FORMAT_MESSAGE)
+        self.assertEqual(validate_photo_file("foto", "image/png", 10), PHOTO_FORMAT_MESSAGE)
+        self.assertEqual(validate_photo_file("foto.png", "image/png", 0), PHOTO_MISSING_MESSAGE)
+
+    def test_rejection_message(self) -> None:
+        too_large = [{"file": {}, "errors": [{"code": "file-too-large", "message": "x"}]}]
+        wrong_type = [{"file": {}, "errors": [{"code": "file-invalid-type", "message": "x"}]}]
+        self.assertEqual(rejection_message(too_large), PHOTO_SIZE_MESSAGE)
+        self.assertEqual(rejection_message(wrong_type), PHOTO_FORMAT_MESSAGE)
+        self.assertEqual(rejection_message([]), PHOTO_FORMAT_MESSAGE)
+        self.assertEqual(rejection_message(None), PHOTO_FORMAT_MESSAGE)
+
+
+class ProfilePhotoStateTests(unittest.TestCase):
+    def _upload(self, state, files, **patch_kwargs):
+        with (
+            patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock, **patch_kwargs) as upload,
+            patch("doafacil.editar_perfil.rx.clear_selected_files", return_value="clear") as clear,
+            patch("doafacil.editar_perfil.rx.redirect", return_value="login"),
+        ):
+            events = _events(EditProfileState.upload_photo.fn(state, files))
+        return events, upload, clear
+
+    def test_load_fills_photo(self) -> None:
+        state = _state()
+        with patch(
+            "doafacil.editar_perfil.fetch_profile",
+            new_callable=AsyncMock,
+            return_value=_parse_profile({**PROFILE_PAYLOAD, "photo": PHOTO_URL}),
+        ):
+            _events(EditProfileState.load_profile.fn(state))
+        self.assertEqual(state.photo, PHOTO_URL)
+
+    def test_upload_success_updates_photo_and_keeps_form_values(self) -> None:
+        state = _ready_state(city="Cidade digitada", about="Texto não salvo")
+        events, upload, clear = self._upload(
+            state, [_FakeUpload("minha foto.png", "image/png", PNG_BYTES)], return_value=PHOTO_URL
+        )
+        args = upload.await_args.args
+        self.assertEqual(args[1:], (TOKEN, "minha foto.png", PNG_BYTES, "image/png"))
+        self.assertEqual(state.photo, PHOTO_URL)
+        self.assertEqual(state.photo_notice, PHOTO_SAVED_MESSAGE)
+        self.assertEqual(state.photo_error, "")
+        self.assertFalse(state.photo_busy)
+        self.assertEqual((state.city, state.about), ("Cidade digitada", "Texto não salvo"))
+        clear.assert_called_once_with(PHOTO_UPLOAD_ID)
+        self.assertEqual(events[-1], "clear")
+
+    def test_invalid_file_is_refused_without_request(self) -> None:
+        for label, files, message in (
+            ("sem arquivo", [], PHOTO_MISSING_MESSAGE),
+            ("formato", [_FakeUpload("doc.pdf", "application/pdf", b"x")], PHOTO_FORMAT_MESSAGE),
+            ("tamanho", [_FakeUpload("g.png", "image/png", b"0" * (PHOTO_MAX_BYTES + 1))], PHOTO_SIZE_MESSAGE),
+        ):
+            with self.subTest(case=label):
+                state = _ready_state(photo=PHOTO_URL)
+                _, upload, _ = self._upload(state, files)
+                upload.assert_not_called()
+                self.assertEqual(state.photo_error, message)
+                self.assertEqual(state.photo, PHOTO_URL)
+                self.assertFalse(state.photo_busy)
+
+    def test_upload_errors_keep_current_photo(self) -> None:
+        for error, message in (
+            (ProfilePhotoRejectedError(PHOTO_SIZE_MESSAGE), PHOTO_SIZE_MESSAGE),
+            (ProfilePhotoRejectedError(PHOTO_FORMAT_MESSAGE), PHOTO_FORMAT_MESSAGE),
+            (ProfileRateLimitError(), RATE_LIMIT_MESSAGE),
+            (ProfileServiceError(), PHOTO_ERROR_MESSAGE),
+            (httpx.ConnectError("x"), PHOTO_ERROR_MESSAGE),
+        ):
+            with self.subTest(error=type(error).__name__, message=message):
+                state = _ready_state(photo=PHOTO_URL, city="Nova cidade")
+                self._upload(state, [_FakeUpload("f.png", "image/png", PNG_BYTES)], side_effect=error)
+                self.assertEqual(state.photo_error, message)
+                self.assertEqual(state.photo_notice, "")
+                self.assertEqual((state.photo, state.city), (PHOTO_URL, "Nova cidade"))
+                self.assertFalse(state.photo_busy)
+
+    def test_upload_401_redirects(self) -> None:
+        state = _ready_state()
+        events, _, _ = self._upload(
+            state, [_FakeUpload("f.png", "image/png", PNG_BYTES)], side_effect=ProfileUnauthorizedError()
+        )
+        self.assertIn("login", events)
+        self.assertEqual(state.auth_token, "")
+        self.assertFalse(state.photo_busy)
+
+    def test_upload_ignored_while_busy(self) -> None:
+        state = _ready_state(photo_busy=True)
+        _, upload, _ = self._upload(state, [_FakeUpload("f.png", "image/png", PNG_BYTES)])
+        upload.assert_not_called()
+
+    def test_photo_rejected_on_screen(self) -> None:
+        state = _ready_state(photo_notice=PHOTO_SAVED_MESSAGE)
+        with patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock) as upload:
+            EditProfileState.photo_rejected.fn(state, [{"errors": [{"code": "file-too-large"}]}])
+        upload.assert_not_called()
+        self.assertEqual(state.photo_error, PHOTO_SIZE_MESSAGE)
+        self.assertEqual(state.photo_notice, "")
+
+    def test_remove_photo_without_confirmation(self) -> None:
+        state = _ready_state(photo=PHOTO_URL, name="Nome digitado")
+        with patch("doafacil.editar_perfil.remove_profile_photo", new_callable=AsyncMock) as remove:
+            _events(EditProfileState.remove_photo.fn(state))
+        self.assertEqual(remove.await_args.args[1], TOKEN)
+        self.assertEqual(state.photo, "")
+        self.assertEqual(state.photo_notice, PHOTO_REMOVED_MESSAGE)
+        self.assertEqual(state.name, "Nome digitado")
+        self.assertFalse(state.photo_busy)
+
+    def test_remove_photo_errors_and_without_photo(self) -> None:
+        for error, message in (
+            (ProfileRateLimitError(), RATE_LIMIT_MESSAGE),
+            (ProfileServiceError(), PHOTO_ERROR_MESSAGE),
+        ):
+            with self.subTest(error=type(error).__name__):
+                state = _ready_state(photo=PHOTO_URL)
+                with patch("doafacil.editar_perfil.remove_profile_photo", new_callable=AsyncMock, side_effect=error):
+                    _events(EditProfileState.remove_photo.fn(state))
+                self.assertEqual((state.photo, state.photo_error), (PHOTO_URL, message))
+                self.assertFalse(state.photo_busy)
+        state = _ready_state(photo="")
+        with patch("doafacil.editar_perfil.remove_profile_photo", new_callable=AsyncMock) as remove:
+            _events(EditProfileState.remove_photo.fn(state))
+        remove.assert_not_called()
+
+    def test_remove_photo_401_redirects(self) -> None:
+        state = _ready_state(photo=PHOTO_URL)
+        with (
+            patch("doafacil.editar_perfil.remove_profile_photo", new_callable=AsyncMock, side_effect=ProfileUnauthorizedError()),
+            patch("doafacil.editar_perfil.rx.redirect", return_value="login"),
+        ):
+            events = _events(EditProfileState.remove_photo.fn(state))
+        self.assertIn("login", events)
+        self.assertEqual(state.auth_token, "")
+
+
 class EditProfilePageTests(unittest.TestCase):
     def test_route_and_on_load(self) -> None:
         page = app._unevaluated_pages["perfil/editar"]
@@ -398,14 +645,17 @@ class EditProfilePageTests(unittest.TestCase):
         self.assertIn('as:"h1"', rendered)
         self.assertNotIn("chat-fab", rendered)
 
-    def test_preview_without_email_counters_or_photo(self) -> None:
+    def test_preview_with_photo_or_initial_without_email_or_counters(self) -> None:
         preview = _preview()
         rendered = str(preview)
-        for var in ("preview_initial", "preview_first_name", "preview_location", "preview_about"):
+        for var in ("photo", "preview_initial", "preview_first_name", "preview_location", "preview_about"):
             with self.subTest(var=var):
                 self.assertIn(f"{var}_rx_state_", rendered)
+        # A foto atual (ou a inicial) em 80 px.
+        self.assertIn("profile-avatar-photo", rendered)
+        self.assertIn("profile-avatar-initial", rendered)
+        self.assertIn('["width"] : "80px"', rendered)
         self.assertNotIn("email", rendered)
-        self.assertNotIn("Image", [type(n).__name__ for n in _nodes(preview)])
         contents = _contents(preview)
         for excluded in ("Doações", "Editar perfil", "Compartilhar", "E-mail"):
             with self.subTest(excluded=excluded):
@@ -445,13 +695,51 @@ class EditProfilePageTests(unittest.TestCase):
         for uf in ("AC", "SP", "TO"):
             with self.subTest(uf=uf):
                 self.assertIn(f'value:"{uf}"', rendered)
-        # Sem foto nesta change.
-        for excluded in ("Foto", "Alterar foto", "Remover foto"):
-            with self.subTest(excluded=excluded):
-                self.assertNotIn(excluded, contents)
-        self.assertNotIn("upload", rendered.lower())
+        # A seção Foto vem antes de “Dados públicos”.
+        self.assertLess(contents.index("Foto"), contents.index("Dados públicos"))
+
+    def test_photo_section(self) -> None:
+        section = _photo_section()
+        contents = _contents(section)
+        rendered = str(section)
+        for text in ("Foto", PHOTO_FORMATS_TEXT, PHOTO_PUBLIC_NOTICE, "Remover foto"):
+            with self.subTest(text=text):
+                self.assertIn(text, contents)
+        self.assertEqual(PHOTO_PUBLIC_NOTICE, "Sua foto aparece para outras pessoas.")
+        # “Alterar foto” dentro do upload; “Enviando...” enquanto envia.
+        self.assertIn('"Alterar foto"', rendered)
+        self.assertIn('"Enviando..."', rendered)
+        self.assertIn(f'id:"{PHOTO_UPLOAD_ID}"', rendered)
+        self.assertIn('type:"file"', rendered)
+        self.assertIn("profile-avatar-photo", rendered)
+        self.assertIn('["width"] : "96px"', rendered)
+        # “Remover foto” só aparece com foto.
+        self.assertIn("photo_rx_state_", rendered)
+        self.assertIn("remove_photo", rendered)
+        self.assertIn('role:"alert"', rendered)
+        self.assertIn('role:"status"', rendered)
+        self.assertIn("photo_error_rx_state_", rendered)
+        self.assertIn("photo_notice_rx_state_", rendered)
+
+    def test_upload_props_check_format_and_size_on_screen(self) -> None:
+        # As props do rx.upload vão para o useDropzone (nos hooks do componente).
+        upload = _photo_section().children[1].children[1].children[0]
+        self.assertEqual(type(upload).__name__, "StyledUpload")
+        hooks = "\n".join(upload.children[0].special_props[0]._get_all_var_data().hooks)
+        self.assertIn("edit_profile_state.upload_photo", hooks)
+        self.assertIn(f'["upload_id"] : "{PHOTO_UPLOAD_ID}"', hooks)
+        self.assertIn("edit_profile_state.photo_rejected", hooks)
+        self.assertIn(f'["maxSize"] : {PHOTO_MAX_BYTES}', hooks)
+        self.assertIn('["maxFiles"] : 1', hooks)
+        self.assertIn('["multiple"] : false', hooks)
+        for mime in ("image/jpeg", "image/png", "image/gif", "image/webp"):
+            with self.subTest(mime=mime):
+                self.assertIn(f'["{mime}"]', hooks)
+        self.assertEqual(PHOTO_MAX_BYTES, 5 * 1024 * 1024)
 
     def test_visibility_text_matches_decision(self) -> None:
+        self.assertIn("sua foto", VISIBILITY_TEXT)
+        self.assertIn("a foto atual", VISIBILITY_TEXT)
         self.assertIn("só é mostrado a pessoas logadas", VISIBILITY_TEXT)
         self.assertIn("preferência “E-mail”", VISIBILITY_TEXT)
         self.assertNotIn("nunca aparece", VISIBILITY_TEXT)
