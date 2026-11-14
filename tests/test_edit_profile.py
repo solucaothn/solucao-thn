@@ -1,15 +1,20 @@
 import asyncio
 import unittest
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from PIL import Image
 
 from doafacil.chat import back_link_header
 from doafacil.doafacil import app
 from doafacil.editar_perfil import (
     ABOUT_HINT,
+    CROP_DIALOG_WIDTH,
+    CROP_HELP,
+    CROP_TITLE,
     EMAIL_HELP,
     LOAD_ERROR_MESSAGE,
     NAME_HELP,
@@ -34,6 +39,7 @@ from doafacil.editar_perfil import (
     ProfileRejectedError,
     ProfileServiceError,
     ProfileUnauthorizedError,
+    _crop_dialog,
     _form,
     _parse_profile,
     _parse_profile_credibility,
@@ -67,7 +73,25 @@ PROFILE_PAYLOAD = {
 # Só o GET traz o selo e os contadores (change perfil-credibilidade).
 GET_PAYLOAD = {**PROFILE_PAYLOAD, "email_verified": True, "counts": {"active": 2, "completed": 5}}
 PHOTO_URL = "https://xano.example/vault/abc/foto.png"
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # cabeçalho de PNG, conteúdo ilegível
+
+
+def _quadrants_png() -> bytes:
+    """PNG 400x300 de verdade, com quatro quadrantes (o sup. dir. é verde)."""
+    image = Image.new("RGB", (400, 300))
+    for color, box in (
+        ((220, 20, 20), (0, 0, 200, 150)),
+        ((20, 160, 60), (200, 0, 400, 150)),
+        ((20, 40, 220), (0, 150, 200, 300)),
+        ((240, 220, 20), (200, 150, 400, 300)),
+    ):
+        image.paste(color, box)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+QUADRANTS_PNG = _quadrants_png()
 
 
 class _FakeUpload:
@@ -121,6 +145,11 @@ def _state(**fields) -> SimpleNamespace:
         photo_error="",
         form_error="",
         is_saving=False,
+        crop_open=False,
+        crop_preview="",
+        crop_area={},
+        _crop_source=b"",
+        _crop_preview_size=(0, 0),
     )
     base.update(fields)
     return SimpleNamespace(**base)
@@ -544,14 +573,117 @@ class ProfilePhotoValidationTests(unittest.TestCase):
 
 
 class ProfilePhotoStateTests(unittest.TestCase):
-    def _upload(self, state, files, **patch_kwargs):
+    """Fluxo da foto com o modal “Ajustar foto” (change recorte-foto-perfil):
+    escolher abre o modal sem requisição; “Usar foto” recorta e envia."""
+
+    def _prepare(self, state, files):
+        with (
+            patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock) as upload,
+            patch("doafacil.editar_perfil.rx.clear_selected_files", return_value="clear") as clear,
+        ):
+            events = _events(EditProfileState.prepare_crop.fn(state, files))
+        return events, upload, clear
+
+    def _confirm(self, state, **patch_kwargs):
         with (
             patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock, **patch_kwargs) as upload,
-            patch("doafacil.editar_perfil.rx.clear_selected_files", return_value="clear") as clear,
             patch("doafacil.editar_perfil.rx.redirect", return_value="login"),
         ):
-            events = _events(EditProfileState.upload_photo.fn(state, files))
+            events = _events(EditProfileState.confirm_crop.fn(state))
+        return events, upload
+
+    def _opened(self, area=None, **fields):
+        """Estado com o modal aberto para o PNG de quadrantes (prévia 400x300)."""
+        state = _ready_state(**fields)
+        self._prepare(state, [_FakeUpload("minha foto.png", "image/png", QUADRANTS_PNG)])
+        EditProfileState.set_crop_area.fn(
+            state, area or {"x": 220, "y": 20, "width": 160, "height": 160}
+        )
+        return state
+
+    def _upload(self, state, files, **patch_kwargs):
+        """Escolher o arquivo e, se o modal abrir, acionar “Usar foto”."""
+        events, upload, clear = self._prepare(state, files)
+        if state.crop_open:
+            EditProfileState.set_crop_area.fn(state, {"x": 0, "y": 0, "width": 300, "height": 300})
+            more, upload = self._confirm(state, **patch_kwargs)
+            events += more
         return events, upload, clear
+
+    def test_choosing_a_valid_photo_opens_modal_without_request(self) -> None:
+        state = _ready_state(city="Cidade digitada")
+        events, upload, clear = self._prepare(state, [_FakeUpload("minha foto.png", "image/png", QUADRANTS_PNG)])
+        upload.assert_not_called()
+        self.assertTrue(state.crop_open)
+        self.assertTrue(state.crop_preview.startswith("data:image/"))
+        self.assertEqual(state._crop_source, QUADRANTS_PNG)
+        self.assertEqual(state._crop_preview_size, (400, 300))
+        self.assertEqual(state.crop_area, {})
+        self.assertEqual(state.city, "Cidade digitada")
+        clear.assert_called_once_with(PHOTO_UPLOAD_ID)
+
+    def test_unreadable_image_shows_format_message_without_modal(self) -> None:
+        state = _ready_state(photo=PHOTO_URL)
+        _, upload, _ = self._prepare(state, [_FakeUpload("f.png", "image/png", PNG_BYTES)])
+        upload.assert_not_called()
+        self.assertFalse(state.crop_open)
+        self.assertEqual(state.photo_error, PHOTO_FORMAT_MESSAGE)
+        self.assertEqual(state.photo, PHOTO_URL)
+
+    def test_cancel_clears_everything_without_request(self) -> None:
+        for close in ("cancel", "esc"):
+            with self.subTest(close=close):
+                state = self._opened(photo=PHOTO_URL)
+                with patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock) as upload:
+                    if close == "cancel":
+                        EditProfileState.cancel_crop.fn(state)
+                    else:
+                        EditProfileState.set_crop_open.fn(state, False)
+                upload.assert_not_called()
+                self.assertFalse(state.crop_open)
+                self.assertEqual((state.crop_preview, state.crop_area), ("", {}))
+                self.assertEqual(state._crop_source, b"")
+                self.assertEqual(state.photo, PHOTO_URL)
+
+    def test_use_photo_sends_square_of_framed_area_and_keeps_form(self) -> None:
+        state = self._opened(city="Cidade digitada", about="Texto não salvo")
+        _, upload = self._confirm(state, return_value=PHOTO_URL)
+        args = upload.await_args.args
+        self.assertEqual(args[1], TOKEN)
+        self.assertEqual((args[2], args[4]), ("foto.png", "image/png"))
+        sent = Image.open(BytesIO(args[3])).convert("RGB")
+        self.assertEqual(sent.size, (512, 512))
+        # A área (220, 20, 160x160) da prévia 400x300 cai no quadrante verde.
+        self.assertTrue(all(abs(a - b) <= 40 for a, b in zip(sent.getpixel((256, 256)), (20, 160, 60))))
+        self.assertEqual(state.photo, PHOTO_URL)
+        self.assertEqual(state.photo_notice, PHOTO_SAVED_MESSAGE)
+        self.assertFalse(state.photo_busy)
+        self.assertFalse(state.crop_open)
+        self.assertEqual(state._crop_source, b"")
+        self.assertEqual((state.city, state.about), ("Cidade digitada", "Texto não salvo"))
+
+    def test_invalid_area_shows_error_without_request(self) -> None:
+        state = self._opened(area={"x": 0, "y": 0, "width": 0, "height": 0}, photo=PHOTO_URL)
+        _, upload = self._confirm(state)
+        upload.assert_not_called()
+        self.assertEqual(state.photo_error, PHOTO_ERROR_MESSAGE)
+        self.assertEqual(state.photo, PHOTO_URL)
+        self.assertFalse(state.crop_open)
+
+    def test_use_photo_without_area_or_closed_modal_does_nothing(self) -> None:
+        state = _ready_state()
+        _, upload = self._confirm(state)
+        upload.assert_not_called()
+        self.assertEqual(state.photo_error, "")
+
+    def test_set_crop_area_keeps_only_the_four_numbers(self) -> None:
+        state = self._opened()
+        EditProfileState.set_crop_area.fn(state, {"x": 1, "y": 2, "width": 3, "height": 4, "extra": 9})
+        self.assertEqual(state.crop_area, {"x": 1, "y": 2, "width": 3, "height": 4})
+        self.assertTrue(EditProfileState.computed_vars["crop_ready"].fget(state))
+        closed = _ready_state()
+        EditProfileState.set_crop_area.fn(closed, {"x": 1, "y": 2, "width": 3, "height": 4})
+        self.assertEqual(closed.crop_area, {})
 
     def test_load_fills_photo(self) -> None:
         state = _state()
@@ -562,21 +694,6 @@ class ProfilePhotoStateTests(unittest.TestCase):
         ):
             _events(EditProfileState.load_profile.fn(state))
         self.assertEqual(state.photo, PHOTO_URL)
-
-    def test_upload_success_updates_photo_and_keeps_form_values(self) -> None:
-        state = _ready_state(city="Cidade digitada", about="Texto não salvo")
-        events, upload, clear = self._upload(
-            state, [_FakeUpload("minha foto.png", "image/png", PNG_BYTES)], return_value=PHOTO_URL
-        )
-        args = upload.await_args.args
-        self.assertEqual(args[1:], (TOKEN, "minha foto.png", PNG_BYTES, "image/png"))
-        self.assertEqual(state.photo, PHOTO_URL)
-        self.assertEqual(state.photo_notice, PHOTO_SAVED_MESSAGE)
-        self.assertEqual(state.photo_error, "")
-        self.assertFalse(state.photo_busy)
-        self.assertEqual((state.city, state.about), ("Cidade digitada", "Texto não salvo"))
-        clear.assert_called_once_with(PHOTO_UPLOAD_ID)
-        self.assertEqual(events[-1], "clear")
 
     def test_invalid_file_is_refused_without_request(self) -> None:
         for label, files, message in (
@@ -591,6 +708,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
                 self.assertEqual(state.photo_error, message)
                 self.assertEqual(state.photo, PHOTO_URL)
                 self.assertFalse(state.photo_busy)
+                self.assertFalse(state.crop_open)
 
     def test_upload_errors_keep_current_photo(self) -> None:
         for error, message in (
@@ -602,7 +720,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
         ):
             with self.subTest(error=type(error).__name__, message=message):
                 state = _ready_state(photo=PHOTO_URL, city="Nova cidade")
-                self._upload(state, [_FakeUpload("f.png", "image/png", PNG_BYTES)], side_effect=error)
+                self._upload(state, [_FakeUpload("f.png", "image/png", QUADRANTS_PNG)], side_effect=error)
                 self.assertEqual(state.photo_error, message)
                 self.assertEqual(state.photo_notice, "")
                 self.assertEqual((state.photo, state.city), (PHOTO_URL, "Nova cidade"))
@@ -611,7 +729,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
     def test_upload_401_redirects(self) -> None:
         state = _ready_state()
         events, _, _ = self._upload(
-            state, [_FakeUpload("f.png", "image/png", PNG_BYTES)], side_effect=ProfileUnauthorizedError()
+            state, [_FakeUpload("f.png", "image/png", QUADRANTS_PNG)], side_effect=ProfileUnauthorizedError()
         )
         self.assertIn("login", events)
         self.assertEqual(state.auth_token, "")
@@ -619,8 +737,9 @@ class ProfilePhotoStateTests(unittest.TestCase):
 
     def test_upload_ignored_while_busy(self) -> None:
         state = _ready_state(photo_busy=True)
-        _, upload, _ = self._upload(state, [_FakeUpload("f.png", "image/png", PNG_BYTES)])
+        _, upload, _ = self._upload(state, [_FakeUpload("f.png", "image/png", QUADRANTS_PNG)])
         upload.assert_not_called()
+        self.assertFalse(state.crop_open)
 
     def test_photo_rejected_on_screen(self) -> None:
         state = _ready_state(photo_notice=PHOTO_SAVED_MESSAGE)
@@ -783,12 +902,42 @@ class EditProfilePageTests(unittest.TestCase):
         self.assertIn("photo_error_rx_state_", rendered)
         self.assertIn("photo_notice_rx_state_", rendered)
 
+    def test_crop_dialog(self) -> None:
+        dialog = _crop_dialog()
+        rendered = str(dialog)
+        contents = _contents(dialog)
+        for text in (CROP_TITLE, CROP_HELP, "Cancelar", "Usar foto"):
+            with self.subTest(text=text):
+                self.assertIn(text, contents)
+        self.assertEqual(CROP_TITLE, "Ajustar foto")
+        # Controlado pelo estado; fechar (Esc, clique fora) cancela.
+        self.assertIn("crop_open_rx_state_", rendered)
+        self.assertIn("set_crop_open", rendered)
+        self.assertIn("cancel_crop", rendered)
+        self.assertIn("confirm_crop", rendered)
+        # “Usar foto” só depois da primeira área recebida.
+        self.assertIn("crop_ready_rx_state_", rendered)
+        # A moldura com a prévia e o evento da área final.
+        self.assertIn("ImageCropper", rendered)
+        self.assertIn("crop_preview_rx_state_", rendered)
+        self.assertIn("set_crop_area", rendered)
+        # Cabe em 360 px; botões de 44 px.
+        self.assertEqual(CROP_DIALOG_WIDTH, "min(480px, calc(100vw - 32px))")
+        self.assertIn(CROP_DIALOG_WIDTH, rendered)
+        self.assertGreaterEqual(rendered.count('["minHeight"] : "44px"'), 2)
+        # Contraste AA dos botões.
+        self.assertGreaterEqual(_contrast("#FFFFFF", "#007A42"), 4.5)
+        self.assertGreaterEqual(_contrast("#2A2A2A", "#FFFFFF"), 4.5)
+        # O modal faz parte da seção Foto.
+        self.assertIn("edit-profile-crop-dialog", str(_photo_section()))
+
     def test_upload_props_check_format_and_size_on_screen(self) -> None:
         # As props do rx.upload vão para o useDropzone (nos hooks do componente).
         upload = _photo_section().children[1].children[1].children[0]
         self.assertEqual(type(upload).__name__, "StyledUpload")
         hooks = "\n".join(upload.children[0].special_props[0]._get_all_var_data().hooks)
-        self.assertIn("edit_profile_state.upload_photo", hooks)
+        # Escolher o arquivo abre o modal “Ajustar foto” (prepare_crop).
+        self.assertIn("edit_profile_state.prepare_crop", hooks)
         self.assertIn(f'["upload_id"] : "{PHOTO_UPLOAD_ID}"', hooks)
         self.assertIn("edit_profile_state.photo_rejected", hooks)
         self.assertIn(f'["maxSize"] : {PHOTO_MAX_BYTES}', hooks)

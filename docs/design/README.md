@@ -438,7 +438,7 @@ Diferenças aprovadas em relação ao Figma:
 
 - **Foto atual** de 96 px, redonda, ou o círculo `#F2F2F2` com a inicial, ao lado dos botões. Em telas estreitas, os botões descem para baixo da foto.
 - **“Alterar foto”:** botão branco com contorno `#007A42` e 44 px de altura, que abre a escolha de arquivo (com o clique ou com Enter ou Espaço).
-  - A foto é enviada **na hora**, sem depender de “Salvar alterações”. Os valores digitados no formulário ficam como estão, sem serem salvos.
+  - Escolher a foto abre o modal **“Ajustar foto”** (veja abaixo). A foto só é enviada em “Usar foto”, sem depender de “Salvar alterações”. Os valores digitados no formulário ficam como estão, sem serem salvos.
   - Enquanto envia, o botão mostra “Enviando...” e fica desativado.
   - Abaixo, a ajuda “JPG, PNG, GIF ou WEBP, até 5 MB”, em `#555555`.
 - **Conferência na tela, antes de enviar:** um arquivo só, no formato JPG, PNG, GIF ou WEBP e com até 5 MB. Fora disso, nada é enviado e aparece “Envie uma imagem JPG, PNG, GIF ou WEBP.” ou “A foto pode ter no máximo 5 MB.”. O Xano confere de novo.
@@ -446,6 +446,28 @@ Diferenças aprovadas em relação ao Figma:
 - **Aviso fixo** “Sua foto aparece para outras pessoas.”, em `#555555`, abaixo da seção.
 - **Mensagens:** “Foto atualizada.” ou “Foto removida.” em `#166B3B`, anunciadas ao leitor de tela (`role="status"`); erros em `#9B2C2C`, com `role="alert"`. Num erro, a foto atual continua a mesma.
 - **Diferenças do Figma:** o Figma não mostra a ajuda de formatos, o aviso nem as mensagens. Não há área de arrastar e soltar: o arquivo é escolhido pelo botão.
+
+#### Modal “Ajustar foto” (change recorte-foto-perfil, sem frame no Figma)
+
+- **Quando abre:** depois de escolher em “Alterar foto” um arquivo aceito (formato e tamanho conferidos como antes). Um arquivo com extensão aceita, mas que não é uma imagem legível, recebe “Envie uma imagem JPG, PNG, GIF ou WEBP.” e não abre o modal.
+- **Conteúdo:**
+  - título “Ajustar foto” e a ajuda “Arraste para posicionar. Use o controle, a roda do mouse ou a pinça para o zoom.”, em `#555555`;
+  - a área quadrada (até 400 px) com fundo `#1F1F1F` e a **moldura circular** do `react-easy-crop`. A imagem cobre sempre toda a moldura;
+  - abaixo, “−” (“Diminuir zoom”), o controle deslizante “Zoom” (1× a 3×) e “+” (“Aumentar zoom”), com botões redondos de 44 px;
+  - o controle tem trilha cinza clara (`#C8C8C8`) com a parte preenchida em `#007A42` e marcador redondo de 20 px, branco com borda `#007A42`;
+  - o foco aparece como um anel `#007A42` no controle, nos botões − e + e na área de enquadramento, no lugar do azul padrão do navegador.
+- **Mover e zoom:**
+  - arrastar com o mouse ou o dedo;
+  - setas na área de enquadramento, que é focável e tem o rótulo “Área de enquadramento. Use as setas para mover e as teclas mais e menos para o zoom.”;
+  - roda do mouse, pinça no celular, o controle e as teclas `+` e `-`.
+- **Botões:**
+  - “Cancelar”, com contorno `#85858D`, fecha sem enviar nada. `Esc` e o clique fora também cancelam;
+  - “Usar foto”, com fundo `#007A42` e texto branco (5,4:1), fica desativado até a moldura informar a primeira área.
+- **Resultado:** um quadrado de 512 × 512 com exatamente a área da moldura.
+  - Vai sem metadados (sem localização nem modelo da câmera) e na orientação em que a foto foi tirada.
+  - JPG e PNG mantêm o formato. GIF vira PNG estático. WEBP vira PNG quando tem transparência e JPG quando não tem. O arquivo enviado é sempre JPG ou PNG.
+  - O nome enviado é sempre `foto.<ext>`.
+- **Largura:** `min(480px, calc(100vw - 32px))`, sem rolagem horizontal em 360 px. O foco fica preso no modal.
 
 ## Chat
 

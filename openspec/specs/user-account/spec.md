@@ -399,13 +399,14 @@ A página `/perfil/editar` MUST exigir login e permitir trocar ou remover a foto
 
 #### Scenario: Enviar uma foto nova
 - **WHEN** a pessoa escolhe em “Alterar foto” um arquivo JPG, PNG, GIF ou WEBP com até 5 MB
-- **THEN** a página MUST enviar a foto na hora, sem depender de “Salvar alterações”, e mostrar um estado de envio
+- **THEN** a página MUST abrir o modal de enquadramento (veja “Enquadramento da foto de perfil”) e só enviar a foto quando a pessoa acionar “Usar foto”, sem depender de “Salvar alterações”
+- **AND** durante o envio, MUST mostrar um estado de envio
 - **AND** no sucesso, a seção “Foto” e a prévia MUST passar a mostrar a foto nova, com uma mensagem curta de sucesso anunciada ao leitor de tela
 - **AND** os valores já digitados no formulário MUST permanecer, sem serem salvos
 
 #### Scenario: Arquivo de formato ou tamanho inválido
-- **WHEN** a pessoa escolhe um arquivo que não é JPG, PNG, GIF ou WEBP, ou que passa de 5 MB
-- **THEN** a página MUST mostrar uma mensagem clara sobre o formato ou o tamanho e MUST NOT enviar a requisição
+- **WHEN** a pessoa escolhe um arquivo que não é JPG, PNG, GIF ou WEBP, que passa de 5 MB ou cujo conteúdo não pode ser lido como imagem
+- **THEN** a página MUST mostrar uma mensagem clara sobre o formato ou o tamanho, MUST NOT abrir o modal de enquadramento e MUST NOT enviar a requisição
 - **AND** quando o Xano recusar o arquivo com HTTP 400, a página MUST mostrar a mensagem correspondente, mantendo a foto anterior
 
 #### Scenario: Remover a foto
@@ -414,7 +415,7 @@ A página `/perfil/editar` MUST exigir login e permitir trocar ou remover a foto
 - **AND** a seção “Foto” e a prévia MUST voltar ao círculo da inicial
 
 #### Scenario: Falha ao enviar ou remover
-- **WHEN** ocorre falha de rede, HTTP 429 ou outro erro ao enviar ou remover a foto
+- **WHEN** ocorre falha de rede, HTTP 429, falha ao preparar o recorte ou outro erro ao enviar ou remover a foto
 - **THEN** a página MUST mostrar uma mensagem de erro simples e manter a foto anterior
 - **AND** um HTTP 401 MUST limpar a sessão e levar a `/login`
 
@@ -558,3 +559,54 @@ Onde o selo é previsto, a interface MUST mostrá-lo somente quando o e-mail da 
 #### Scenario: Selo em tela estreita
 - **WHEN** o selo aparece numa largura de 360 px
 - **THEN** ele MUST caber sem cortar o texto e sem rolagem horizontal
+
+### Requirement: Enquadramento da foto de perfil
+Antes do envio, a página `/perfil/editar` MUST deixar a pessoa enquadrar a foto escolhida num modal com moldura circular. Só a área enquadrada MUST ser enviada, como imagem quadrada de 512 × 512 px, pelo mesmo endpoint de envio da foto de perfil.
+
+#### Scenario: Abrir o modal ao escolher uma foto válida
+- **WHEN** a pessoa escolhe em “Alterar foto” um arquivo JPG, PNG, GIF ou WEBP com até 5 MB
+- **THEN** a página MUST abrir um modal com a imagem escolhida, já na orientação correta, sob uma moldura circular
+- **AND** MUST NOT enviar nenhuma requisição ao Xano antes de “Usar foto”
+
+#### Scenario: Posicionar e dar zoom
+- **WHEN** o modal está aberto
+- **THEN** a pessoa MUST poder mover a imagem arrastando com o mouse ou o dedo e pelas setas do teclado
+- **AND** MUST poder mudar o zoom por um controle deslizante com o rótulo “Zoom”, pela roda do mouse, por pinça no celular e pelas teclas `+` e `-`
+- **AND** a imagem MUST cobrir sempre toda a moldura, sem área vazia dentro dela
+
+#### Scenario: Cancelar
+- **WHEN** a pessoa aciona “Cancelar” ou pressiona `Esc`
+- **THEN** o modal MUST fechar sem enviar requisição, mantendo a foto atual e os valores já digitados no formulário
+
+#### Scenario: Usar foto
+- **WHEN** a pessoa aciona “Usar foto”
+- **THEN** a página MUST enviar uma imagem quadrada de 512 × 512 px com exatamente a área que estava dentro da moldura, mostrando um estado de envio
+- **AND** no sucesso, a seção “Foto” e a prévia MUST passar a mostrar a foto nova, com a mensagem curta de sucesso anunciada ao leitor de tela
+- **AND** os valores já digitados no formulário MUST permanecer, sem serem salvos
+
+#### Scenario: Formato do resultado
+- **WHEN** a foto enquadrada é enviada
+- **THEN** o resultado MUST manter o formato do original quando ele é JPG ou PNG
+- **AND** um WEBP MUST virar PNG quando tiver algum pixel transparente, preservando a transparência, e JPEG quando não tiver
+- **AND** um GIF MUST virar uma imagem PNG estática, com o primeiro quadro
+- **AND** o resultado enviado MUST ser sempre JPEG ou PNG
+- **AND** o resultado MUST NOT conter metadados do arquivo original, como a localização ou o modelo da câmera
+
+#### Scenario: Orientação da câmera
+- **WHEN** o arquivo traz a indicação de orientação (EXIF) de uma foto tirada com o celular girado
+- **THEN** o modal e o resultado MUST mostrar a imagem na orientação em que foi fotografada, e não deitada ou de cabeça para baixo
+
+#### Scenario: Arquivo que não é uma imagem legível
+- **WHEN** o arquivo tem extensão e tipo aceitos, mas o conteúdo não pode ser lido como imagem
+- **THEN** a página MUST mostrar “Envie uma imagem JPG, PNG, GIF ou WEBP.”, MUST NOT abrir o modal e MUST NOT enviar a requisição
+
+#### Scenario: Área enquadrada inválida
+- **WHEN** a área recebida para o recorte fica fora da imagem, tem largura ou altura nula ou não é um quadrado
+- **THEN** o recorte MUST ficar limitado à imagem, sem área vazia, ou, se não houver área válida, a página MUST mostrar a mensagem de erro de envio sem enviar a requisição e mantendo a foto atual
+
+#### Scenario: Acessibilidade e layout do modal
+- **WHEN** o modal é exibido, inclusive numa largura de 360 px
+- **THEN** o modal MUST caber na largura da tela, sem rolagem horizontal
+- **AND** o foco MUST ficar preso no modal e voltar a “Alterar foto” ao fechar
+- **AND** o modal MUST ter o título “Ajustar foto”, e a área de enquadramento MUST ter um rótulo acessível que explique como mover e dar zoom pelo teclado
+- **AND** “Cancelar”, “Usar foto” e os controles de zoom MUST ter rótulos acessíveis, contraste mínimo AA e área de toque de pelo menos 44 px
