@@ -608,11 +608,70 @@ A foto de perfil é da própria pessoa: os endpoints usam sempre o token, nunca 
 
 - **Seção Foto** (`doafacil/editar_perfil.py`):
   - “Alterar foto” usa `rx.upload` com `accept` (os formatos do cadastro de doação), `max_files=1` e `max_size` de 5 MB. Um arquivo recusado pela tela chama `photo_rejected` e não faz requisição.
-  - O arquivo aceito vai na hora para `upload_photo`, que confere de novo o formato (extensão e tipo) e o tamanho e envia `POST /auth/profile/photo` (multipart, campo `photo`) com o token.
+  - O arquivo aceito vai para `prepare_crop`, que confere de novo o formato (extensão e tipo) e o tamanho, abre a imagem com o Pillow e abre o modal “Ajustar foto”. Nada vai ao Xano nesse momento. Veja “Enquadramento da foto (recorte)” abaixo.
+  - “Usar foto” chama `confirm_crop`, que recorta e envia `POST /auth/profile/photo` (multipart, campo `photo`) com o token.
   - “Remover foto” chama `remove_photo` (`DELETE /auth/profile/photo`), sem confirmação.
   - Um 400 do envio mostra a mensagem de tamanho quando o Xano fala em “MB”, e a de formato nos outros casos. Um 401 limpa a sessão e leva a `/login`; um 429 mostra o aviso de limite.
   - A foto e o formulário são independentes: enviar ou remover a foto não salva os outros campos, e “Salvar alterações” não envia a foto.
-- **Testes:** `tests/test_edit_profile.py` (seção Foto, cliente e eventos) e `tests/test_profile_photo.py` (avatar, `parse_photo_url` e a foto nas outras telas).
+- **Testes:** `tests/test_edit_profile.py` (seção Foto, modal, cliente e eventos) e `tests/test_profile_photo.py` (avatar, `parse_photo_url` e a foto nas outras telas).
+
+#### Enquadramento da foto (recorte)
+
+Entrou com a change recorte-foto-perfil. O Xano não mudou.
+
+- **Dependências:**
+  - `pillow` no `requirements.txt`. Depois de um pull, rode `python -m pip install -r requirements.txt` com o `.venv` ativo;
+  - `react-easy-crop@6.2.4`, que o próprio Reflex instala no `.web` ao compilar.
+- **Componente:** `assets/recorte/image_cropper.jsx` é um componente React pequeno, envolvido em `doafacil/recorte_foto.py` (`ImageCropper`, `NoSSRComponent`).
+  - Ele guarda o enquadramento e o zoom **no navegador**, para o arraste ser fluido, e trata `+` e `-`.
+  - Só a área final (`croppedAreaPixels`) vai ao estado, pelo `on_crop_complete`.
+  - Foi a saída aprovada (plano B) porque o Reflex não filtra teclas no navegador e o `ClientStateVar` é experimental. Os detalhes estão no `design.md` da change.
+- **Estado (`EditProfileState`):**
+
+  | Evento | O que faz |
+  |---|---|
+  | `prepare_crop` | valida o arquivo e abre o modal |
+  | `set_crop_area` | guarda a área recebida da moldura |
+  | `cancel_crop` / `set_crop_open(False)` | fecha o modal sem requisição |
+  | `confirm_crop` | recorta e envia |
+
+  - O original fica em `_crop_source`, uma variável de backend (começa com `_`) que não vai ao navegador. Ela é limpa ao fechar, ao enviar e ao recarregar a página.
+  - O navegador recebe só a prévia, com até 1024 px.
+- **Funções puras** (`doafacil/recorte_foto.py`):
+  - `prepare_source` abre a imagem, recusa mais de 40 milhões de pixels, usa o 1º quadro do GIF, corrige o EXIF e descarta os metadados;
+  - `make_preview` gera a prévia;
+  - `crop_box` converte a área da prévia para o original e a mantém quadrada e dentro da imagem;
+  - `encode_square` gera 512 × 512 em `foto.jpg` ou `foto.png`, nunca em WEBP. O GIF vira `foto.png`. O WEBP vira `foto.png` quando algum pixel é transparente e `foto.jpg` quando não é.
+  - Um WEBP enviado como WEBP falhou no teste real (RC4), e a causa não foi confirmada: pode ser o Xano ou o servidor de arquivos. Converter antes do envio deixa o resultado independente disso (decisão 4a do `design.md` da change).
+- **Testes:** `tests/test_profile_photo_crop.py` (coordenadas, EXIF, limites, formatos, metadados e componente) e os testes do modal em `tests/test_edit_profile.py`.
+
+#### Testar o recorte contra o Xano real
+
+O script `scripts/teste_recorte_foto_real.py` roda os cenários RC1 a RC8, mais o RC4b, contra o Xano publicado. Ele usa as mesmas funções do modal e o mesmo cliente de envio da página.
+
+Antes de rodar, tenha **uma conta** e as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas no terminal (seção 4). Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_recorte_foto_real.py
+```
+
+| Cenário | O que confere |
+|---|---|
+| RC1 | o recorte do quadrante verde de uma imagem de quatro cores vira 512 × 512 só verde |
+| RC2 | um JPEG com orientação EXIF 6 sai em pé |
+| RC3 | um PNG com transparência continua PNG com transparência |
+| RC4 | um WEBP sem transparência vira JPEG |
+| RC4b | um WEBP com transparência vira PNG com transparência |
+| RC5 | um GIF vira PNG |
+| RC6 | o arquivo guardado não tem EXIF, marca, modelo nem localização |
+| RC7 | o `GET auth/profile` traz a URL da última foto enviada |
+| RC8 | a foto original volta (ou a conta fica sem foto, como estava) |
+
+Cuidados:
+
+- **O script altera a foto da conta** e a restaura no fim, mesmo se der erro no meio.
+- Ele não imprime nomes, e-mails, URLs nem corpos de resposta.
+- Ele espera 2,5 s entre as requisições, o que dá cerca de 1 minuto. A pausa pode ser trocada com a variável `TESTE_RECORTE_PAUSA`.
 
 #### Testar a foto de perfil contra o Xano real
 

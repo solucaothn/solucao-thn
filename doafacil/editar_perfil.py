@@ -33,6 +33,15 @@ from doafacil.minhas_doacoes import (
     _state_message,
 )
 from doafacil.perfil_doador import location_label
+from doafacil.recorte_foto import (
+    CropAreaError,
+    PhotoImageError,
+    crop_box,
+    encode_square,
+    image_cropper,
+    make_preview,
+    prepare_source,
+)
 from doafacil.perfil_publico import (
     ABOUT_MAX_LENGTH,
     about_text,
@@ -81,6 +90,9 @@ PHOTO_SIZE_MESSAGE = "A foto pode ter no máximo 5 MB."
 PHOTO_SAVED_MESSAGE = "Foto atualizada."
 PHOTO_REMOVED_MESSAGE = "Foto removida."
 PHOTO_ERROR_MESSAGE = "Não foi possível atualizar a foto. Tente novamente."
+CROP_TITLE = "Ajustar foto"
+CROP_HELP = "Arraste para posicionar. Use o controle, a roda do mouse ou a pinça para o zoom."
+CROP_DIALOG_WIDTH = "min(480px, calc(100vw - 32px))"
 
 
 class ProfileError(Exception):
@@ -318,6 +330,16 @@ def _clear_form(state: Any) -> None:
     state.photo_error = ""
     state.form_error = ""
     state.is_saving = False
+    _clear_crop(state)
+
+
+def _clear_crop(state: Any) -> None:
+    """Fecha o modal e descarta o original e a prévia."""
+    state.crop_open = False
+    state.crop_preview = ""
+    state.crop_area = {}
+    state._crop_source = b""
+    state._crop_preview_size = (0, 0)
 
 
 class EditProfileState(LoginState):
@@ -339,6 +361,17 @@ class EditProfileState(LoginState):
     photo_error: str = ""
     form_error: str = ""
     is_saving: bool = False
+    # Modal “Ajustar foto” (change recorte-foto-perfil). O original escolhido
+    # fica em variáveis de backend (com “_”), que não vão ao navegador.
+    crop_open: bool = False
+    crop_preview: str = ""
+    crop_area: dict[str, Any] = {}
+    _crop_source: bytes = b""
+    _crop_preview_size: tuple[int, int] = (0, 0)
+
+    @rx.var
+    def crop_ready(self) -> bool:
+        return bool(self.crop_area)
 
     @rx.var
     def preview_first_name(self) -> str:
@@ -396,11 +429,12 @@ class EditProfileState(LoginState):
         self.view_state = "ready"
 
     @rx.event
-    async def upload_photo(self, files: list[rx.UploadFile]):
-        """Envia a foto na hora (sem depender de “Salvar alterações”). Os
-        valores digitados no formulário ficam como estão, sem serem salvos."""
+    async def prepare_crop(self, files: list[rx.UploadFile]):
+        """Valida a foto escolhida (as mesmas regras de antes) e abre o modal
+        “Ajustar foto”. Nenhuma requisição ao Xano antes de “Usar foto”."""
         if self.photo_busy or self.view_state != "ready":
             return
+        _clear_crop(self)
         self.photo_notice = ""
         self.photo_error = ""
         if not files:
@@ -413,20 +447,73 @@ class EditProfileState(LoginState):
             self.photo_error = PHOTO_ERROR_MESSAGE
             yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
             return
-        filename = file.name or ""
-        error = validate_photo_file(filename, file.content_type or "", len(contents))
+        error = validate_photo_file(file.name or "", file.content_type or "", len(contents))
         if error:
             self.photo_error = error
             yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
             return
+        try:
+            source = prepare_source(contents)
+            preview, width, height = make_preview(source.image)
+        except PhotoImageError:
+            # Extensão e tipo aceitos, mas o conteúdo não é uma imagem legível.
+            self.photo_error = PHOTO_FORMAT_MESSAGE
+            yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
+            return
+
+        # O original fica só no servidor (variável de backend); o navegador
+        # recebe a prévia reduzida.
+        self._crop_source = contents
+        self._crop_preview_size = (width, height)
+        self.crop_preview = preview
+        self.crop_open = True
+        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
+
+    @rx.event
+    def set_crop_area(self, area: dict[str, Any]) -> None:
+        """Área final do enquadramento (croppedAreaPixels, em pixels da prévia)."""
+        if not self.crop_open or not isinstance(area, dict):
+            return
+        self.crop_area = {
+            key: area.get(key) for key in ("x", "y", "width", "height")
+        }
+
+    @rx.event
+    def cancel_crop(self) -> None:
+        """“Cancelar”, Esc ou clique fora: fecha sem enviar nada."""
+        _clear_crop(self)
+
+    @rx.event
+    def set_crop_open(self, is_open: bool) -> None:
+        if not is_open:
+            _clear_crop(self)
+
+    @rx.event
+    async def confirm_crop(self):
+        """“Usar foto”: recorta a área, gera 512 × 512 sem metadados e envia
+        pelo endpoint de sempre. Os valores do formulário não são salvos."""
+        if self.photo_busy or not self.crop_open or not self._crop_source:
+            return
+        contents = self._crop_source
+        area = dict(self.crop_area)
+        preview_size = self._crop_preview_size
+        _clear_crop(self)
+        self.photo_notice = ""
+        self.photo_error = ""
+        try:
+            source = prepare_source(contents)
+            box = crop_box(source.image.size, area, preview_size)
+            square, filename, mime_type = encode_square(source, box)
+        except (PhotoImageError, CropAreaError):
+            self.photo_error = PHOTO_ERROR_MESSAGE
+            return
 
         self.photo_busy = True
         yield
-        mime_type = IMAGE_TYPES[PurePath(filename).suffix.lower()]
         try:
             async with _new_client() as client:
                 url = await upload_profile_photo(
-                    client, self.auth_token, PurePath(filename).name, contents, mime_type
+                    client, self.auth_token, filename, square, mime_type
                 )
         except ProfileUnauthorizedError:
             _clear_session(self)
@@ -443,7 +530,6 @@ class EditProfileState(LoginState):
             self.photo = url
             self.photo_notice = PHOTO_SAVED_MESSAGE
         self.photo_busy = False
-        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
 
     @rx.event
     def photo_rejected(self, rejections: list[dict[str, Any]]) -> None:
@@ -664,6 +750,75 @@ def _visibility_notice() -> rx.Component:
     )
 
 
+def _crop_dialog() -> rx.Component:
+    """Modal “Ajustar foto”: a moldura circular, o zoom, “Cancelar” e “Usar
+    foto”. Prende o foco; Esc e clique fora cancelam sem enviar nada."""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title(CROP_TITLE, color=TEXT_FIELD, font_size="1.2rem", font_weight="700"),
+            rx.dialog.description(
+                CROP_HELP,
+                color=TEXT_MUTED,
+                font_size="0.9rem",
+                line_height="1.4",
+            ),
+            rx.box(
+                image_cropper(
+                    EditProfileState.crop_preview,
+                    on_crop_complete=EditProfileState.set_crop_area,
+                ),
+                width="100%",
+                padding_top="12px",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        "Cancelar",
+                        type="button",
+                        on_click=EditProfileState.cancel_crop,
+                        variant="outline",
+                        min_height="44px",
+                        padding="0 20px",
+                        color=TEXT_STRONG,
+                        border="1px solid #85858D",
+                        border_radius="999px",
+                        background=WHITE,
+                        cursor="pointer",
+                        _focus_visible={"outline": f"2px solid {LINK_GREEN}", "outlineOffset": "2px"},
+                    ),
+                ),
+                rx.button(
+                    "Usar foto",
+                    type="button",
+                    on_click=EditProfileState.confirm_crop,
+                    disabled=~EditProfileState.crop_ready,
+                    min_height="44px",
+                    padding="0 24px",
+                    background=LINK_GREEN,
+                    color="white",
+                    border_radius="999px",
+                    font_weight="700",
+                    cursor="pointer",
+                    _hover={"background": LINK_GREEN_HOVER},
+                    _focus_visible={"outline": f"2px solid {LINK_GREEN}", "outlineOffset": "2px"},
+                ),
+                gap="12px",
+                justify="end",
+                wrap="wrap",
+                padding_top="16px",
+            ),
+            class_name="edit-profile-crop-dialog",
+            width=CROP_DIALOG_WIDTH,
+            max_width=CROP_DIALOG_WIDTH,
+            padding="20px 16px",
+            background=WHITE,
+            overflow_x="hidden",
+        ),
+        open=EditProfileState.crop_open,
+        on_open_change=EditProfileState.set_crop_open,
+    )
+
+
 def _photo_section() -> rx.Component:
     """Seção “Foto” (Figma): foto atual ou inicial, “Alterar foto” (envio na
     hora, com formato e tamanho conferidos na tela) e “Remover foto” (só com
@@ -704,7 +859,7 @@ def _photo_section() -> rx.Component:
                     multiple=False,
                     no_keyboard=True,
                     disabled=EditProfileState.photo_busy,
-                    on_drop=EditProfileState.upload_photo(
+                    on_drop=EditProfileState.prepare_crop(
                         rx.upload_files(upload_id=PHOTO_UPLOAD_ID)
                     ),
                     on_drop_rejected=EditProfileState.photo_rejected,
@@ -762,6 +917,7 @@ def _photo_section() -> rx.Component:
             ),
             rx.fragment(),
         ),
+        _crop_dialog(),
         class_name="edit-profile-photo",
         align="start",
         spacing="2",
