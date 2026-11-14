@@ -98,7 +98,7 @@ Arquivo: `xano/task/marcar_email_verificado_inicial.xs`.
   - nenhum e-mail, nome ou id.
 - **Duas rodadas:**
   1. a primeira versão publicada tem `var $aplicar { value = false }` e só conta. O Higor lê o log da execução no Xano e confere se os números batem com o esperado (por exemplo, as contas de teste dos scripts);
-  2. a segunda versão troca `$aplicar` para `true` e publica de novo. Depois do teste real, um terceiro push **apaga a task**.
+  2. a segunda versão troca `$aplicar` para `true` e publica de novo. Depois do teste real, a task e a function são removidas pelo painel (veja a decisão 5a, que substitui o “terceiro push”).
 - **Agendamento:** `starts_on` alguns minutos depois do push, `freq` de 86400 e `ends_on` uma hora depois do início, para rodar uma vez. Se o Xano permitir rodar a task na hora pelo painel, o Higor pode usar isso no lugar de esperar. A sintaxe será confirmada no MCP.
 - **Reversão:** uma task igual, com o mesmo critério, gravando `false`. Como antes da change ninguém tinha o campo, voltar todo mundo a `false` também é seguro.
 
@@ -133,7 +133,8 @@ Arquivo: `xano/task/marcar_email_verificado_inicial.xs`.
 - **Linhas de `event_log` apagadas no futuro** → não afetam quem já foi marcado. Uma conta nova é marcada no próprio `signup_verify`, sem depender do evento.
 - **Os contadores públicos revelam quantas doações estão reservadas,** somadas às disponíveis → é a decisão 2 do grupo. O detalhe por status nunca é exposto.
 - **Duas contagens a mais** no `donor`, no `detail` e no `profile` → as consultas usam o `owner_id` e o status. A latência é medida no teste real. Se ficar ruim, um índice em `donation.owner_id` entra numa change própria.
-- **A task esquecida no workspace** → a tarefa de apagá-la faz parte da change. O archive só acontece depois do push que a apaga.
+- **A task ou a function esquecidas no workspace** → a remoção pelo painel e o pull de conferência fazem parte da change. O archive só acontece depois dela.
+- **O plano gratuito não aceitar tasks** → a Forma 2 da decisão 5a roda a mesma function pelo painel.
 - **Scripts reais que conferem as chaves exatas** (PP1, MD2, EP2, EP3 e EP11) → são ajustados na Parte A.
 - **O perfil público mostra dois números parecidos,** “Doações N” (ativas) e “Doações disponíveis · M itens” (só disponíveis) → veja a dúvida 3.
 
@@ -151,22 +152,195 @@ Arquivo: `xano/task/marcar_email_verificado_inicial.xs`.
    - os campos novos nas respostas são aditivos. O frontend antigo ignora chaves a mais, mas os scripts de teste real precisam do ajuste da Parte A;
    - o selo é desligado pela task de reversão (decisão 5).
 
-## Dúvidas para o grupo
+## Respostas às dúvidas (tarefa 1.1)
 
-1. **Critério da marcação inicial.**
-   - *Recomendo:* o evento `signup_confirmed` **e** a data a partir de 2026-11-04 (Brasília).
-   - *Alternativa:* só a data, como na decisão 3 literal. Nesse caso, falta confirmar a hora exata do push no histórico do Xano.
-   - Confirme também que a publicação foi em 2026-11-04, a data do commit `cd794bd`. A change foi arquivada em 2026-11-05.
-2. **Rodadas da task.**
-   - *Recomendo:* duas, uma só contando e outra aplicando, com um terceiro push para apagar a task.
-   - *Alternativa:* uma rodada só, já aplicando, e o push para apagar.
-3. **Contadores no perfil público.**
-   - Ao lado de “Doações disponíveis · N itens”, o “Doações” soma as disponíveis e as reservadas, então os números podem diferir.
-   - *Recomendo:* manter, como na decisão 2, e registrar a diferença no README.
-   - *Alternativa:* no perfil público, o rótulo “Doações ativas”.
-4. **Estilo do selo.**
-   - *Recomendo:* a pílula verde-clara (`#E8F5EC`), com o ícone `badge-check` e o texto `#166B3B`, ajustada ao frame `Group 6` no apply.
-   - *Alternativa:* só o ícone e o texto, sem fundo.
-5. **Contas antigas.**
-   - Confirme que, nesta change, as contas anteriores ficam sem selo para sempre.
-   - Uma “verificar meu e-mail” para elas seria uma change própria.
+1. **Critério da marcação inicial:** critério duplo. A conta precisa ter o evento `signup_confirmed` **e** ter sido criada a partir de 2026-11-04, no horário de Brasília. O Higor confirmou que a publicação foi nesse dia. O corte é `2026-11-04 00:00 -03:00`, igual a `2026-11-04 03:00:00+0000`, ou `1793761200000` em ms.
+2. **Rodadas:** duas, uma contando e outra aplicando, e depois a remoção da task (veja a decisão 5a sobre como remover).
+3. **Contadores no perfil público:** manter “Doações” (disponíveis + reservadas) e registrar no README a diferença em relação a “Doações disponíveis · N itens”.
+4. **Selo:** pílula `#E8F5EC` com o ícone `badge-check` e o texto `#166B3B`.
+5. **Contas antigas:** ficam sem selo nesta change.
+
+### 5a. Duas formas de rodar a marcação (depois da 1.1)
+
+O plano gratuito do Xano já recusou o `storage.create_attachment` (“Please upgrade”), e as tasks podem ter a mesma limitação. Por isso a lógica fica numa **function**, e a task é só um invólucro dela.
+
+- **`xano/function/credibilidade/marcar_email_verificado_inicial.xs`**, a function `Credibilidade/marcar_email_verificado_inicial`:
+  - tem a entrada `bool aplicar?=false`;
+  - faz a lógica da decisão 5 e devolve só as contagens: `aplicar`, `eventos`, `contas_com_evento`, `a_marcar`, `contas_marcadas`, `ja_verificadas`, `fora_da_data`, `conta_inexistente`, `total_de_contas` e `verificadas_no_fim`;
+  - também grava as contagens com `debug.log`;
+  - não é endpoint: só pode ser executada por outro stack ou pelo painel.
+- **`xano/task/marcar_email_verificado_inicial.xs`**: chama a function com `aplicar` fixo e grava o resultado com `debug.log`. O agendamento roda uma vez, com `starts_on`, `freq: 86400` e `ends_on` uma hora depois. O Higor ajusta o horário antes do push, se for preciso.
+- **Forma 1, com a task:**
+  1. push da function e da task com `aplicar: false`;
+  2. a task roda, e o Higor lê o resultado no histórico;
+  3. a task passa a `aplicar: true`, com um novo `starts_on`, e é publicada de novo.
+- **Forma 2, sem a task** (se o dry-run ou o push recusarem a task, ou se o plano não rodá-la):
+  1. push só da function, excluindo `task/**`;
+  2. o Higor roda a function no painel (**Run & Debug**) com `aplicar = false` e lê as contagens;
+  3. depois roda com `aplicar = true`.
+
+  Não há endpoint exposto e nem um push a mais entre as rodadas.
+- **Forma usada: a 2.** O push saiu com `-e "task/**"`, e a task nunca foi publicada. O arquivo local dela foi apagado. As rodadas no Run & Debug deram estes números (só contagens):
+
+  | Rodada | eventos | contas_com_evento | a_marcar | contas_marcadas | ja_verificadas | fora_da_data | conta_inexistente | total_de_contas | verificadas_no_fim |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Contagem (`aplicar = false`) | 6 | 6 | 3 | 0 | 0 | 0 | 3 | 3 | — |
+  | Aplicação (`aplicar = true`) | — | — | 3 | 3 | — | — | — | 3 | 3 |
+
+  - Os 3 de `conta_inexistente` são eventos de contas que já foram apagadas. A function os ignora, como previsto.
+  - Depois da aplicação, `verificadas_no_fim` é igual a `total_de_contas`. Logo, uma nova contagem daria `a_marcar = 0`.
+- **Remoção depois do teste real:**
+  - O push parcial da CLI é aditivo: apagar o arquivo não apaga o objeto no workspace. Remover exige `--sync --delete`, que apaga **tudo** o que não existe nos arquivos locais. Esse risco é alto num workspace compartilhado com divergências.
+  - Por isso a function é apagada pelo Higor **no painel do Xano** (a task não existe, porque foi usada a Forma 2). Depois vêm um pull e a remoção do arquivo local.
+  - A function só roda quando chamada, então não oferece risco se ficar até a remoção.
+- **Notas do MCP (tarefa 2.1):**
+  - `bool x?=false` é um campo opcional com default, e a doc pede campos novos no fim do `schema`;
+  - `db.query` aceita `return = {type: "count"}` e `output`;
+  - `conditional` usa `elseif`;
+  - `map`, `unique` e `count` existem como filtros;
+  - o `debug.log` aparece no histórico de requisições, e a doc pede para não registrar dados pessoais;
+  - a task usa `schedule = [{starts_on, freq, ends_on}]` (UTC);
+  - a doc da CLI diz que o push padrão é parcial e aditivo e que `--delete` exige `--sync`;
+  - a doc não diz se uma task pode ser disparada na hora pelo painel. Se puder, o Higor usa isso no lugar de esperar o `starts_on`;
+  - as linhas antigas leem `null` no campo novo, por isso toda resposta usa `($x.email_verified == true)`.
+
+## Apêndice: a function que foi rodada
+
+Este é o registro da function `Credibilidade/marcar_email_verificado_inicial`, como foi publicada e rodada no Run & Debug (Forma 2). Ela foi rodada com `aplicar = false` e depois com `aplicar = true`, e os números estão na decisão 5a. Depois do teste real, o Higor a apagou pelo painel do Xano, e o arquivo local `xano/function/credibilidade/marcar_email_verificado_inicial.xs` foi removido. O código fica aqui só como registro: ele não deve ser publicado de novo.
+
+```xanoscript
+// Marcação inicial do e-mail verificado (change perfil-credibilidade).
+// TEMPORÁRIA: apagar pelo painel depois do teste real.
+//
+// Marca email_verified = true somente nas contas com as duas provas:
+// - um event_log "signup_confirmed" (gravado só pelo auth/signup_verify);
+// - created_at a partir de 2026-11-04 00:00 (Brasília) = 1793761200000 ms.
+// Nunca grava false, nunca mexe em outro campo e pode ser repetida sem efeito
+// novo. Com aplicar = false, só conta. O log e a resposta têm só números:
+// nenhum e-mail, nome ou id.
+function "Credibilidade/marcar_email_verificado_inicial" {
+  input {
+    bool aplicar?=false
+  }
+
+  stack {
+    var $inicio {
+      value = 1793761200000
+    }
+
+    db.query event_log {
+      where = $db.event_log.action == "signup_confirmed"
+      return = {type: "list"}
+      output = ["user_id"]
+    } as $eventos
+
+    var $ids {
+      value = $eventos
+        |map:$$.user_id
+        |unique
+    }
+
+    var $a_marcar {
+      value = 0
+    }
+
+    var $contas_marcadas {
+      value = 0
+    }
+
+    var $ja_verificadas {
+      value = 0
+    }
+
+    var $fora_da_data {
+      value = 0
+    }
+
+    var $conta_inexistente {
+      value = 0
+    }
+
+    foreach ($ids) {
+      each as $user_id {
+        db.get user {
+          field_name = "id"
+          field_value = $user_id
+          output = ["id", "created_at", "email_verified"]
+        } as $conta
+
+        conditional {
+          if ($conta == null) {
+            var.update $conta_inexistente {
+              value = $conta_inexistente + 1
+            }
+          }
+
+          elseif ($conta.email_verified == true) {
+            var.update $ja_verificadas {
+              value = $ja_verificadas + 1
+            }
+          }
+
+          elseif ($conta.created_at < $inicio) {
+            var.update $fora_da_data {
+              value = $fora_da_data + 1
+            }
+          }
+
+          else {
+            var.update $a_marcar {
+              value = $a_marcar + 1
+            }
+
+            conditional {
+              if ($input.aplicar) {
+                db.edit user {
+                  field_name = "id"
+                  field_value = $conta.id
+                  data = {email_verified: true}
+                  output = ["id"]
+                } as $marcada
+
+                var.update $contas_marcadas {
+                  value = $contas_marcadas + 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    db.query user {
+      return = {type: "count"}
+    } as $total_de_contas
+
+    db.query user {
+      where = $db.user.email_verified == true
+      return = {type: "count"}
+    } as $verificadas_no_fim
+
+    var $resultado {
+      value = {
+        aplicar          : $input.aplicar
+        eventos          : $eventos|count
+        contas_com_evento: $ids|count
+        a_marcar         : $a_marcar
+        contas_marcadas  : $contas_marcadas
+        ja_verificadas   : $ja_verificadas
+        fora_da_data     : $fora_da_data
+        conta_inexistente: $conta_inexistente
+        total_de_contas  : $total_de_contas
+        verificadas_no_fim: $verificadas_no_fim
+      }
+    }
+
+    debug.log {
+      value = $resultado
+    }
+  }
+
+  response = $resultado
+  guid = "atyrRi7FECZDivCnUpnmzLgDVbg"
+}
+```

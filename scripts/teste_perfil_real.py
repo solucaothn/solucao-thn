@@ -44,8 +44,20 @@ MENSAGEM_404 = "Doação não encontrada."
 
 CHAVES_RESPOSTA = {"donor", "items", "page", "per_page", "total", "page_total"}
 # O “about” (Sobre) entrou na change editar-perfil e o “photo” (URL da foto
-# de perfil) na change foto-perfil: os dois são texto ou nulo.
-CHAVES_DONOR = {"first_name", "city", "state", "member_since", "about", "photo"}
+# de perfil) na change foto-perfil: os dois são texto ou nulo. O selo
+# (“email_verified”, booleano) e os contadores (“counts”) entraram na change
+# perfil-credibilidade.
+CHAVES_DONOR = {
+    "first_name",
+    "city",
+    "state",
+    "member_since",
+    "about",
+    "photo",
+    "email_verified",
+    "counts",
+}
+CHAVES_COUNTS = {"active", "completed"}
 CHAVES_ITEM = {"id", "created_at", "title", "photo", "condition"}
 # Chaves que não podem aparecer em nenhum nível da resposta.
 CHAVES_PROIBIDAS = {
@@ -130,6 +142,15 @@ def tipos_ok(dados: Any) -> tuple[bool, str]:
         problemas.append("about")
     if donor.get("photo") is not None and not isinstance(donor.get("photo"), str):
         problemas.append("photo")
+    if not isinstance(donor.get("email_verified"), bool):
+        problemas.append("email_verified")
+    counts = donor.get("counts")
+    if (
+        not isinstance(counts, dict)
+        or set(counts) != CHAVES_COUNTS
+        or not all(eh_int(counts[c]) and counts[c] >= 0 for c in CHAVES_COUNTS)
+    ):
+        problemas.append("counts")
     for campo in ("page", "per_page", "total", "page_total"):
         if not eh_int(dados.get(campo)):
             problemas.append(campo)

@@ -10,7 +10,7 @@ query "catalog/donations/mine" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $auth.id
-      output = ["name", "about", "photo"]
+      output = ["name", "email", "about", "photo", "email_verified"]
     } as $owner
   
     var $owner_photo {
@@ -132,8 +132,10 @@ query "catalog/donations/mine" verb=GET {
     owner     : ```
       {
         first_name: $first_name
+        email     : $owner.email
         about     : $owner.about
         photo     : $owner_photo
+        email_verified: $owner.email_verified == true
       }
       ```
     counts    : ```
