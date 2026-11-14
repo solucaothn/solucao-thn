@@ -26,7 +26,7 @@ query "catalog/donations/donor" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $donation.owner_id
-      output = ["name", "created_at", "about", "photo"]
+      output = ["name", "created_at", "about", "photo", "email_verified"]
     } as $owner
   
     precondition ($owner != null) {
@@ -76,6 +76,18 @@ query "catalog/donations/donor" verb=GET {
       }
     }
   
+    // Contadores públicos de quem doa (os mesmos da donations/mine), separados
+    // do $total da lista, que conta só as disponíveis.
+    db.query donation {
+      where = $db.donation.owner_id == $donation.owner_id && ($db.donation.status == "disponível" || $db.donation.status == "reservada")
+      return = {type: "count"}
+    } as $active
+
+    db.query donation {
+      where = $db.donation.owner_id == $donation.owner_id && $db.donation.status == "concluída"
+      return = {type: "count"}
+    } as $completed
+
     db.query donation {
       where = $db.donation.owner_id == $donation.owner_id && $db.donation.status == "disponível"
       return = {type: "count"}
@@ -152,6 +164,8 @@ query "catalog/donations/donor" verb=GET {
         member_since: $member_since
         about       : $owner.about
         photo       : $owner_photo
+        email_verified: $owner.email_verified == true
+        counts      : {active: $active, completed: $completed}
       }
       ```
     items     : $items

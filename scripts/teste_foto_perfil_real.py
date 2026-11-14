@@ -48,7 +48,19 @@ PAUSA_SEGUNDOS = float(os.getenv("TESTE_FOTO_PAUSA", "2.5"))
 LIMITE_BYTES = 5 * 1024 * 1024
 MENSAGEM_FORMATO = "Envie uma imagem JPG, PNG, GIF ou WEBP."
 MENSAGEM_TAMANHO = "A foto pode ter no máximo 5 MB."
-CHAVES_PERFIL = {"id", "created_at", "name", "email", "city", "state", "about", "photo"}
+# O selo e os contadores entraram na change perfil-credibilidade.
+CHAVES_PERFIL = {
+    "id",
+    "created_at",
+    "name",
+    "email",
+    "city",
+    "state",
+    "about",
+    "photo",
+    "email_verified",
+    "counts",
+}
 
 
 def png(largura: int, altura: int, nivel: int = 9) -> bytes:

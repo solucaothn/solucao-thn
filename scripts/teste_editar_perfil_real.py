@@ -41,11 +41,21 @@ from teste_chat_real import (
 )
 
 PAUSA_SEGUNDOS = float(os.getenv("TESTE_PERFIL_EDICAO_PAUSA", "2.5"))
-# O GET devolve também a URL da foto (change foto-perfil); a resposta do PATCH
-# não muda e continua sem “photo”.
+# O GET devolve também a URL da foto (change foto-perfil), o selo
+# (“email_verified”) e os contadores (“counts”) (change perfil-credibilidade).
+# A resposta do PATCH (EP3) não muda e continua sem esses campos.
 CHAVES_PERFIL_PATCH = {"id", "created_at", "name", "email", "city", "state", "about"}
-CHAVES_PERFIL = CHAVES_PERFIL_PATCH | {"photo"}
-CHAVES_DONOR = {"first_name", "city", "state", "member_since", "about", "photo"}
+CHAVES_PERFIL = CHAVES_PERFIL_PATCH | {"photo", "email_verified", "counts"}
+CHAVES_DONOR = {
+    "first_name",
+    "city",
+    "state",
+    "member_since",
+    "about",
+    "photo",
+    "email_verified",
+    "counts",
+}
 SOBRE_TESTE = "Teste de Sobre.\nSegunda linha."
 SOBRE_HTML = "<b>oi</b> & <script>x</script>"
 CIDADE_TESTE = "Cidade de Teste"

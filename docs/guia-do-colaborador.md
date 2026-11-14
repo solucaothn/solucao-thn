@@ -655,6 +655,84 @@ Cuidados:
 - O script espera 2,5 s entre as requisições, o que dá cerca de 1 minuto e meio. A pausa pode ser trocada com a variável `TESTE_FOTO_PAUSA`. O FP5 envia cerca de 5 MB.
 - Depois desta change, rode também o `teste_perfil_real.py`, o `teste_minhas_doacoes_real.py` e o `teste_editar_perfil_real.py`. O PP1, o MD2, o EP2 e o EP11 agora esperam o `photo`. O EP3 confere a resposta do `PATCH`, que continua sem `photo`.
 
+### E-mail verificado e contadores (backend)
+
+- **Tabela `user`:** campo `email_verified` (`bool?`, padrão falso), o último do `schema`.
+  - O `POST /auth/signup/verify` grava `email_verified: true` ao criar a conta. É a única forma de criar contas.
+  - O `PATCH /auth/profile` não aceita esse campo. Um `email_verified: false` enviado é ignorado.
+  - Linhas antigas leem nulo no campo. Por isso toda resposta devolve `($x.email_verified == true)`, sempre um booleano.
+- **Contadores:** `active` conta as doações disponíveis e reservadas da pessoa; `completed`, as concluídas. São as mesmas contagens de `mine`, feitas com `count` no banco.
+- **Campos novos de cada resposta** (sem requisição a mais):
+
+  | Endpoint | Selo | Contadores | E-mail |
+  |---|---|---|---|
+  | `GET /auth/profile` | `email_verified` | `counts: {active, completed}` | `email` (já existia) |
+  | `GET /catalog/donations/mine` | `owner.email_verified` | `counts` (já existia) | `owner.email`, só da própria conta |
+  | `GET /catalog/donations/donor` | `donor.email_verified` | `donor.counts: {active, completed}` | nunca |
+  | `GET /catalog/donations/detail` | `donor_email_verified` | `donor_counts: {active, completed}` | nunca |
+
+  No `donor`, o `total` e a paginação continuam contando só as disponíveis. Os `counts` são separados.
+  A resposta do `PATCH /auth/profile` não mudou: continua sem o selo e sem os contadores.
+- **Marcação inicial das contas existentes** (feita uma vez, nesta change):
+  - **Critério duplo:** só foram marcadas as contas com um `event_log` `signup_confirmed` (gravado só pelo `signup_verify`) **e** criadas a partir de 2026-11-04 00:00, no horário de Brasília. Contas mais antigas ficam sem selo.
+  - **Como foi rodada:** o plano gratuito não aceitou a task. Por isso foi usada uma function temporária, rodada no painel do Xano (**Run & Debug**), primeiro só contando e depois aplicando. Ela foi apagada pelo painel depois do teste real. O código está no apêndice do `design.md` da change `perfil-credibilidade`.
+  - **Resultado:** havia 6 eventos. 3 eram de contas já apagadas, e as outras 3 contas foram marcadas. No fim, as 3 contas existentes estavam verificadas.
+  - **Não publique a function de novo.** Para apagar um objeto do Xano, use o painel: o `push --sync --delete` apaga tudo o que não existe nos arquivos locais.
+
+#### Selo e contadores nas telas
+
+- **Componentes compartilhados** (`doafacil/perfil_publico.py`):
+  - `donation_counts(active, completed)` mostra “Doações” e “Doações realizadas”, no singular com 1;
+  - `verified_badge(flag)` mostra a pílula “E-mail verificado” com o ícone `badge-check` decorativo. Com `flag` falso, não renderiza nada;
+  - `parse_email_verified()` aceita só booleano, e `parse_counts()` só `{active, completed}` com inteiros `>= 0`. Qualquer outro valor (inclusive ausente ou nulo) é resposta inválida, e a tela mostra a mensagem de erro de sempre.
+- **Onde aparece:**
+
+  | Tela | Contadores | Selo | E-mail | Campos lidos |
+  |---|---|---|---|---|
+  | Cartão da pessoa em `/minhas-doacoes` | sim | abaixo do e-mail | sim, com o rótulo “E-mail” | `counts`, `owner.email`, `owner.email_verified` |
+  | Prévia de `/perfil/editar` | sim | sim | não | `counts` e `email_verified` do `GET /auth/profile` |
+  | Perfil público | sim | sim | não | `donor.counts`, `donor.email_verified` |
+  | “Quem doa” no detalhe | sim | sim | não | `donor_counts`, `donor_email_verified` |
+
+- Na prévia, os contadores e o selo vêm do `GET` e não acompanham a digitação. A resposta do `PATCH` não os traz, e o parser do `PATCH` não os exige.
+- O layout e as diferenças em relação ao frame `Group 6` estão em `docs/design/README.md` (“Contadores e selo ‘E-mail verificado’” e “Minhas doações”).
+- **Testes:** `tests/test_profile_credibility.py` (componentes, parsers e contraste) e os testes de cada tela (`test_my_donations.py`, `test_edit_profile.py`, `test_donor_profile.py` e `test_donation_detail.py`).
+
+#### Testar o selo e os contadores contra o Xano real
+
+O script `scripts/teste_perfil_credibilidade_real.py` roda os cenários PC1 a PC10 contra o Xano publicado. Ele fica fora de `tests/`.
+
+Antes de rodar, tenha:
+
+- **uma conta criada pelo `signup_verify`**, que tenha o selo;
+- **o ID de uma doação disponível dessa conta;**
+- as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas no terminal (seção 4).
+
+Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_perfil_credibilidade_real.py
+```
+
+| Cenário | O que confere |
+|---|---|
+| PC1 a PC4 | os campos novos e os tipos em `auth/profile`, `mine`, `donor` e `detail` |
+| PC5 | os contadores e o selo iguais nas quatro respostas |
+| PC6 | o `owner.email` da `mine` igual ao e-mail do perfil (comparado só em memória) |
+| PC7 | nenhum e-mail no `donor` nem no `detail` |
+| PC8 | a conta tem o selo verdadeiro |
+| PC9 | um `PATCH /auth/profile` com `email_verified: false` não muda o selo |
+| PC10 | sem token, `auth/profile` e `mine` dão 401 |
+
+Cuidados:
+
+- **O PC9 regrava o perfil com os valores atuais.** Um Sobre nulo volta como texto vazio.
+- O script não imprime nomes, e-mails, ids nem corpos de resposta. A pausa entre requisições (2,5 s) pode ser trocada com a variável `TESTE_CREDIBILIDADE_PAUSA`.
+- Depois desta change, rode também os outros scripts:
+  - o PP1 e o PP2 agora esperam `email_verified` e `counts` em `donor`;
+  - o MD2 espera `owner.email` e `owner.email_verified`, e o MD3a ignora só o `owner.email` ao procurar `@`;
+  - o EP2, o EP11 e o FP3 esperam as chaves novas.
+
 ## 9. Design
 
 - As telas ficam em `docs/design` como PNG. O `README.md` dessa pasta **prevalece sobre as imagens**.

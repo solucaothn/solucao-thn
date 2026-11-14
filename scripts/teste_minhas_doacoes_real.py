@@ -24,6 +24,7 @@ Cenários MD1 a MD19 (decisão 6 do design da change minhas-doacoes).
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import sys
@@ -55,8 +56,10 @@ CONDICOES = {"Ótimo", "Bom", "Regular"}
 
 CHAVES_LISTA = {"owner", "counts", "items", "page", "per_page", "total", "page_total"}
 # O “about” (Sobre) entrou na change editar-perfil e o “photo” (URL da foto
-# de perfil) na change foto-perfil: os dois são texto ou nulo.
-CHAVES_OWNER = {"first_name", "about", "photo"}
+# de perfil) na change foto-perfil: os dois são texto ou nulo. O e-mail da
+# própria conta (“email”) e o selo (“email_verified”, booleano) entraram na
+# change perfil-credibilidade; o MD3a ignora só o owner.email.
+CHAVES_OWNER = {"first_name", "email", "about", "photo", "email_verified"}
 CHAVES_COUNTS = {"active", "completed"}
 CHAVES_ITEM_LISTA = {"id", "created_at", "title", "photo", "condition", "status"}
 CHAVES_ITEM_EDICAO = {
@@ -148,6 +151,10 @@ def tipos_lista_ok(dados: Any) -> tuple[bool, str]:
         problemas.append("about")
     if owner.get("photo") is not None and not isinstance(owner.get("photo"), str):
         problemas.append("photo")
+    if not isinstance(owner.get("email"), str) or "@" not in owner["email"]:
+        problemas.append("email")
+    if not isinstance(owner.get("email_verified"), bool):
+        problemas.append("email_verified")
     for campo in ("active", "completed"):
         if not eh_int(counts.get(campo)) or counts[campo] < 0:
             problemas.append(campo)
@@ -248,8 +255,11 @@ def main() -> None:
         registrar("MD2b. Tipos dos campos da lista", ok, detalhe)
 
         # MD3. Nada de chaves proibidas, '@' ou sobrenome; a outra pessoa não vê a doação da dona.
-        proibidas = sorted(chaves_em_todos_os_niveis(d2) & CHAVES_PROIBIDAS)
-        vazamento = vaza_dados(r2, proibidos)
+        # O owner.email (o e-mail da própria conta) é permitido e sai da checagem.
+        d2_sem_email = {**d2, "owner": {k: v for k, v in d2["owner"].items() if k != "email"}}
+        proibidas = sorted(chaves_em_todos_os_niveis(d2_sem_email) & CHAVES_PROIBIDAS)
+        texto_sem_email = json.dumps(d2_sem_email, ensure_ascii=False)
+        vazamento = vaza_dados(httpx.Response(200, text=texto_sem_email), proibidos)
         registrar(
             "MD3a. Sem chaves proibidas, '@' ou sobrenome",
             not proibidas and vazamento is None,

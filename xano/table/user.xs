@@ -30,6 +30,12 @@ table user {
         bool used?
       }
     }
+
+    // E-mail confirmado pelo código do cadastro: gravado como verdadeiro só
+    // pelo auth/signup_verify (e, uma vez, pela marcação inicial das contas
+    // confirmadas). Nenhum endpoint aceita este campo do cliente. Linhas
+    // antigas podem ler nulo: as respostas usam `== true`.
+    bool email_verified?=false
   }
 
   index = [

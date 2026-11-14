@@ -44,13 +44,24 @@ query "catalog/donations/detail" verb=GET {
     db.get user {
       field_name = "id"
       field_value = $donation.owner_id
-      output = ["name", "photo"]
+      output = ["name", "photo", "email_verified"]
     } as $owner
-  
+
     precondition ($category != null && $owner != null) {
       error_type = "notfound"
       error = "Doação não encontrada."
     }
+
+    // Contadores públicos de quem doa (os mesmos da donations/mine).
+    db.query donation {
+      where = $db.donation.owner_id == $donation.owner_id && ($db.donation.status == "disponível" || $db.donation.status == "reservada")
+      return = {type: "count"}
+    } as $donor_active
+
+    db.query donation {
+      where = $db.donation.owner_id == $donation.owner_id && $db.donation.status == "concluída"
+      return = {type: "count"}
+    } as $donor_completed
   
     var $donor_first_name {
       value = (($owner.name ?? "")|trim|split:" "|first)
@@ -159,6 +170,8 @@ query "catalog/donations/detail" verb=GET {
     photos            : $photo_urls
     donor_first_name  : $donor_first_name
     donor_photo       : $donor_photo
+    donor_email_verified: $owner.email_verified == true
+    donor_counts      : {active: $donor_active, completed: $donor_completed}
   }
 
   guid = "4fMeGBKAefzsbLsPbgpmV6tA7FM"
