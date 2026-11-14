@@ -116,9 +116,15 @@ O dry-run e o push são sempre feitos pelo Higor.
 ## 8. Verificação final
 
 - [x] 8.1 Rodar `python -m unittest discover -s tests`, `openspec validate perfil-credibilidade --strict` e `reflex compile`, e mostrar o `git diff --stat`. Verificação: tudo passa.
-- [ ] 8.2 (manual) No navegador, em 1512 px e 360 px, conferir:
+- [x] 8.2 (manual) No navegador, em 1512 px e 360 px, conferir:
   - o selo e os contadores na prévia, em “Minhas doações” (com o e-mail), no perfil público e no “Quem doa”, vistos também por outra conta, sem o e-mail fora de “Minhas doações”;
   - uma conta sem selo, sem nenhum espaço no lugar dele;
   - nenhuma rolagem horizontal e o contraste.
 
   Verificação: os itens conferidos e anotados.
+  - Conferido pelo Higor:
+    - e-mail e selo em “Minhas doações”;
+    - contadores e selo na prévia, no “Quem doa” e no perfil público, sem e-mail, vistos também por outra conta;
+    - no celular, sem rolagem horizontal.
+  - O caso “sem selo” ficou só nos testes automatizados, porque todas as contas atuais são verificadas.
+  - Ajuste feito depois do roteiro: o e-mail do cartão quebrava no meio do domínio (“…@gm” / “ail.com”). Agora quebra só antes do “@”, e uma parte só quebra por dentro se sozinha for maior que o cartão. Há testes novos para isso, e a suíte passou com 462 testes.

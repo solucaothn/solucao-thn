@@ -46,18 +46,19 @@ O sistema SHALL exigir uma sessão válida para consultar os dados da conta aute
 - **THEN** o sistema rejeita a solicitação sem retornar dados da conta
 
 ### Requirement: Consulta e atualização do perfil
-O sistema SHALL permitir que uma pessoa autenticada consulte e atualize apenas o próprio perfil, incluindo nome, cidade, estado e o texto de Sobre. A consulta também devolve a URL pública da foto de perfil. O e-mail e a foto MUST NOT ser alterados por essa atualização.
+O sistema SHALL permitir que uma pessoa autenticada consulte e atualize apenas o próprio perfil, incluindo nome, cidade, estado e o texto de Sobre. A consulta também devolve a URL pública da foto de perfil, se o e-mail está verificado e os contadores de doações da própria pessoa. O e-mail, a foto e o e-mail verificado MUST NOT ser alterados por essa atualização.
 
 #### Scenario: Consultar perfil
 - **WHEN** uma pessoa autenticada solicita seu perfil
-- **THEN** o sistema retorna o identificador, a data de criação, o nome, o e-mail, a cidade, o estado, o texto de Sobre e a URL pública da foto de perfil da própria conta
+- **THEN** o sistema retorna o identificador, a data de criação, o nome, o e-mail, a cidade, o estado, o texto de Sobre, a URL pública da foto de perfil, se o e-mail está verificado (verdadeiro ou falso) e os contadores de doações da própria conta
 - **AND** sem foto, a URL MUST vir nula
 - **AND** um Sobre nunca preenchido MUST vir vazio ou nulo
+- **AND** o contador de doações ativas MUST somar as disponíveis e as reservadas, e o de concluídas MUST contar as concluídas, considerando todas as doações da pessoa
 
 #### Scenario: Atualizar perfil
 - **WHEN** uma pessoa autenticada envia nome, cidade, estado e Sobre válidos para atualização
 - **THEN** o sistema atualiza esses campos da própria conta e retorna identificador, data de criação, nome, e-mail, cidade, estado e Sobre atualizados
-- **AND** o e-mail, a senha, a foto de perfil e as doações já publicadas MUST permanecer iguais
+- **AND** o e-mail, a senha, a foto de perfil, o e-mail verificado e as doações já publicadas MUST permanecer iguais
 
 #### Scenario: Perfil com campo obrigatório inválido
 - **WHEN** uma pessoa autenticada envia nome, cidade ou estado vazio
@@ -296,11 +297,11 @@ O sistema SHALL enviar o código de confirmação por uma função própria via 
 - **THEN** o endpoint não revela qual dessas condições se aplica
 
 ### Requirement: Verificação e criação da conta
-O sistema SHALL criar a conta somente após verificar o código da pendência e a senha enviada nessa verificação, sem emitir sessão.
+O sistema SHALL criar a conta somente após verificar o código da pendência e a senha enviada nessa verificação, sem emitir sessão. A conta criada dessa forma MUST nascer com o e-mail verificado.
 
 #### Scenario: Código válido e senha válida
 - **WHEN** a pessoa apresenta e-mail, código válido e senha que cumpre as regras da conta
-- **THEN** o sistema cria a conta com os dados da pendência, remove a pendência e não emite token de sessão
+- **THEN** o sistema cria a conta com os dados da pendência e o e-mail verificado, remove a pendência e não emite token de sessão
 
 #### Scenario: Código ou pendência inválidos
 - **WHEN** a pendência não existe, expirou ou venceu, o código está incorreto, expirou, foi usado ou atingiu cinco tentativas
@@ -425,7 +426,9 @@ A página `/perfil/editar` MUST exigir login e permitir trocar ou remover a foto
 #### Scenario: Prévia do perfil
 - **WHEN** a página está com o formulário preenchido
 - **THEN** MUST mostrar, à esquerda, uma prévia com a foto de perfil (ou, sem foto, o círculo da inicial), o primeiro nome, “Cidade, UF” e o texto de Sobre, acompanhando o que a pessoa digita
-- **AND** a prévia MUST NOT mostrar e-mail, contadores, “Editar perfil” ou “Compartilhar”
+- **AND** a prévia MUST mostrar “Doações” com o contador de ativas e “Doações realizadas” com o contador de concluídas, como aparecem para outras pessoas
+- **AND** a prévia MUST mostrar o selo “E-mail verificado” somente quando o e-mail da pessoa está verificado
+- **AND** a prévia MUST NOT mostrar e-mail, “Editar perfil” ou “Compartilhar”
 - **AND** com o Sobre vazio, a prévia MUST NOT mostrar nada no lugar dele
 
 #### Scenario: Quem vê estas informações
@@ -504,3 +507,54 @@ O sistema MUST permitir que a pessoa autenticada envie e remova somente a própr
 #### Scenario: Foto de outra pessoa
 - **WHEN** qualquer requisição de envio ou remoção é feita
 - **THEN** ela MUST alterar somente a conta da sessão, sem aceitar identificador de usuário enviado pelo cliente
+
+### Requirement: E-mail verificado da conta
+A conta MUST guardar se o e-mail foi verificado. Esse dado MUST ser verdadeiro somente para contas criadas pela verificação do código de cadastro e MUST NOT ser alterado pelo cliente. Ele MUST ser devolvido apenas como verdadeiro ou falso, nunca com a data ou o modo da verificação.
+
+#### Scenario: Conta criada pela verificação do cadastro
+- **WHEN** a verificação do cadastro cria uma conta
+- **THEN** a conta MUST nascer com o e-mail verificado
+
+#### Scenario: Nenhum endpoint altera o dado
+- **WHEN** uma pessoa autenticada envia `email_verified` ou um campo parecido na atualização do perfil ou em qualquer outra requisição
+- **THEN** o sistema MUST ignorar esse valor e manter o dado como estava
+
+#### Scenario: Conta sem verificação
+- **WHEN** uma conta não foi criada pela verificação do cadastro
+- **THEN** o e-mail MUST constar como não verificado
+
+### Requirement: Marcação inicial das contas existentes
+As contas que já existiam antes desta change MUST receber o e-mail verificado uma única vez, somente quando há prova de que foram criadas pela verificação do cadastro, publicada em 2026-11-04. As demais MUST ficar como não verificadas. A marcação MUST poder ser repetida sem efeito novo e MUST NOT registrar e-mails, nomes ou identificadores em logs.
+
+#### Scenario: Conta confirmada pelo código
+- **WHEN** a marcação inicial roda e a conta tem o registro de cadastro confirmado gravado pela verificação, com data de criação a partir de 2026-11-04 (horário de Brasília)
+- **THEN** a conta MUST passar a ter o e-mail verificado
+
+#### Scenario: Conta anterior à confirmação
+- **WHEN** a marcação inicial roda e a conta foi criada antes de 2026-11-04 ou não tem o registro de cadastro confirmado
+- **THEN** a conta MUST continuar com o e-mail não verificado
+
+#### Scenario: Marcação repetida
+- **WHEN** a marcação inicial roda de novo
+- **THEN** nenhuma conta MUST mudar, e nenhuma conta verificada MUST voltar a não verificada
+
+#### Scenario: Resultado auditável sem dados pessoais
+- **WHEN** a marcação inicial termina
+- **THEN** o registro de execução MUST conter somente contagens (contas marcadas, já verificadas e deixadas como não verificadas), sem e-mail, nome ou identificador
+
+### Requirement: Selo “E-mail verificado”
+Onde o selo é previsto, a interface MUST mostrá-lo somente quando o e-mail da pessoa está verificado, com um ícone de verificado e o texto “E-mail verificado”. Com o e-mail não verificado, MUST NOT mostrar selo, texto ou espaço reservado.
+
+#### Scenario: Pessoa com e-mail verificado
+- **WHEN** a pessoa exibida tem o e-mail verificado
+- **THEN** o selo MUST mostrar o ícone de verificado e o texto “E-mail verificado”
+- **AND** o texto e o ícone MUST ter contraste mínimo AA sobre o fundo do selo, e o fundo, sobre o cartão
+- **AND** o ícone MUST ser decorativo para o leitor de tela, que lê só o texto
+
+#### Scenario: Pessoa sem e-mail verificado
+- **WHEN** a pessoa exibida não tem o e-mail verificado
+- **THEN** a interface MUST NOT mostrar o selo, nem “não verificado”, nem um espaço no lugar dele
+
+#### Scenario: Selo em tela estreita
+- **WHEN** o selo aparece numa largura de 360 px
+- **THEN** ele MUST caber sem cortar o texto e sem rolagem horizontal

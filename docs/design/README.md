@@ -208,6 +208,7 @@ O que segue o Figma:
 - **“Detalhes”:** uma grade em que cada item tem o ícone verde do Figma (`assets/detalhe-atributo.svg`), um rótulo pequeno e o valor logo abaixo. Os itens são Categoria, Condição, Forma de entrega e Preferência de contato. A grade tem 4 colunas em telas largas, 2 em médias e 1 no celular.
 - **“Localização”:** a ilustração de edifícios do Figma (`assets/detalhe-localizacao.svg`, 56 px) e “Cidade, UF”.
 - **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, a foto de perfil de 48 px (ou o círculo `#F2F2F2` com a inicial) ao lado do primeiro nome, e o ícone de local com “Cidade, UF”. A foto entrou com a change foto-perfil. O cartão inteiro é o link para o perfil público (veja “Perfil público de quem doa”).
+  - Abaixo da cidade, numa linha, os contadores “Doações” e “Doações realizadas” e, abaixo deles, o selo “E-mail verificado”, só quando o e-mail de quem doa está verificado. Entraram com a change perfil-credibilidade e usam os componentes compartilhados (veja “Contadores e selo ‘E-mail verificado’”). O e-mail nunca aparece.
 - **No celular:** uma coluna, na ordem galeria → resumo → título e descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
 
 Diferenças aprovadas em relação ao Figma:
@@ -238,7 +239,7 @@ Diferenças aprovadas em relação ao Figma:
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações, presença online e indicadores de verificação dependem de dados ou funcionalidades que ainda não existem. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
+Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações e presença online dependem de dados ou funcionalidades que ainda não existem. O único indicador de verificação é o selo “E-mail verificado” do cartão “Quem doa”. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
 
 ## Perfil público de quem doa
 
@@ -255,6 +256,8 @@ O que segue o Figma:
   - branco, com borda `#D9D9D9` e cantos de 8 px;
   - à esquerda, a foto de perfil redonda (ou, sem foto, o círculo `#F2F2F2` com a inicial do primeiro nome em `#555555`), de 120 px no computador e 72 px no celular;
   - o primeiro nome como título (`h1`) em `#166B3B`, “Cidade, UF” em `#2A2A2A` e “No DoaFácil desde <mês> de <ano>” em `#555555`, com o mês por extenso.
+  - abaixo, os **contadores** “Doações” e “Doações realizadas” e o selo **“E-mail verificado”** (só quando verificado), que entraram com a change perfil-credibilidade.
+    - “Doações” soma as disponíveis e as **reservadas** de quem doa. Por isso pode ser maior que o “N itens” de “Doações disponíveis”, que conta só as disponíveis e é o total da lista. A diferença é intencional (decisão do grupo).
   - abaixo, o **Sobre** de quem doa, que entrou na change editar-perfil. Vai em `#2A2A2A`, como texto simples, com as quebras de linha. Com o Sobre vazio, não aparece nada: nem título, nem espaço reservado.
   - No celular, o círculo fica acima do texto, e tudo fica centralizado.
 - **“Doações disponíveis”** (`h2` em `#166B3B`), com o contador “1 item” ou “N itens” em `#555555` ao lado.
@@ -269,7 +272,7 @@ Diferenças aprovadas em relação ao Figma:
   - Leva a `/doacao/<id>` da doação de origem. Com um id inválido na rota, leva a `/`.
   - Os frames não têm a linha do logotipo; ela entra para o perfil ficar igual às outras páginas.
 - **Foto de perfil:** entrou com a change foto-perfil. A foto é cortada em círculo (`object-fit: cover`), tem o texto alternativo “Foto de <primeiro nome>” e é a foto **atual** da pessoa. Sem foto, fica o círculo com a inicial, do mesmo tamanho.
-- **Sem o selo “E-mail verificado”, sem o botão de chat e sem avaliações.** Esses itens não aparecem nem como “Em breve”. O botão flutuante do chat também não aparece no perfil.
+- **Sem o botão de chat e sem avaliações.** Esses itens não aparecem nem como “Em breve”. O selo “E-mail verificado” aparece desde a change perfil-credibilidade. O botão flutuante do chat também não aparece no perfil.
 - **Só o primeiro nome:** nada de sobrenome ou e-mail. A cidade e a UF são as da doação de origem, o mesmo dado que o detalhe já mostra.
 - **Paginação, que não está no Figma:** de 12 em 12, só quando há mais de uma página.
   - Os botões “Anterior” e “Próxima” têm contorno `#007A42` e 44 px de altura, e o texto “Página N de M” é anunciado ao leitor de tela (`aria-live="polite"`).
@@ -282,6 +285,19 @@ Diferenças aprovadas em relação ao Figma:
   - uma mensagem de erro simples para falha de rede, resposta inválida ou limite de acessos (429).
 - **Fonte LINE Seed JP** e as cores AA do projeto, como no resto do site. Todos os pares passam de 4,5:1. Os de menor contraste são `#007A42` sobre o creme (5,1:1) e `#555555` sobre o `#F2F2F2` do círculo (6,7:1).
 - **Animação:** `page-fade-enter`, que respeita `prefers-reduced-motion`, só nos títulos fixos (“Doações disponíveis”, o título do estado vazio) e nas mensagens de estado. O cabeçalho, o cartão de identificação e os cartões de doação, que vêm do Xano, não animam.
+
+## Contadores e selo “E-mail verificado”
+
+Componentes compartilhados de `doafacil/perfil_publico.py`, usados em “Minhas doações”, na prévia de `/perfil/editar`, no perfil público e no cartão “Quem doa” (change perfil-credibilidade).
+
+- **Contadores (`donation_counts`):** o número em `#166B3B` (1,5 rem, negrito) e o rótulo em `#555555` abaixo. São “Doações” (disponíveis e reservadas) e “Doações realizadas” (concluídas), com “Doação” e “Doação realizada” quando o número é 1.
+- **Selo (`verified_badge`):**
+  - uma pílula com o ícone `badge-check` e o texto “E-mail verificado”, em `#166B3B` sobre `#E8F5EC` (5,8:1), com borda `#B7DEC4` e cantos de 999 px;
+  - o ícone é decorativo (`aria-hidden`), e o leitor de tela lê só o texto;
+  - a largura é a do conteúdo, até 100 % do cartão, e o texto quebra a linha se for preciso (360 px sem rolagem);
+  - sem o e-mail verificado, não aparece nada: nem “não verificado”, nem espaço reservado;
+  - contas antigas, criadas antes de 2026-11-04 ou sem a confirmação do e-mail, ficam sem selo.
+- **Sem animação:** os dois vêm do Xano e não animam.
 
 ## Minhas doações
 
@@ -297,6 +313,8 @@ O que segue o Figma:
   - a foto de perfil de 80 px (ou o círculo `#F2F2F2` com a inicial em `#555555`) e o primeiro nome;
   - os dois números em `#166B3B`: “Doações”, que soma as disponíveis e as reservadas, e “Doações realizadas”, que conta as concluídas. O rótulo fica no singular com 1.
   - o **Sobre** da pessoa, centralizado, em `#2A2A2A`, como texto simples com as quebras de linha. Vazio, não aparece;
+  - o **e-mail** da própria conta, como o bloco “Email” do frame: o rótulo “E-mail” em negrito e o endereço abaixo, inteiro, sem rolagem horizontal. Quando não cabe numa linha, quebra só antes do “@” (“ana.lima” / “@gmail.com”): as duas partes são blocos em linha com até 100 % da largura e um `<wbr>` entre elas. Uma parte só quebra por dentro (`overflow-wrap: anywhere`) se sozinha for maior que o cartão;
+  - abaixo do e-mail, o selo **“E-mail verificado”**, só quando o e-mail está verificado (no Figma, o selo fica em “Credibilidade”, no fim do cartão);
   - o botão **“Editar perfil”**, com contorno `#007A42`, 44 px de altura e toda a largura do cartão, que leva a `/perfil/editar`.
 - **Grade à direita, com 6 doações por página:** 3 colunas em telas largas (`lg`), o 3 × 2 do Figma; 2 colunas em telas médias; 1 no celular.
 - **Cartão da doação:** como o da home, com a foto (ou a imagem genérica), o degradê e, em branco, o título e “Condição: …”.
@@ -306,7 +324,13 @@ Diferenças aprovadas em relação ao Figma:
 
 - **Cabeçalho com o logotipo:** “Voltar ao início” fica na linha do logotipo, em `#007A42`, com o mesmo cabeçalho das outras páginas (`back_link_header()`). Os 44 px de área de toque e o rótulo acessível valem também no celular, onde aparece só a seta.
 - **Título à esquerda,** em negrito e `#166B3B`, no lugar do título centralizado e preto.
-- **Cartão da pessoa só com o essencial:** sem e-mail, “Compartilhar link do perfil”, avaliações, selo “Verificado” e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”. O Sobre e o “Editar perfil” entraram com a change editar-perfil, e a foto de perfil, com a change foto-perfil.
+- **Cartão da pessoa só com o essencial:** sem “Compartilhar link do perfil”, avaliações e botão de chat. Esses itens entram em outra change e não aparecem nem como “Em breve”. O Sobre e o “Editar perfil” entraram com a change editar-perfil, a foto de perfil com a change foto-perfil, e o e-mail e o selo com a change perfil-credibilidade.
+- **E-mail e selo (change perfil-credibilidade), diferenças em relação ao `Group 6`:**
+  - o endereço vai em `#555555` (7,5:1 sobre o branco), e não no `#A2A2A2` do Figma, que tinha cerca de 2,3:1 sobre o fundo `#F3F4F6` do cartão;
+  - o rótulo é “E-mail”, como no resto do site, e não “Email”;
+  - não há o título “Credibilidade”. O selo fica logo abaixo do e-mail e antes de “Editar perfil”;
+  - o selo é a pílula do projeto (veja “Contadores e selo ‘E-mail verificado’”), no lugar da tag “Verificado” com borda verde e o círculo azul `#20B9DE` do Figma, cujo “✓” branco tinha cerca de 2,3:1;
+  - o “Editar perfil” continua no fim do cartão, e não abaixo dos contadores como no Figma.
 - **Selo de status no lugar do NOVO,** no canto superior esquerdo da foto. O fundo é opaco, então o contraste não depende da foto:
 
   | Selo | Fundo | Texto | Contraste |
@@ -385,9 +409,10 @@ O que segue o Figma:
 Diferenças aprovadas em relação ao Figma:
 
 - **Cabeçalho com o logotipo:** “Voltar a Minhas doações” em `#007A42`, no lugar de “Voltar ao perfil”, com o mesmo cabeçalho das outras páginas (`back_link_header()`).
-- **Prévia só com o que é público:** a foto de perfil de 80 px (ou o círculo `#F2F2F2` com a inicial em `#555555`), o primeiro nome, “Cidade, UF” e o Sobre.
-  - Ela acompanha a digitação.
-  - Não mostra e-mail, contadores, “Editar perfil”, “Compartilhar” nem selo.
+- **Prévia só com o que é público:** a foto de perfil de 80 px (ou o círculo `#F2F2F2` com a inicial em `#555555`), o primeiro nome, “Cidade, UF”, os contadores “Doações” e “Doações realizadas”, o selo “E-mail verificado” (só quando verificado) e o Sobre.
+  - O nome, a cidade e o Sobre acompanham a digitação. Os contadores e o selo vêm do `GET auth/profile` e não mudam enquanto a pessoa edita.
+  - Os contadores e o selo entraram com a change perfil-credibilidade, na mesma ordem do perfil público: abaixo de “Cidade, UF” e antes do Sobre.
+  - Não mostra e-mail, “Editar perfil” nem “Compartilhar”.
   - A legenda é “Prévia — é assim que seu perfil aparece para outras pessoas.”, em `#555555`.
 - **Ajudas abaixo dos campos,** em `#555555`, com 0,8 rem:
   - no Nome, “Só o primeiro nome aparece para outras pessoas.”;

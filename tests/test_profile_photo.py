@@ -72,7 +72,15 @@ class AvatarTests(unittest.TestCase):
 
 def _donor_payload(photo: object) -> dict:
     return {
-        "donor": {"first_name": "Ana", "city": "Campinas", "state": "SP", "member_since": "2020-10", "photo": photo},
+        "donor": {
+            "first_name": "Ana",
+            "city": "Campinas",
+            "state": "SP",
+            "member_since": "2020-10",
+            "photo": photo,
+            "email_verified": False,
+            "counts": {"active": 0, "completed": 0},
+        },
         "items": [],
         "page": 1,
         "per_page": 12,
@@ -83,7 +91,7 @@ def _donor_payload(photo: object) -> dict:
 
 def _mine_payload(photo: object) -> dict:
     return {
-        "owner": {"first_name": "Ana", "photo": photo},
+        "owner": {"first_name": "Ana", "email": "ana@exemplo.com", "email_verified": False, "photo": photo},
         "counts": {"active": 0, "completed": 0},
         "items": [],
         "page": 1,
@@ -105,6 +113,8 @@ def _detail_payload(photo: object) -> dict:
         "delivery_method": "A combinar",
         "contact_preference": "Chat",
         "donor_first_name": "Ana",
+        "donor_email_verified": False,
+        "donor_counts": {"active": 1, "completed": 0},
         "photos": ["https://images.example/capa.jpg"],
     }
     if photo is not ...:

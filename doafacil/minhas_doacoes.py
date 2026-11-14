@@ -31,7 +31,15 @@ from doafacil.detalhe_doacao import (
     _positive_donation_id,
 )
 from doafacil.login import LoginState
-from doafacil.perfil_publico import about_text, avatar, parse_about, parse_photo_url
+from doafacil.perfil_publico import (
+    about_text,
+    avatar,
+    donation_counts,
+    parse_about,
+    parse_email_verified,
+    parse_photo_url,
+    verified_badge,
+)
 
 
 MY_DONATIONS_PATH = "/catalog/donations/mine"
@@ -221,14 +229,21 @@ def _parse_my_donations(payload: object) -> dict[str, Any]:
     try:
         about = parse_about(owner.get("about"))
         photo = parse_photo_url(owner.get("photo"))
+        email_verified = parse_email_verified(owner.get("email_verified"))
     except ValueError:
         raise MyDonationsServiceError from None
+    # O e-mail da própria conta (change perfil-credibilidade).
+    email = owner.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise MyDonationsServiceError
 
     items = [parsed for item in raw_items if (parsed := _parse_my_donation_item(item))]
     if raw_items and not items:
         raise MyDonationsServiceError
     return {
         "first_name": first_name.strip(),
+        "email": email.strip(),
+        "email_verified": email_verified,
         "about": about,
         "photo": photo,
         "active": active,
@@ -341,8 +356,13 @@ async def delete_donation(
         raise MyDonationsServiceError
 
 
-def count_label(count: int, singular: str, plural: str) -> str:
-    return singular if count == 1 else plural
+def split_email(email: str) -> tuple[str, str]:
+    """'ana.lima@gmail.com' → ('ana.lima', '@gmail.com'). O cartão quebra a
+    linha só entre as duas partes. Sem '@', tudo fica na primeira parte."""
+    local, at, domain = email.rpartition("@")
+    if not at:
+        return email, ""
+    return local, at + domain
 
 
 def _new_client() -> httpx.AsyncClient:
@@ -356,6 +376,8 @@ def _clear_session(state: Any) -> None:
 
 def _clear_list(state: Any) -> None:
     state.first_name = ""
+    state.email = ""
+    state.email_verified = False
     state.about = ""
     state.photo = ""
     state.initial = ""
@@ -369,6 +391,8 @@ def _clear_list(state: Any) -> None:
 
 def _apply_list(state: Any, data: dict[str, Any]) -> None:
     state.first_name = data["first_name"]
+    state.email = data["email"]
+    state.email_verified = data["email_verified"]
     state.about = data["about"]
     state.photo = data["photo"]
     state.initial = avatar_initial(data["first_name"])
@@ -439,6 +463,8 @@ class MyDonationsState(LoginState):
     view_state: str = "loading"
     load_error: str = ""
     first_name: str = ""
+    email: str = ""
+    email_verified: bool = False
     about: str = ""
     photo: str = ""
     initial: str = ""
@@ -486,14 +512,12 @@ class MyDonationsState(LoginState):
         return "Marcar como concluída"
 
     @rx.var
-    def active_label(self) -> str:
-        return count_label(self.active_count, "Doação", "Doações")
+    def email_local(self) -> str:
+        return split_email(self.email)[0]
 
     @rx.var
-    def completed_label(self) -> str:
-        return count_label(
-            self.completed_count, "Doação realizada", "Doações realizadas"
-        )
+    def email_domain(self) -> str:
+        return split_email(self.email)[1]
 
     @rx.event
     def set_flash(self, message: str) -> None:
@@ -1041,20 +1065,55 @@ def my_donation_card(donation: rx.Var) -> rx.Component:
     )
 
 
-def _stat(value: rx.Var, label: rx.Var) -> rx.Component:
+def _email_part(value: rx.Var) -> rx.Component:
+    """Uma parte do e-mail (antes do “@” ou “@domínio”) que não quebra por
+    dentro, a menos que sozinha não caiba na largura do cartão.
+
+    Como bloco em linha com até 100% da largura, a parte ocupa a largura do
+    próprio texto quando cabe (sem quebra interna) e só quebra em qualquer
+    ponto quando é maior que o cartão.
+    """
+    return rx.el.span(
+        value,
+        class_name="my-donations-owner-email-part",
+        style={
+            "display": "inline-block",
+            "maxWidth": "100%",
+            "overflowWrap": "anywhere",
+        },
+    )
+
+
+def _owner_email() -> rx.Component:
+    """O e-mail da própria conta, como no bloco “Email” do frame Group 6:
+    rótulo em negrito e o endereço abaixo, inteiro. Quando não cabe numa
+    linha, quebra só antes do “@” (“ana.lima” / “@gmail.com”)."""
     return rx.vstack(
-        rx.text(value, color=TITLE_GREEN, font_size="1.5rem", font_weight="700", line_height="1"),
-        rx.text(label, color=TEXT_MUTED, font_size="0.85rem", text_align="center"),
+        rx.text("E-mail", color=TEXT_STRONG, font_size="0.8rem", font_weight="700"),
+        rx.text(
+            _email_part(MyDonationsState.email_local),
+            # Ponto de quebra explícito entre as duas partes.
+            rx.el.wbr(),
+            _email_part(MyDonationsState.email_domain),
+            class_name="my-donations-owner-email",
+            color=TEXT_MUTED,
+            font_size="0.9rem",
+            text_align="center",
+            width="100%",
+            min_width="0",
+        ),
         align="center",
         spacing="1",
+        width="100%",
         min_width="0",
     )
 
 
 def _owner_card() -> rx.Component:
     """Foto de perfil (ou, sem foto, o círculo com a inicial), primeiro nome,
-    os dois contadores, o Sobre (só quando preenchido) e “Editar perfil”. Sem
-    e-mail, “Compartilhar”, avaliações, selo ou chat."""
+    os dois contadores, o Sobre (só quando preenchido), o e-mail, o selo “E-mail
+    verificado” (só quando verificado) e “Editar perfil”. Sem “Compartilhar”,
+    avaliações ou chat."""
     return rx.vstack(
         avatar(
             MyDonationsState.photo,
@@ -1073,14 +1132,15 @@ def _owner_card() -> rx.Component:
             text_align="center",
             overflow_wrap="anywhere",
         ),
-        rx.hstack(
-            _stat(MyDonationsState.active_count, MyDonationsState.active_label),
-            _stat(MyDonationsState.completed_count, MyDonationsState.completed_label),
-            spacing="6",
+        donation_counts(
+            MyDonationsState.active_count,
+            MyDonationsState.completed_count,
             justify="center",
             width="100%",
         ),
         about_text(MyDonationsState.about, text_align="center"),
+        _owner_email(),
+        verified_badge(MyDonationsState.email_verified),
         rx.link(
             "Editar perfil",
             href="/perfil/editar",

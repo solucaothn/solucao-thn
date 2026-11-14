@@ -23,6 +23,7 @@ A resposta do detalhe MUST conter somente os dados da doação aprovados para ex
 #### Scenario: Dados retornados para o detalhe
 - **WHEN** uma consulta pública retorna uma doação disponível
 - **THEN** a resposta MUST incluir identificador, título, descrição, condição, nome da categoria, modalidade de entrega, preferência de contato, cidade e UF, fotos ordenadas, primeiro nome de quem doa e a URL pública da foto de perfil de quem doa, nula quando não há foto
+- **AND** MUST incluir, de quem doa, o contador de doações ativas, que soma as disponíveis e as reservadas, o contador de doações concluídas, considerando todas as doações dessa pessoa, e se o e-mail está verificado, como verdadeiro ou falso
 - **AND** o primeiro nome MUST ser o único dado nominal de quem doa
 - **AND** cidade e UF usadas no cartão de quem doa MUST corresponder à localização da doação
 
@@ -52,13 +53,14 @@ A página de detalhe MUST apresentar os dados existentes e aprovados da doação
 
 #### Scenario: Exibir detalhes disponíveis
 - **WHEN** uma pessoa abre uma doação disponível
-- **THEN** a página MUST apresentar a galeria, o título, a condição com o rótulo “Condição”, a descrição, o nome da categoria, a cidade/UF, a modalidade de entrega, a preferência de contato como texto e o cartão de quem doa com a foto de perfil de quem doa, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo com a inicial do primeiro nome, o primeiro nome e cidade/UF, sem outros dados de quem doa
+- **THEN** a página MUST apresentar a galeria, o título, a condição com o rótulo “Condição”, a descrição, o nome da categoria, a cidade/UF, a modalidade de entrega, a preferência de contato como texto e o cartão de quem doa com a foto de perfil de quem doa, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo com a inicial do primeiro nome, o primeiro nome e cidade/UF
+- **AND** o cartão de quem doa MUST mostrar “Doações” com o contador de ativas e “Doações realizadas” com o contador de concluídas, no singular quando o número é 1, e o selo “E-mail verificado” somente quando o e-mail de quem doa está verificado, sem outros dados de quem doa
 - **AND** MUST apresentar no topo do cartão os botões “Outros meios de comunicação” e “Chat” em conformidade com o layout aprovado no Figma
 - **AND** o acesso ao perfil de quem doa MUST ser feito somente pelo cartão “Quem doa”, sem outros botões de perfil
 
 #### Scenario: Não apresentar dados ou recursos indisponíveis
 - **WHEN** a página exibe os detalhes da doação
-- **THEN** MUST permanecerem ocultos Cor, Material, Tipo, bairro, CEP, avaliações, presença online, indicadores de conta ou e-mail verificados
+- **THEN** MUST permanecerem ocultos Cor, Material, Tipo, bairro, CEP, avaliações, presença online e o e-mail de quem doa
 - **AND** as outras doações de quem doa MUST aparecer somente no perfil público, não no detalhe
 - **AND** MUST NOT apresentar esses itens como “Em breve”
 
