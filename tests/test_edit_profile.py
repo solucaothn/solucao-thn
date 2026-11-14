@@ -36,6 +36,7 @@ from doafacil.editar_perfil import (
     ProfileUnauthorizedError,
     _form,
     _parse_profile,
+    _parse_profile_credibility,
     _photo_section,
     _preview,
     edit_profile_page,
@@ -63,6 +64,8 @@ PROFILE_PAYLOAD = {
     "state": "SP",
     "about": "Gosto de doar.\nAté breve.",
 }
+# Só o GET traz o selo e os contadores (change perfil-credibilidade).
+GET_PAYLOAD = {**PROFILE_PAYLOAD, "email_verified": True, "counts": {"active": 2, "completed": 5}}
 PHOTO_URL = "https://xano.example/vault/abc/foto.png"
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"0" * 64
 
@@ -86,6 +89,12 @@ def _call(handler, function, *args):
 
     with patch.dict("os.environ", {"XANO_AUTH_API_URL": AUTH_URL}):
         return asyncio.run(run())
+
+
+def _loaded(**changes) -> dict:
+    """O que o fetch_profile devolve para um GET com estas mudanças."""
+    payload = {**GET_PAYLOAD, **changes}
+    return {**_parse_profile(payload), **_parse_profile_credibility(payload)}
 
 
 def _events(generator) -> list:
@@ -201,12 +210,39 @@ class EditProfileClientTests(unittest.TestCase):
             self.assertEqual(request.method, "GET")
             self.assertEqual(request.url.path, "/api:auth/auth/profile")
             self.assertEqual(request.headers.get("Authorization"), f"Bearer {TOKEN}")
-            return httpx.Response(200, json=PROFILE_PAYLOAD)
+            return httpx.Response(200, json=GET_PAYLOAD)
 
         profile = _call(handler, fetch_profile)
         self.assertEqual(profile["name"], "Ana Beatriz Lima")
         self.assertEqual(profile["state"], "SP")
         self.assertEqual(profile["about"], "Gosto de doar.\nAté breve.")
+        self.assertIs(profile["email_verified"], True)
+        self.assertEqual((profile["active"], profile["completed"]), (2, 5))
+
+    def test_get_requires_badge_and_counters(self) -> None:
+        for label, payload in {
+            "sem selo": PROFILE_PAYLOAD,
+            "selo nulo": {**GET_PAYLOAD, "email_verified": None},
+            "selo texto": {**GET_PAYLOAD, "email_verified": "false"},
+            "sem contadores": {k: v for k, v in GET_PAYLOAD.items() if k != "counts"},
+            "contador negativo": {**GET_PAYLOAD, "counts": {"active": -1, "completed": 0}},
+            "contador decimal": {**GET_PAYLOAD, "counts": {"active": 1, "completed": 0.5}},
+            "contador booleano": {**GET_PAYLOAD, "counts": {"active": False, "completed": 0}},
+        }.items():
+            with self.subTest(case=label):
+                with self.assertRaises(ProfileServiceError):
+                    _call(lambda r, body=payload: httpx.Response(200, json=body), fetch_profile)
+        # Selo falso é válido.
+        profile = _call(
+            lambda r: httpx.Response(200, json={**GET_PAYLOAD, "email_verified": False}), fetch_profile
+        )
+        self.assertIs(profile["email_verified"], False)
+
+    def test_patch_response_does_not_need_badge_or_counters(self) -> None:
+        fields = {"name": "Ana Lima", "city": "Santos", "state": "SP", "about": ""}
+        profile = _call(lambda r: httpx.Response(200, json=PROFILE_PAYLOAD), update_profile, fields)
+        self.assertNotIn("email_verified", profile)
+        self.assertNotIn("active", profile)
 
     def test_null_about_becomes_empty_and_extra_fields_are_ignored(self) -> None:
         profile = _parse_profile({**PROFILE_PAYLOAD, "about": None, "role": "admin", "password": "x"})
@@ -305,19 +341,21 @@ class EditProfileStateTests(unittest.TestCase):
         with patch(
             "doafacil.editar_perfil.fetch_profile",
             new_callable=AsyncMock,
-            return_value=_parse_profile(PROFILE_PAYLOAD),
+            return_value=_loaded(),
         ):
             _events(EditProfileState.load_profile.fn(state))
         self.assertEqual(state.view_state, "ready")
         self.assertEqual((state.name, state.email, state.city, state.uf), ("Ana Beatriz Lima", "ana@example.test", "Campinas", "SP"))
         self.assertEqual(state.about, "Gosto de doar.\nAté breve.")
+        self.assertIs(state.email_verified, True)
+        self.assertEqual((state.active_count, state.completed_count), (2, 5))
 
     def test_state_outside_list_starts_empty(self) -> None:
         state = _state()
         with patch(
             "doafacil.editar_perfil.fetch_profile",
             new_callable=AsyncMock,
-            return_value=_parse_profile({**PROFILE_PAYLOAD, "state": "São Paulo"}),
+            return_value=_loaded(state="São Paulo"),
         ):
             _events(EditProfileState.load_profile.fn(state))
         self.assertEqual(state.uf, "")
@@ -520,7 +558,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
         with patch(
             "doafacil.editar_perfil.fetch_profile",
             new_callable=AsyncMock,
-            return_value=_parse_profile({**PROFILE_PAYLOAD, "photo": PHOTO_URL}),
+            return_value=_loaded(photo=PHOTO_URL),
         ):
             _events(EditProfileState.load_profile.fn(state))
         self.assertEqual(state.photo, PHOTO_URL)
@@ -645,21 +683,45 @@ class EditProfilePageTests(unittest.TestCase):
         self.assertIn('as:"h1"', rendered)
         self.assertNotIn("chat-fab", rendered)
 
-    def test_preview_with_photo_or_initial_without_email_or_counters(self) -> None:
+    def test_preview_with_photo_counters_and_badge_without_email(self) -> None:
         preview = _preview()
         rendered = str(preview)
-        for var in ("photo", "preview_initial", "preview_first_name", "preview_location", "preview_about"):
+        for var in (
+            "photo",
+            "preview_initial",
+            "preview_first_name",
+            "preview_location",
+            "preview_about",
+            "active_count",
+            "completed_count",
+            "email_verified",
+        ):
             with self.subTest(var=var):
                 self.assertIn(f"{var}_rx_state_", rendered)
         # A foto atual (ou a inicial) em 80 px.
         self.assertIn("profile-avatar-photo", rendered)
         self.assertIn("profile-avatar-initial", rendered)
         self.assertIn('["width"] : "80px"', rendered)
-        self.assertNotIn("email", rendered)
+        # Contadores e selo como aparecem para outras pessoas (perfil-credibilidade).
+        self.assertIn("profile-counts", rendered)
+        self.assertIn("verified-badge", rendered)
+        # Nunca o e-mail: só o nome da variável do selo contém “email”.
+        self.assertNotIn("email", rendered.replace("email_verified", ""))
         contents = _contents(preview)
-        for excluded in ("Doações", "Editar perfil", "Compartilhar", "E-mail"):
+        self.assertIn("E-mail verificado", contents)
+        for excluded in ("Editar perfil", "Compartilhar", "E-mail"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
+
+    def test_preview_counts_and_badge_come_before_about(self) -> None:
+        rendered = str(_preview())
+        positions = [
+            rendered.index("preview_location_rx_state_"),
+            rendered.index("profile-counts"),
+            rendered.index("verified-badge"),
+            rendered.index("profile-about-text"),
+        ]
+        self.assertEqual(positions, sorted(positions))
 
     def test_form_sections_fields_and_help(self) -> None:
         form = _form()

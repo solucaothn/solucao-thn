@@ -41,6 +41,8 @@ DETAIL_PAYLOAD = {
     "delivery_method": "A combinar",
     "contact_preference": "E-mail",
     "donor_first_name": "Ana",
+    "donor_email_verified": True,
+    "donor_counts": {"active": 3, "completed": 1},
     "photos": [
         "https://images.example/capa.jpg",
         "https://images.example/capa.jpg",
@@ -409,10 +411,16 @@ class DonationDetailTests(unittest.TestCase):
                 "contact_preference",
                 "donor_first_name",
                 "donor_photo",
+                "donor_email_verified",
+                "donor_active",
+                "donor_completed",
                 "photos",
             },
         )
+        self.assertIs(detail["donor_email_verified"], True)
+        self.assertEqual((detail["donor_active"], detail["donor_completed"]), (3, 1))
         self.assertNotIn("email", detail)
+        self.assertNotIn("private@example.com", repr(detail))
         self.assertNotIn("owner_id", detail)
         self.assertNotIn("address", detail)
         self.assertNotIn("last_name", detail)
@@ -433,6 +441,16 @@ class DonationDetailTests(unittest.TestCase):
             {**DETAIL_PAYLOAD, "title": ""},
             {**DETAIL_PAYLOAD, "condition": "Excelente"},
             {**DETAIL_PAYLOAD, "photos": ["", 3]},
+            # Selo e contadores de quem doa (change perfil-credibilidade).
+            {k: v for k, v in DETAIL_PAYLOAD.items() if k != "donor_email_verified"},
+            {**DETAIL_PAYLOAD, "donor_email_verified": None},
+            {**DETAIL_PAYLOAD, "donor_email_verified": "true"},
+            {k: v for k, v in DETAIL_PAYLOAD.items() if k != "donor_counts"},
+            {**DETAIL_PAYLOAD, "donor_counts": [1, 2]},
+            {**DETAIL_PAYLOAD, "donor_counts": {"active": -1, "completed": 0}},
+            {**DETAIL_PAYLOAD, "donor_counts": {"active": 1.5, "completed": 0}},
+            {**DETAIL_PAYLOAD, "donor_counts": {"active": True, "completed": 0}},
+            {**DETAIL_PAYLOAD, "donor_counts": {"active": 1}},
         ):
             with self.subTest(payload=payload):
                 with self.assertRaises(ValueError):
@@ -571,6 +589,8 @@ class DonationDetailTests(unittest.TestCase):
             "https://images.example/capa.jpg",
             "https://images.example/segunda.jpg",
         ])
+        self.assertIs(state.donor_email_verified, True)
+        self.assertEqual((state.donor_active, state.donor_completed), (3, 1))
         self.assertFalse(hasattr(state, "email"))
 
     def test_network_failure_is_not_converted_to_success(self) -> None:
@@ -817,14 +837,24 @@ class DonationDetailTests(unittest.TestCase):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, rendered)
 
-    def test_donor_card_shows_only_first_name_and_city(self) -> None:
+    def test_donor_card_shows_first_name_city_counts_and_badge_only(self) -> None:
         from doafacil.detalhe_doacao import _donor_card
 
         card = _donor_card()
         rendered = str(card)
-        # O único texto novo é a indicação “Ver perfil” do link.
-        self.assertEqual(_component_contents(card), ["Quem doa", ", ", "Ver perfil"])
+        # Textos fixos: o título, a vírgula da cidade, o selo e “Ver perfil”.
+        self.assertEqual(
+            _component_contents(card), ["Quem doa", ", ", "E-mail verificado", "Ver perfil"]
+        )
         self.assertIn("donor_first_name_rx_state_", rendered)
+        # Contadores e selo, sem e-mail (change perfil-credibilidade).
+        for var in ("donor_active", "donor_completed", "donor_email_verified"):
+            with self.subTest(var=var):
+                self.assertIn(f"{var}_rx_state_", rendered)
+        self.assertIn("profile-counts", rendered)
+        self.assertIn("verified-badge", rendered)
+        self.assertNotIn("@", rendered)
+        self.assertNotIn("donor_email_rx_state_", rendered)
         self.assertIn("LucideMapPin", rendered)
         self.assertNotIn("<img", rendered)
         self.assertNotIn("Image", [type(n).__name__ for n in _all_component_nodes(card)])

@@ -48,6 +48,9 @@ PROFILE_PAYLOAD = {
         "city": "Campinas",
         "state": "SP",
         "member_since": "2020-10",
+        # Selo e contadores (change perfil-credibilidade).
+        "email_verified": True,
+        "counts": {"active": 3, "completed": 4},
     },
     "items": [
         {
@@ -203,6 +206,8 @@ class DonorProfileClientTests(unittest.TestCase):
         self.assertEqual(profile["city"], "Campinas")
         self.assertEqual(profile["state"], "SP")
         self.assertEqual(profile["member_since"], "2020-10")
+        self.assertIs(profile["email_verified"], True)
+        self.assertEqual((profile["active"], profile["completed"]), (3, 4))
         # Itens no formato do cartão da home: foto genérica, “Condição: …” e NOVO.
         first, second = profile["items"]
         self.assertEqual(first["condition_label"], "Condição: Bom")
@@ -237,6 +242,14 @@ class DonorProfileClientTests(unittest.TestCase):
             "page_total negativo": _profile(page_total=-1),
             "items não lista": _profile(items={}),
             "itens todos inválidos": _profile(items=[{"id": "x"}]),
+            # Selo e contadores (change perfil-credibilidade).
+            "selo ausente": _profile(donor={k: v for k, v in PROFILE_PAYLOAD["donor"].items() if k != "email_verified"}),
+            "selo nulo": _profile(donor={**PROFILE_PAYLOAD["donor"], "email_verified": None}),
+            "selo número": _profile(donor={**PROFILE_PAYLOAD["donor"], "email_verified": 1}),
+            "contadores ausentes": _profile(donor={k: v for k, v in PROFILE_PAYLOAD["donor"].items() if k != "counts"}),
+            "contador negativo": _profile(donor={**PROFILE_PAYLOAD["donor"], "counts": {"active": -1, "completed": 0}}),
+            "contador decimal": _profile(donor={**PROFILE_PAYLOAD["donor"], "counts": {"active": 1, "completed": 2.5}}),
+            "contador texto": _profile(donor={**PROFILE_PAYLOAD["donor"], "counts": {"active": "1", "completed": 0}}),
         }
         for label, payload in invalid_payloads.items():
             with self.subTest(case=label):
@@ -262,7 +275,21 @@ class DonorProfileClientTests(unittest.TestCase):
         profile = _parse_donor_profile(payload, NOW)
         self.assertEqual(
             set(profile),
-            {"first_name", "city", "state", "member_since", "about", "photo", "items", "page", "total", "page_total"},
+            {
+                "first_name",
+                "city",
+                "state",
+                "member_since",
+                "about",
+                "photo",
+                "email_verified",
+                "active",
+                "completed",
+                "items",
+                "page",
+                "total",
+                "page_total",
+            },
         )
         self.assertEqual(
             set(profile["items"][0]), {"id", "title", "photo", "condition_label", "is_new"}
@@ -328,6 +355,9 @@ class DonorProfileStateTests(unittest.TestCase):
         self.assertEqual(state.count_label, "2 itens")
         self.assertEqual([item["id"] for item in state.items], [17, 9])
         self.assertEqual((state.page, state.page_total, state.total), (1, 1, 2))
+        # Os contadores públicos são separados do total da lista.
+        self.assertEqual((state.active_count, state.completed_count), (3, 4))
+        self.assertIs(state.email_verified, True)
 
     def test_load_profile_with_one_item_uses_singular(self) -> None:
         state = _state("17")
@@ -495,8 +525,16 @@ class DonorProfilePageTests(unittest.TestCase):
     def test_identity_card_has_initial_name_location_and_member_since(self) -> None:
         card = _identity_card()
         rendered = str(card)
-        self.assertEqual(_component_contents(card), ["No DoaFácil desde "])
-        for state_var in ("initial", "first_name", "location", "member_since_label"):
+        self.assertEqual(_component_contents(card), ["No DoaFácil desde ", "E-mail verificado"])
+        for state_var in (
+            "initial",
+            "first_name",
+            "location",
+            "member_since_label",
+            "active_count",
+            "completed_count",
+            "email_verified",
+        ):
             with self.subTest(var=state_var):
                 self.assertIn(f"{state_var}_rx_state_", rendered)
         self.assertIn('as:"h1"', rendered)
@@ -510,6 +548,16 @@ class DonorProfilePageTests(unittest.TestCase):
         self.assertIn('"row"', rendered)
         # Sem foto de perfil.
         self.assertNotIn("Image", [type(node).__name__ for node in _all_nodes(card)])
+
+    def test_identity_card_counts_and_badge_between_member_since_and_about(self) -> None:
+        rendered = str(_identity_card())
+        positions = [
+            rendered.index("member_since_label_rx_state_"),
+            rendered.index("profile-counts"),
+            rendered.index("verified-badge"),
+            rendered.index("profile-about-text"),
+        ]
+        self.assertEqual(positions, sorted(positions))
 
     def test_donations_list_title_count_grid_and_home_cards(self) -> None:
         rendered = str(donor_profile_page())
@@ -557,8 +605,9 @@ class DonorProfilePageTests(unittest.TestCase):
         page = donor_profile_page()
         contents = _component_contents(page)
         rendered = str(page)
+        # O selo “E-mail verificado” entrou na change perfil-credibilidade; o
+        # e-mail continua ausente.
         for excluded in (
-            "E-mail verificado",
             "Chat",
             "Avaliações",
             "Em breve",
@@ -569,9 +618,10 @@ class DonorProfilePageTests(unittest.TestCase):
         ):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
+        without_badge = rendered.replace("email_verified", "")
         for excluded in ("email", "owner_id", "user_id", "last_name", "LucideMessageCircle", "chat-fab"):
             with self.subTest(excluded=excluded):
-                self.assertNotIn(excluded, rendered)
+                self.assertNotIn(excluded, without_badge)
         # A única imagem fora dos cartões é o logotipo (sem foto de perfil).
         identity_images = [
             node for node in _all_nodes(_identity_card()) if type(node).__name__ == "Image"

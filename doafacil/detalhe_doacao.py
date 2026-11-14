@@ -18,7 +18,14 @@ from doafacil.chat import (
     start_conversation,
 )
 from doafacil.login import LoginState
-from doafacil.perfil_publico import avatar, parse_photo_url
+from doafacil.perfil_publico import (
+    avatar,
+    donation_counts,
+    parse_counts,
+    parse_email_verified,
+    parse_photo_url,
+    verified_badge,
+)
 
 
 DONATION_DETAIL_PATH = "/catalog/donations/detail"
@@ -128,6 +135,9 @@ def _parse_donation_detail(
 
     # Foto de perfil de quem doa: URL pública ou nula (sem foto → "").
     donor_photo = parse_photo_url(payload.get("donor_photo"))
+    # Contadores e selo de quem doa (change perfil-credibilidade).
+    donor_email_verified = parse_email_verified(payload.get("donor_email_verified"))
+    donor_active, donor_completed = parse_counts(payload.get("donor_counts"))
 
     unique_photos = list(dict.fromkeys(photos))
     if not unique_photos:
@@ -145,6 +155,9 @@ def _parse_donation_detail(
         "contact_preference": contact_preference,
         "donor_first_name": donor_first_name,
         "donor_photo": donor_photo,
+        "donor_email_verified": donor_email_verified,
+        "donor_active": donor_active,
+        "donor_completed": donor_completed,
         "photos": unique_photos,
     }
 
@@ -204,6 +217,9 @@ class DonationDetailState(LoginState):
     contact_preference: str = ""
     donor_first_name: str = ""
     donor_photo: str = ""
+    donor_email_verified: bool = False
+    donor_active: int = 0
+    donor_completed: int = 0
     photos: list[str] = []
     view_state: str = "loading"
     contact_message: str = ""
@@ -276,6 +292,9 @@ class DonationDetailState(LoginState):
         self.contact_preference = ""
         self.donor_first_name = ""
         self.donor_photo = ""
+        self.donor_email_verified = False
+        self.donor_active = 0
+        self.donor_completed = 0
         self.photos = []
         self.view_state = "loading"
         self.contact_message = ""
@@ -311,6 +330,9 @@ class DonationDetailState(LoginState):
             self.contact_preference = donation["contact_preference"]
             self.donor_first_name = donation["donor_first_name"]
             self.donor_photo = donation["donor_photo"]
+            self.donor_email_verified = donation["donor_email_verified"]
+            self.donor_active = donation["donor_active"]
+            self.donor_completed = donation["donor_completed"]
             self.photos = donation["photos"]
             self.view_state = "loaded"
 
@@ -996,7 +1018,8 @@ def _location_card() -> rx.Component:
 
 
 def _donor_card() -> rx.Component:
-    """Cartão mínimo de quem doa: primeiro nome e “Cidade, UF”.
+    """Cartão de quem doa: foto, primeiro nome, “Cidade, UF”, os contadores e o
+    selo “E-mail verificado” (só quando verificado). Nunca o e-mail.
 
     O cartão inteiro é o link para o perfil público (/doacao/<id>/quem-doa),
     com rótulo acessível “Ver perfil de <primeiro nome>”. O frontend só usa o
@@ -1069,6 +1092,12 @@ def _donor_card_content() -> rx.Component:
             spacing="3",
             align="center",
         ),
+        # Contadores numa linha e, abaixo, o selo (só quando verificado).
+        donation_counts(
+            DonationDetailState.donor_active,
+            DonationDetailState.donor_completed,
+        ),
+        verified_badge(DonationDetailState.donor_email_verified),
         # Mostra que o cartão é clicável.
         rx.hstack(
             rx.text("Ver perfil", color=PRIMARY_GREEN, font_weight="700"),

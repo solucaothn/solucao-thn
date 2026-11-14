@@ -40,6 +40,7 @@ from doafacil.minhas_doacoes import (
     _edit_form,
     _empty_state,
     _owner_card,
+    _owner_email,
     _pagination,
     _parse_my_donation,
     _parse_my_donations,
@@ -50,6 +51,7 @@ from doafacil.minhas_doacoes import (
     fetch_my_donation,
     fetch_my_donations,
     my_donation_card,
+    split_email,
     my_donations_page,
     update_donation,
 )
@@ -58,8 +60,11 @@ from doafacil.minhas_doacoes import (
 BASE_URL = "https://xano.example/api:catalog"
 TOKEN = "token-de-teste"
 
+# O e-mail e o selo da própria conta entraram na change perfil-credibilidade.
+OWNER = {"first_name": "Ana", "email": "ana@exemplo.com", "email_verified": True}
+
 LIST_PAYLOAD = {
-    "owner": {"first_name": "Ana"},
+    "owner": OWNER,
     "counts": {"active": 2, "completed": 1},
     "items": [
         {"id": 17, "created_at": 1_700_000_000_000, "title": "Carrinho", "photo": "https://img.example/a.jpg", "condition": "Bom", "status": "disponível"},
@@ -273,25 +278,61 @@ class MyDonationsClientTests(unittest.TestCase):
         payload = {
             **LIST_PAYLOAD,
             "email": "x@y.z",
-            "owner": {"first_name": "Ana", "email": "x@y.z", "owner_id": 9},
+            "owner": {**OWNER, "owner_id": 9, "name": "Ana Souza"},
             "items": [{**LIST_PAYLOAD["items"][0], "owner_id": 9}],
         }
         data = _parse_my_donations(payload)
         self.assertEqual(
             set(data),
-            {"first_name", "about", "photo", "active", "completed", "items", "page", "total", "page_total"},
+            {
+                "first_name",
+                "email",
+                "email_verified",
+                "about",
+                "photo",
+                "active",
+                "completed",
+                "items",
+                "page",
+                "total",
+                "page_total",
+            },
         )
         self.assertEqual(
             set(data["items"][0]),
             {"id", "title", "photo", "condition_label", "status", "status_label"},
         )
+        # Só o e-mail do owner é lido; o do topo e outros campos são ignorados.
         self.assertNotIn("x@y.z", repr(data))
+        self.assertNotIn("Souza", repr(data))
+
+    def test_owner_email_and_verified_are_read(self) -> None:
+        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {**OWNER, "email": "  ana@exemplo.com "}})
+        self.assertEqual(data["email"], "ana@exemplo.com")
+        self.assertIs(data["email_verified"], True)
+        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {**OWNER, "email_verified": False}})
+        self.assertIs(data["email_verified"], False)
+
+    def test_invalid_owner_email_or_verified_raise(self) -> None:
+        cases = {
+            "sem e-mail": {k: v for k, v in OWNER.items() if k != "email"},
+            "e-mail vazio": {**OWNER, "email": "  "},
+            "e-mail não texto": {**OWNER, "email": 5},
+            "selo ausente": {k: v for k, v in OWNER.items() if k != "email_verified"},
+            "selo nulo": {**OWNER, "email_verified": None},
+            "selo texto": {**OWNER, "email_verified": "true"},
+            "selo número": {**OWNER, "email_verified": 1},
+        }
+        for label, owner in cases.items():
+            with self.subTest(label=label):
+                with self.assertRaises(MyDonationsServiceError):
+                    _parse_my_donations({**LIST_PAYLOAD, "owner": owner})
 
     def test_invalid_list_responses_raise(self) -> None:
         cases = {
             "lista": [],
             "sem owner": {k: v for k, v in LIST_PAYLOAD.items() if k != "owner"},
-            "nome vazio": {**LIST_PAYLOAD, "owner": {"first_name": " "}},
+            "nome vazio": {**LIST_PAYLOAD, "owner": {**OWNER, "first_name": " "}},
             "contador negativo": {**LIST_PAYLOAD, "counts": {"active": -1, "completed": 0}},
             "contador booleano": {**LIST_PAYLOAD, "counts": {"active": True, "completed": 0}},
             "página 0": {**LIST_PAYLOAD, "page": 0},
@@ -405,6 +446,7 @@ class MyDonationsStateTests(unittest.TestCase):
         self.assertEqual(state.view_state, "ready")
         self.assertEqual((state.first_name, state.initial), ("Ana", "A"))
         self.assertEqual((state.active_count, state.completed_count), (2, 1))
+        self.assertEqual((state.email, state.email_verified), ("ana@exemplo.com", True))
         self.assertEqual([item["id"] for item in state.items], [17, 12, 9])
         # O aviso da edição aparece uma vez.
         self.assertEqual(state.notice, SAVED_MESSAGE)
@@ -418,13 +460,15 @@ class MyDonationsStateTests(unittest.TestCase):
         )
         for error, message in cases:
             with self.subTest(error=type(error).__name__):
-                state = _list_state(items=[{"id": 99}], first_name="Outra")
+                state = _list_state(items=[{"id": 99}], first_name="Outra", email="o@x.y", email_verified=True)
                 with patch("doafacil.minhas_doacoes.fetch_my_donations", new_callable=AsyncMock, side_effect=error):
                     _events(MyDonationsState.load_page.fn(state))
                 self.assertEqual(state.view_state, "error")
                 self.assertEqual(state.load_error, message)
                 self.assertEqual(state.items, [])
                 self.assertEqual(state.first_name, "")
+                # Sem dados parciais: nem o e-mail nem o selo anteriores.
+                self.assertEqual((state.email, state.email_verified), ("", False))
 
     def test_401_clears_session_and_redirects(self) -> None:
         state = _list_state()
@@ -593,11 +637,6 @@ class MyDonationsStateTests(unittest.TestCase):
         self.assertIn("não poderá voltar a outro status", _computed("confirm_text", complete))
         self.assertIn("somente para leitura", _computed("confirm_text", complete))
 
-    def test_counter_labels(self) -> None:
-        self.assertEqual(_computed("active_label", _list_state(active_count=1)), "Doação")
-        self.assertEqual(_computed("active_label", _list_state(active_count=2)), "Doações")
-        self.assertEqual(_computed("completed_label", _list_state(completed_count=1)), "Doação realizada")
-        self.assertEqual(_computed("completed_label", _list_state(completed_count=0)), "Doações realizadas")
 
 
 class MyDonationsPageTests(unittest.TestCase):
@@ -618,23 +657,76 @@ class MyDonationsPageTests(unittest.TestCase):
         # Sem o botão flutuante do chat.
         self.assertNotIn("chat-fab", rendered)
 
-    def test_owner_card_has_initial_name_and_counters_only(self) -> None:
+    def test_owner_card_has_initial_name_counters_email_and_badge(self) -> None:
         card = _owner_card()
         rendered = str(card)
-        for var in ("initial", "first_name", "active_count", "completed_count", "active_label", "completed_label"):
+        for var in ("initial", "first_name", "active_count", "completed_count", "email_local", "email_domain", "email_verified"):
             with self.subTest(var=var):
                 self.assertIn(f"{var}_rx_state_", rendered)
         self.assertNotIn("Image", [type(n).__name__ for n in _nodes(card)])
+        # Contadores do componente compartilhado, com singular e plural.
+        self.assertIn("profile-counts", rendered)
+        for label in ("Doa\\u00e7\\u00e3o", "Doa\\u00e7\\u00f5es", "Doa\\u00e7\\u00e3o realizada", "Doa\\u00e7\\u00f5es realizadas"):
+            with self.subTest(label=label):
+                self.assertIn(f'"{label}"', rendered)
+        # E-mail com rótulo; o selo só com email_verified.
+        self.assertIn("E-mail", _contents(card))
+        self.assertIn("my-donations-owner-email", rendered)
+        self.assertIn("verified-badge", rendered)
+
+    def test_split_email_keeps_at_with_domain(self) -> None:
+        self.assertEqual(split_email("ana.lima@gmail.com"), ("ana.lima", "@gmail.com"))
+        self.assertEqual(split_email("a@b@c.com"), ("a@b", "@c.com"))
+        self.assertEqual(split_email("sem-arroba"), ("sem-arroba", ""))
+        self.assertEqual(split_email(""), ("", ""))
+        state = _list_state(email="ana.lima@gmail.com")
+        self.assertEqual(_computed("email_local", state), "ana.lima")
+        self.assertEqual(_computed("email_domain", state), "@gmail.com")
+
+    def test_owner_email_breaks_only_before_the_at(self) -> None:
+        """Duas partes que não quebram por dentro quando cabem, com o ponto de
+        quebra entre elas; só uma parte maior que o cartão quebra em qualquer
+        ponto (bloco em linha com até 100% da largura)."""
+        email = _owner_email()
+        rendered = str(email)
+        parts = [n for n in _nodes(email) if getattr(n, "class_name", None) is not None and "my-donations-owner-email-part" in str(n.class_name)]
+        self.assertEqual(len(parts), 2)
+        for part in parts:
+            part_rendered = str(part)
+            with self.subTest(part=part_rendered[:60]):
+                self.assertIn('["display"] : "inline-block"', part_rendered)
+                self.assertIn('["maxWidth"] : "100%"', part_rendered)
+                self.assertIn('["overflowWrap"] : "anywhere"', part_rendered)
+        self.assertLess(rendered.index("email_local_rx_state_"), rendered.index('jsx("wbr"'))
+        self.assertLess(rendered.index('jsx("wbr"'), rendered.index("email_domain_rx_state_"))
+        # O texto do e-mail inteiro não quebra em qualquer ponto.
+        container = rendered.split("my-donations-owner-email-part")[0]
+        self.assertNotIn("anywhere", container)
+        self.assertNotIn("break-word", rendered)
+
+    def test_owner_card_order_follows_group_6(self) -> None:
+        """Nome, contadores, Sobre, e-mail, selo e, por último, “Editar perfil”."""
+        rendered = str(_owner_card())
+        positions = [
+            rendered.index("first_name_rx_state_"),
+            rendered.index("profile-counts"),
+            rendered.index("profile-about-text"),
+            rendered.index("my-donations-owner-email"),
+            rendered.index("verified-badge"),
+            rendered.index("my-donations-edit-profile"),
+        ]
+        self.assertEqual(positions, sorted(positions))
 
     def test_out_of_scope_items_are_absent(self) -> None:
         page = my_donations_page()
         contents = _contents(page)
         rendered = str(page)
-        # “Editar perfil” entrou na change editar-perfil (o botão do cartão).
-        for excluded in ("Sobre", "Compartilhar", "Avaliação", "Verificado", "Chat", "Email", "E-mail", "Em breve", "NOVO"):
+        # “Editar perfil” entrou na change editar-perfil (o botão do cartão); o
+        # e-mail e o selo, na change perfil-credibilidade.
+        for excluded in ("Sobre", "Compartilhar", "Avaliação", "Verificado", "Credibilidade", "Chat", "Email", "Em breve", "NOVO"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
-        for excluded in ("email", "owner_id", "LucideMessageCircle"):
+        for excluded in ("owner_id", "LucideMessageCircle"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, rendered)
 
@@ -1010,15 +1102,15 @@ class MyDonationsAboutAndEditProfileTests(unittest.TestCase):
     """Sobre e “Editar perfil” no cartão da pessoa (change editar-perfil)."""
 
     def test_owner_about_is_read(self) -> None:
-        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {"first_name": "Ana", "about": " Oi.\nTchau. "}})
+        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {**OWNER, "about": " Oi.\nTchau. "}})
         self.assertEqual(data["about"], "Oi.\nTchau.")
         self.assertEqual(_parse_my_donations(LIST_PAYLOAD)["about"], "")
         with self.assertRaises(MyDonationsServiceError):
-            _parse_my_donations({**LIST_PAYLOAD, "owner": {"first_name": "Ana", "about": []}})
+            _parse_my_donations({**LIST_PAYLOAD, "owner": {**OWNER, "about": []}})
 
     def test_load_page_sets_about(self) -> None:
         state = _list_state(about="")
-        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {"first_name": "Ana", "about": "Oi."}})
+        data = _parse_my_donations({**LIST_PAYLOAD, "owner": {**OWNER, "about": "Oi."}})
         with patch("doafacil.minhas_doacoes.fetch_my_donations", new_callable=AsyncMock, return_value=data):
             _events(MyDonationsState.load_page.fn(state))
         self.assertEqual(state.about, "Oi.")

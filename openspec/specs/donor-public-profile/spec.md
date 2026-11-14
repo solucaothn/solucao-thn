@@ -22,7 +22,7 @@ O sistema MUST permitir consultar, sem autenticação, o perfil público de quem
 - **THEN** o frontend MUST fazer uma única requisição ao endpoint do perfil, que traz a identificação e a página pedida da lista
 
 ### Requirement: Resposta do perfil sem dados privados
-A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês e o ano de cadastro, o texto de Sobre e a URL pública da foto de perfil de quem doa e a página pedida das doações disponíveis. Ela MUST NOT expor dados privados nem identificadores de usuário.
+A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês e o ano de cadastro, o texto de Sobre, a URL pública da foto de perfil, os contadores de doações e se o e-mail de quem doa está verificado, além da página pedida das doações disponíveis. Ela MUST NOT expor dados privados nem identificadores de usuário.
 
 #### Scenario: Dados de identificação retornados
 - **WHEN** a consulta do perfil é respondida com sucesso
@@ -31,6 +31,12 @@ A resposta do perfil MUST conter somente o primeiro nome, a cidade, a UF, o mês
 - **AND** a data de cadastro MUST ser reduzida a mês e ano, sem dia nem horário
 - **AND** um Sobre não preenchido MUST vir vazio ou nulo
 - **AND** sem foto, a URL MUST vir nula
+
+#### Scenario: Contadores e e-mail verificado
+- **WHEN** a consulta do perfil é respondida com sucesso
+- **THEN** a resposta MUST incluir o contador de doações ativas de quem doa, que soma as disponíveis e as reservadas, e o contador de doações concluídas, considerando todas as doações dessa pessoa
+- **AND** MUST incluir se o e-mail de quem doa está verificado, como verdadeiro ou falso
+- **AND** os contadores MUST NOT vir separados por status além desses dois números
 
 #### Scenario: Campos privados excluídos
 - **WHEN** a resposta do perfil é construída
@@ -61,6 +67,11 @@ A página `/doacao/<id>/quem-doa` MUST apresentar a identificação de quem doa 
 - **WHEN** o perfil carrega com sucesso
 - **THEN** a página MUST mostrar, num cartão, a foto de perfil de quem doa, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo com a inicial do primeiro nome, no mesmo tamanho do círculo, o primeiro nome, “Cidade, UF” e “No DoaFácil desde <mês> de <ano>”, com o mês por extenso em português
 
+#### Scenario: Contadores e selo de quem doa
+- **WHEN** o perfil carrega com sucesso
+- **THEN** o cartão de identificação MUST mostrar “Doações” com o contador de ativas e “Doações realizadas” com o contador de concluídas, no singular quando o número é 1
+- **AND** MUST mostrar o selo “E-mail verificado” somente quando o e-mail de quem doa está verificado
+
 #### Scenario: Sobre de quem doa
 - **WHEN** o perfil carrega com sucesso e quem doa preencheu o Sobre
 - **THEN** o cartão de identificação MUST mostrar o texto de Sobre abaixo de “No DoaFácil desde …”, como texto simples, preservando as quebras de linha e sem interpretar HTML
@@ -68,7 +79,7 @@ A página `/doacao/<id>/quem-doa` MUST apresentar a identificação de quem doa 
 
 #### Scenario: Itens fora do escopo
 - **WHEN** a página do perfil é exibida
-- **THEN** MUST NOT apresentar selo de e-mail verificado, botão de chat, avaliações, sobrenome ou e-mail
+- **THEN** MUST NOT apresentar botão de chat, avaliações, sobrenome ou e-mail
 - **AND** MUST NOT apresentar esses itens como “Em breve”
 
 #### Scenario: Lista de doações e contador

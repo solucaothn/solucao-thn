@@ -37,8 +37,12 @@ from doafacil.perfil_publico import (
     ABOUT_MAX_LENGTH,
     about_text,
     avatar,
+    donation_counts,
     parse_about,
+    parse_counts,
+    parse_email_verified,
     parse_photo_url,
+    verified_badge,
 )
 
 
@@ -148,6 +152,21 @@ def _parse_profile(payload: object) -> dict[str, str]:
     }
 
 
+def _parse_profile_credibility(payload: object) -> dict[str, Any]:
+    """Selo e contadores do GET auth/profile (change perfil-credibilidade).
+
+    Só o GET os traz; a resposta do PATCH continua sem eles.
+    """
+    if not isinstance(payload, dict):
+        raise ProfileServiceError
+    try:
+        email_verified = parse_email_verified(payload.get("email_verified"))
+        active, completed = parse_counts(payload.get("counts"))
+    except ValueError:
+        raise ProfileServiceError from None
+    return {"email_verified": email_verified, "active": active, "completed": completed}
+
+
 def _json(response: httpx.Response) -> object:
     try:
         return response.json()
@@ -155,12 +174,13 @@ def _json(response: httpx.Response) -> object:
         raise ProfileServiceError from None
 
 
-async def fetch_profile(client: httpx.AsyncClient, auth_token: str) -> dict[str, str]:
+async def fetch_profile(client: httpx.AsyncClient, auth_token: str) -> dict[str, Any]:
     response = await client.get(
         _endpoint(), headers={"Authorization": f"Bearer {auth_token}"}
     )
     _raise_for_status(response)
-    return _parse_profile(_json(response))
+    payload = _json(response)
+    return {**_parse_profile(payload), **_parse_profile_credibility(payload)}
 
 
 async def update_profile(
@@ -290,6 +310,9 @@ def _clear_form(state: Any) -> None:
     state.uf = ""
     state.about = ""
     state.photo = ""
+    state.email_verified = False
+    state.active_count = 0
+    state.completed_count = 0
     state.photo_busy = False
     state.photo_notice = ""
     state.photo_error = ""
@@ -307,6 +330,10 @@ class EditProfileState(LoginState):
     uf: str = ""
     about: str = ""
     photo: str = ""
+    # Selo e contadores da prévia: vêm do GET e não acompanham a digitação.
+    email_verified: bool = False
+    active_count: int = 0
+    completed_count: int = 0
     photo_busy: bool = False
     photo_notice: str = ""
     photo_error: str = ""
@@ -363,6 +390,9 @@ class EditProfileState(LoginState):
         self.uf = profile["state"] if profile["state"] in BRAZILIAN_STATES else ""
         self.about = profile["about"]
         self.photo = profile["photo"]
+        self.email_verified = profile["email_verified"]
+        self.active_count = profile["active"]
+        self.completed_count = profile["completed"]
         self.view_state = "ready"
 
     @rx.event
@@ -568,8 +598,9 @@ def _section_title(text: str) -> rx.Component:
 
 
 def _preview() -> rx.Component:
-    """Prévia: foto (ou inicial), primeiro nome, “Cidade, UF” e Sobre. Sem
-    e-mail, contadores, “Editar perfil” ou “Compartilhar”."""
+    """Prévia: foto (ou inicial), primeiro nome, “Cidade, UF”, os contadores,
+    o selo “E-mail verificado” (só quando verificado) e o Sobre, como aparecem
+    para outras pessoas. Sem e-mail, “Editar perfil” ou “Compartilhar”."""
     return rx.vstack(
         rx.vstack(
             avatar(
@@ -596,6 +627,13 @@ def _preview() -> rx.Component:
                 text_align="center",
                 overflow_wrap="anywhere",
             ),
+            donation_counts(
+                EditProfileState.active_count,
+                EditProfileState.completed_count,
+                justify="center",
+                width="100%",
+            ),
+            verified_badge(EditProfileState.email_verified),
             about_text(EditProfileState.preview_about, text_align="center"),
             class_name="edit-profile-preview",
             align="center",

@@ -6,7 +6,7 @@ Permite que quem doa veja todas as próprias doações, com o status e os contad
 ## Requirements
 
 ### Requirement: Listagem das próprias doações
-O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisição, uma página das doações da pessoa autenticada, de qualquer status, os contadores dela, o primeiro nome, o texto de Sobre e a URL pública da foto de perfil. A pessoa é sempre derivada da sessão, nunca de um identificador enviado pelo cliente.
+O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisição, uma página das doações da pessoa autenticada, de qualquer status, os contadores dela, o primeiro nome, o e-mail, se o e-mail está verificado, o texto de Sobre e a URL pública da foto de perfil. A pessoa é sempre derivada da sessão, nunca de um identificador enviado pelo cliente.
 
 #### Scenario: Página das próprias doações
 - **WHEN** uma pessoa autenticada pede uma página das suas doações
@@ -21,11 +21,13 @@ O sistema MUST oferecer uma consulta autenticada que devolve, numa só requisiç
 - **AND** a resposta MUST incluir o primeiro nome da pessoa autenticada como único dado nominal
 - **AND** a resposta MUST incluir o texto de Sobre da pessoa autenticada, vazio ou nulo quando não preenchido
 - **AND** a resposta MUST incluir a URL pública da foto de perfil da pessoa autenticada, nula quando não há foto
+- **AND** a resposta MUST incluir o e-mail da pessoa autenticada e se ele está verificado, como verdadeiro ou falso
 
 #### Scenario: Somente dados da própria pessoa
 - **WHEN** a consulta é respondida
 - **THEN** ela MUST NOT conter doações, nomes, e-mails ou identificadores de outras pessoas
-- **AND** MUST NOT conter e-mail, sobrenome, `owner_id` nem id de usuário
+- **AND** o único e-mail da resposta MUST ser o da própria pessoa autenticada
+- **AND** MUST NOT conter sobrenome, `owner_id` nem id de usuário
 
 #### Scenario: Página inválida ou fora do intervalo
 - **WHEN** a página pedida é menor que 1 ou maior que o total de páginas
@@ -136,9 +138,11 @@ A página `/minhas-doacoes` MUST exigir login e apresentar o cartão da pessoa e
 #### Scenario: Cartão da pessoa
 - **WHEN** a página carrega com sucesso
 - **THEN** MUST mostrar a foto de perfil da pessoa, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo com a inicial, no mesmo tamanho; o primeiro nome, “Doações” com o contador de ativas e “Doações realizadas” com o contador de concluídas
+- **AND** MUST mostrar o e-mail da pessoa abaixo do primeiro nome, inteiro, quebrando a linha quando não couber, sem rolagem horizontal
+- **AND** MUST mostrar o selo “E-mail verificado” somente quando o e-mail da pessoa está verificado
 - **AND** MUST mostrar o botão “Editar perfil”, que leva a `/perfil/editar`, com área de toque de pelo menos 44 px
 - **AND** quando a pessoa preencheu o Sobre, MUST mostrá-lo como texto simples, preservando as quebras de linha; com o Sobre vazio, MUST NOT mostrar nada no lugar dele
-- **AND** MUST NOT apresentar e-mail, “Compartilhar”, avaliações, selo de verificação ou botão de chat, nem como “Em breve”
+- **AND** MUST NOT apresentar “Compartilhar”, avaliações ou botão de chat, nem como “Em breve”
 
 #### Scenario: Grade das doações
 - **WHEN** a pessoa tem doações

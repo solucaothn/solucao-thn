@@ -20,7 +20,16 @@ import reflex as rx
 
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
-from doafacil.perfil_publico import about_text, avatar, parse_about, parse_photo_url
+from doafacil.perfil_publico import (
+    about_text,
+    avatar,
+    donation_counts,
+    parse_about,
+    parse_counts,
+    parse_email_verified,
+    parse_photo_url,
+    verified_badge,
+)
 from doafacil.detalhe_doacao import (
     DONATION_NOT_FOUND_MESSAGE,
     DonationNotFoundError,
@@ -130,6 +139,9 @@ def _parse_donor_profile(
         raise ValueError("A resposta do perfil contém dados inválidos.")
     about = parse_about(donor.get("about"))
     photo = parse_photo_url(donor.get("photo"))
+    # Contadores e selo de quem doa (change perfil-credibilidade).
+    email_verified = parse_email_verified(donor.get("email_verified"))
+    active, completed = parse_counts(donor.get("counts"))
 
     page = payload.get("page")
     total = payload.get("total")
@@ -151,6 +163,9 @@ def _parse_donor_profile(
         "member_since": member_since,
         "about": about,
         "photo": photo,
+        "email_verified": email_verified,
+        "active": active,
+        "completed": completed,
         "items": _parse_donations(payload.get("items"), now),
         "page": page,
         "total": total,
@@ -190,6 +205,9 @@ class DonorProfileState(rx.State):
     member_since_label: str = ""
     about: str = ""
     photo: str = ""
+    email_verified: bool = False
+    active_count: int = 0
+    completed_count: int = 0
     items: list[dict[str, Any]] = []
     total: int = 0
     count_label: str = ""
@@ -205,6 +223,9 @@ class DonorProfileState(rx.State):
         self.member_since_label = member_since_label(profile["member_since"])
         self.about = profile["about"]
         self.photo = profile["photo"]
+        self.email_verified = profile["email_verified"]
+        self.active_count = profile["active"]
+        self.completed_count = profile["completed"]
         self.items = profile["items"]
         self.total = profile["total"]
         self.count_label = items_count_label(profile["total"])
@@ -218,6 +239,9 @@ class DonorProfileState(rx.State):
         self.member_since_label = ""
         self.about = ""
         self.photo = ""
+        self.email_verified = False
+        self.active_count = 0
+        self.completed_count = 0
         self.items = []
         self.total = 0
         self.count_label = ""
@@ -333,7 +357,8 @@ def _state_message(message: rx.Var | str, color: str) -> rx.Component:
 
 def _identity_card() -> rx.Component:
     """Foto de perfil (ou, sem foto, o círculo com a inicial), primeiro nome,
-    “Cidade, UF”, “membro desde” e o Sobre. Sem selo de e-mail verificado.
+    “Cidade, UF”, “membro desde”, os contadores, o selo “E-mail verificado”
+    (só quando verificado) e o Sobre. Nunca o e-mail.
     """
     avatar_size = rx.breakpoints(initial="72px", md="120px")
     return rx.flex(
@@ -369,6 +394,14 @@ def _identity_card() -> rx.Component:
                 color=TEXT_MUTED,
                 font_size="0.95rem",
             ),
+            # Contadores e selo, abaixo do “No DoaFácil desde …” e antes do Sobre.
+            donation_counts(
+                DonorProfileState.active_count,
+                DonorProfileState.completed_count,
+                justify=rx.breakpoints(initial="center", md="start"),
+                padding_top="4px",
+            ),
+            verified_badge(DonorProfileState.email_verified),
             # Sobre de quem doa: texto simples; vazio, nada.
             about_text(DonorProfileState.about, padding_top="4px"),
             spacing="2",
