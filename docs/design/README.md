@@ -65,9 +65,39 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 - Não incluir selo de segurança, CNPJ ou cidade, horário de atendimento, "Busca por recibo" ou "Verificação de links", itens herdados da referência do Vakinha.
 - Em telas estreitas, os cartões das seções ficam em coluna.
 
+### 16-landing-nova.png — Nova landing (change landing-nova)
+
+Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do arquivo `doafacil` no Figma. As seções 01 a 03 acima continuam como histórico; onde elas diferem desta, vale esta.
+
+> No PNG, os 4 cartões institucionais estão cobertos por blocos cinza com “foto a definir”. As fotos do Figma têm marca d'água de banco de imagens e não entram no repositório nem no site.
+
+- **Cabeçalho:** “Explorar Doações” (`/explorar`), “Como funciona” (`/como-funciona`) e “Categorias” (`/categorias`) são links. Com sessão, o **menu da conta** (círculo com a inicial, primeiro nome e seta) reúne “Minhas doações”, “Editar perfil” e “Sair”; abaixo de 768 px fica só a inicial. Sem sessão, **Entrar**. **Quero Doar** sempre.
+- **Título:** como no nó `615:2345` do Figma: LINE Seed JP Bold 36 px, altura de linha normal, `#2A2A2A`, centralizado, 1376 px de largura em 1512 px, quebrando em “…recomeço para” / “alguém.”. Em telas menores, a fonte diminui com a largura (`clamp(1.5rem, 2.4vw, 2.25rem)`).
+- **Números:** “Doações em circulação!” (doações disponíveis) e “Pessoas alcançadas” (doações concluídas), ambos vindos de `catalog/donations/count`. Número em Bold 24 px e rótulo em Regular 16 px, em `#005723` (8,9:1 sobre o creme), centralizados na altura dos cartões das recentes.
+- **Cartões das recentes:** quadrados entre 220 e 260 px de lado, dividindo a largura do carrossel entre os 4. A linha dos números e do carrossel usa as mesmas bordas do conteúdo do cabeçalho (até 1200 px, com margens de 16 e 24 px), e a coluna dos números tem 11rem. Assim, os 4 cartões cabem em 1512 px; quando não cabem, o carrossel rola dentro dele.
+- **“Doações mais recentes:”** com o link **“Ver mais...”** (`/explorar`) à direita.
+- **“Comece por aqui”:** “Para você mesmo” leva a `/explorar` e “Ajude quem precisa” a `/cadastro-doacao`; “Desapego em grupo” segue **Em breve**. A busca funciona: categorias do Xano, as 27 UFs e “Buscar” abrindo `/explorar?q=…&categoria=…&uf=…`.
+- **Institucional:** fundo creme, título em `#1F1F1F`, texto de apoio em `#166B3B` e quatro cartões quadrados com ícone em círculo verde: Solidariedade — “Histórias que continuam”; Segurança — “Você no controle”; Nossa missão — “Nada se perde”; Passo a passo — “Doar leva minutos”. Sem “Saiba mais”. Enquanto não houver fotos próprias, o fundo é um degradê verde e cinza (`INSTITUTIONAL_CARDS` em `doafacil/doafacil.py`).
+- **Rodapé:** os links navegam (rotas na tabela do guia, seção 8).
+
+**Diferenças aprovadas em relação ao Figma:**
+
+| No Figma | Na implementação | Motivo |
+|---|---|---|
+| “Estado: Ótimo” nos cartões | “Condição: Ótimo” | termo do domínio (decisão 6) |
+| “COMECE POR AQUI” quase invisível (branco sobre creme) | `#166B3B` | contraste AA; o `#168447` dá só 4,4:1 sobre o creme |
+| “Linkes rápidos” | “Links rápidos” | erro de digitação |
+| “Desapego em grupo” com seta | “Em breve”, sem seta | a funcionalidade não existe |
+| fotos com marca d'água “shutterstock” | degradê como placeholder | direitos de imagem |
+| sem “Projeto acadêmico DoaFácil” | a linha continua | exigida pela spec do rodapé |
+| 6 cartões de recentes no quadro | até 4 | spec atual; “Ver mais...” leva ao resto |
+| cartões de recentes com cerca de 214 px | entre 220 e 260 px, dividindo o carrossel | pedido do grupo: textos legíveis e os 4 cabendo em 1512 px |
+| linha dos números e cartões quase até a borda | mesmas bordas do conteúdo do cabeçalho | pedido do grupo |
+| números no topo da linha | centralizados na altura dos cartões | pedido do grupo |
+
 ## Telas ainda sem desenho
 
-Login e cadastro, catálogo (Explorar Doações), detalhe da doação, formulário de cadastro da doação, Como funciona, Categorias.
+Login e cadastro, catálogo (Explorar Doações; hoje há só a página provisória `/explorar`), detalhe da doação, formulário de cadastro da doação, Como funciona, Categorias.
 
 ## Referência de estrutura (Vakinha)
 
@@ -80,7 +110,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 1. A **localização** da doação é a cidade e o estado do perfil do doador, copiados na hora de cadastrar a doação.
 2. A barra de busca pertence à página **Explorar Doações**. A tela "Comece por aqui" é a porta de entrada.
 3. A etiqueta **NOVO** vale para doações criadas nos últimos 7 dias.
-4. A estatística "Pessoas alcançadas" **não entra** na primeira versão. Só "Doações em circulação".
+4. ~~A estatística "Pessoas alcançadas" não entra na primeira versão.~~ Substituída pela change landing-nova: "Pessoas alcançadas" conta as doações concluídas.
 5. **Desapego em grupo** (vários itens de uma vez) fica fora do MVP.
 6. O rótulo do estado do item é **Condição** (Ótimo, Bom, Regular), para não confundir com o estado geográfico nem com o status da doação.
 7. Na seção "Comece por aqui", exibir "Desapego em grupo" com a etiqueta "Em breve" e sem seta. A barra abaixo dos cartões é apenas visual nesta home e não executa busca nem navega; a busca funcional permanece exclusiva da página Explorar Doações.
@@ -93,6 +123,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 14. A primeira área da home (cabeçalho, destaque, doações recentes e ilustração) tem no mínimo 100vh, com ilustração encostada à base e sem exibir “Comece por aqui” na primeira dobra; quando o conteúdo ultrapassa a viewport, a área cresce sem cortes.
 15. A seção “Comece por aqui” usa espaçamentos e cartões arejados conforme definidos acima; a busca visual tem controles brancos, borda cinza clara e texto legível, sem executar busca.
 16. O rodapé preserva o logotipo colorido original, sem filtro; títulos em 15px, links e contato em 13px com 6px entre linhas, texto acadêmico em 12px e texto de contato sem sublinhado.
+17. **Change landing-nova:** as decisões 7, 8, 9 e 13 deixam de valer onde falam em controles “sem navegação”, “Saiba mais” e nos títulos antigos dos cartões institucionais. Os cartões, a busca, o menu e o rodapé navegam, inclusive para as rotas futuras, que mostram a página “não encontrada” até serem criadas. Veja “16-landing-nova.png” acima.
 
 ## Cadastro de doação: integração com o backend (Xano)
 
@@ -108,6 +139,8 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 ![Comece por aqui](02-comece-aqui.png)
 
 ![Seção institucional e rodapé](03-secao-institucional-e-rodape.png)
+
+![Nova landing (change landing-nova)](16-landing-nova.png)
 
 ## Novas telas
 
@@ -304,7 +337,7 @@ O que segue o Figma:
 - **“Doações disponíveis”** (`h2` em `#166B3B`), com o contador “1 item” ou “N itens” em `#555555` ao lado.
 - **Cartões iguais aos da home:** foto (ou a imagem genérica), título, “Condição: …”, NOVO para doações de até 7 dias e “Acessar”, que leva a `/doacao/<id>` do item.
   - Ficam numa grade `repeat(auto-fill, minmax(220px, 1fr))` com 24 px entre os cartões: 5 colunas a 1512 px e 1 a 360 px.
-  - Na grade, o cartão ocupa a largura da célula, em vez dos 280 px fixos do carrossel da home.
+  - Na grade, o cartão ocupa a largura da célula, em vez do tamanho fixo do carrossel da home (260 px desde a change landing-nova).
 - **Estado vazio (`perfil-doador-02`):** cartão branco centralizado com “Nenhuma doação disponível no momento” (`#166B3B`, negrito), a frase “Quando <nome> publicar uma nova doação, ela aparece aqui.” e o link “Explorar outras doações” (`#007A42`), que leva à home até existir uma página de explorar. Sem contador e sem paginação.
 
 Diferenças aprovadas em relação ao Figma:
@@ -404,7 +437,9 @@ Diferenças aprovadas em relação ao Figma:
 
 ### Link “Minhas doações” no cabeçalho da home
 
-- Com login, o cabeçalho da home mostra “Minhas doações” antes de “Olá, <primeiro nome>”, com o ícone `package`, em `#168447` (4,8:1 sobre o branco), levando a `/minhas-doacoes`. A partir de 1280 px, o espaço até “Olá” é de 32 px, o mesmo dos itens do menu (“Explorar Doações”, “Como funciona”, “Categorias”).
+> **Substituído pela change landing-nova:** “Minhas doações” passou a ser item do menu da conta (veja “16-landing-nova.png”). O texto abaixo fica como histórico. A regra de fonte de 14 px e 12 px entre os itens do menu, entre 992 e 1279 px, continua valendo.
+
+- Com login, o cabeçalho da home mostrava “Minhas doações” antes de “Olá, <primeiro nome>”, com o ícone `package`, em `#168447` (4,8:1 sobre o branco), levando a `/minhas-doacoes`. A partir de 1280 px, o espaço até “Olá” é de 32 px, o mesmo dos itens do menu (“Explorar Doações”, “Como funciona”, “Categorias”).
 - Abaixo de 1280 px, aparece só o ícone, com o rótulo acessível “Minhas doações” e 44 px de área de toque.
 - **Nada quebra linha no cabeçalho entre 768 e 1512 px:**
   - “Olá, <primeiro nome>” aparece em todas as larguras, sempre numa linha só, com reticências num nome longo (até 100 px abaixo de 1280 px e 120 px a partir dele);

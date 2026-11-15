@@ -113,11 +113,11 @@ Somente a pessoa dona MUST poder apagar uma doação, de qualquer status. A excl
 - **THEN** o endpoint MUST recusar a requisição sem remover nada
 
 ### Requirement: Link “Minhas doações” no cabeçalho da home
-O cabeçalho autenticado da home MUST mostrar o link “Minhas doações”, que leva a `/minhas-doacoes`. O cabeçalho de visitante MUST NOT mostrar esse link.
+O cabeçalho autenticado da home MUST oferecer “Minhas doações”, que leva a `/minhas-doacoes`, como item do menu da conta. O cabeçalho de visitante MUST NOT mostrar esse link.
 
 #### Scenario: Pessoa logada na home
-- **WHEN** a home está com o cabeçalho autenticado
-- **THEN** o cabeçalho MUST mostrar “Minhas doações” ao lado de “Olá, <primeiro nome>” e “Sair”, levando a `/minhas-doacoes`
+- **WHEN** a home está com o cabeçalho autenticado e a pessoa abre o menu da conta
+- **THEN** o menu MUST mostrar “Minhas doações”, junto de “Editar perfil” e “Sair”, levando a `/minhas-doacoes`
 
 #### Scenario: Visitante na home
 - **WHEN** a home está com o cabeçalho de visitante

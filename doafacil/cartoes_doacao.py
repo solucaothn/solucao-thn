@@ -103,8 +103,15 @@ def _parse_donations(
     return donations
 
 
+# Lado do cartão quadrado do carrossel da home (change landing-nova): divide a
+# largura do carrossel em 4 (descontando os 3 espaços de 20 px), entre 220 e
+# 260 px. O 100% é a largura do carrossel. Abaixo de 220 px por cartão, o
+# carrossel rola; em 360 px, cada cartão tem 220 px (cerca de 61% da tela).
+RECENT_CARD_SIZE = "clamp(220px, calc((100% - 60px) / 4), 260px)"
+
+
 def donation_card(donation: rx.Var[dict[str, Any]]) -> rx.Component:
-    """Cartão da home (carrossel), com 280 px fixos.
+    """Cartão da home (carrossel), quadrado com RECENT_CARD_SIZE de lado.
 
     Um argumento só: o rx.foreach passa o índice como segundo argumento.
     """
@@ -123,7 +130,7 @@ def _donation_card(
     size_props: dict[str, str] = (
         {"min_width": "0", "width": "100%", "max_width": "none"}
         if fluid
-        else {"min_width": "280px", "width": "280px", "max_width": "280px"}
+        else {"min_width": RECENT_CARD_SIZE, "width": RECENT_CARD_SIZE, "max_width": RECENT_CARD_SIZE}
     )
     return rx.box(
         rx.cond(

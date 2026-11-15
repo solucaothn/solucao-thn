@@ -185,16 +185,16 @@ A aplicação SHALL permitir que a pessoa navegue entre as telas públicas de lo
 - **THEN** a aplicação navega para `/`
 
 ### Requirement: Identidade da sessão no cabeçalho da home
-A home SHALL representar a sessão autenticada com o primeiro nome da pessoa e permitir que ela encerre a sessão sem adicionar persistência própria em armazenamento do navegador.
+A home SHALL representar a sessão autenticada com o primeiro nome da pessoa, num menu da conta, e permitir que ela encerre a sessão por esse menu, sem adicionar persistência própria em armazenamento do navegador.
 
 #### Scenario: Exibir pessoa autenticada
 - **WHEN** a consulta autenticada da conta retorna um nome válido
-- **THEN** o cabeçalho exibe “Olá, <primeiro nome>” e o botão “Sair” no lugar de “Entrar”
+- **THEN** o cabeçalho exibe, no lugar de “Entrar”, o menu da conta com a inicial e o primeiro nome, e o menu oferece “Sair”
 - **AND** mantém o botão “Quero Doar”
 
 #### Scenario: Consulta da conta falha sem rejeitar o token
 - **WHEN** a consulta falha por rede, configuração ou erro do serviço que não indique token inválido
-- **THEN** a home permanece disponível e o cabeçalho exibe “Minha conta”
+- **THEN** a home permanece disponível e o menu da conta exibe “Minha conta”
 - **AND** o carregamento da contagem e das doações recentes continua independente
 
 #### Scenario: Token rejeitado
@@ -203,7 +203,7 @@ A home SHALL representar a sessão autenticada com o primeiro nome da pessoa e p
 - **AND** mantém a home pública disponível
 
 #### Scenario: Encerrar sessão
-- **WHEN** a pessoa aciona “Sair”
+- **WHEN** a pessoa aciona “Sair” no menu da conta
 - **THEN** a aplicação limpa o token e o nome do estado transitório
 - **AND** permanece na home com o cabeçalho de visitante
 

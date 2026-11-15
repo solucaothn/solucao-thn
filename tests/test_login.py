@@ -695,21 +695,22 @@ class LoginPageTests(unittest.TestCase):
         self.assertIn("on_click", getattr(enter, "event_triggers", {}))
         self.assertIn("/login", str(enter.event_triggers["on_click"]))
 
+        # Change landing-nova: o “Sair” fica no menu da conta, junto do nome.
         logout = next(
             node
             for node in nodes
-            if type(node).__name__ == "Button"
-            and _component_text(node) == "Sair"
+            if type(node).__name__ == "DropdownMenuItem"
+            and "Sair" in _component_text(node)
         )
-        self.assertIn("on_click", getattr(logout, "event_triggers", {}))
-        self.assertIn("LoginState.logout", str(logout.event_triggers["on_click"]))
-        self.assertTrue(
-            any("Olá," in _component_text(node) for node in nodes)
-        )
+        self.assertIn("on_select", getattr(logout, "event_triggers", {}))
+        self.assertIn("LoginState.logout", str(logout.event_triggers["on_select"]))
+        self.assertIn("home-account-menu", str(page))
         self.assertIn("account_name", str(page))
 
+        # Só o “Entrar”, os itens do menu da conta e a busca têm eventos.
+        allowed = {"DropdownMenuItem", "Form"}
         for node in nodes:
-            if node not in (enter, logout):
+            if node is not enter and type(node).__name__ not in allowed:
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
     def test_messages_link_only_in_authenticated_header(self) -> None:
