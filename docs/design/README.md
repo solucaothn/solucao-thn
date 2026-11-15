@@ -149,7 +149,7 @@ As telas de referência adicionadas são:
 
 1. **Item:** nome da doação.
 2. **Detalhes:** descrição, categoria existente e condição (Ótimo, Bom ou Regular).
-3. **Fotos:** pelo menos uma e até cinco imagens JPEG, PNG, GIF ou WEBP são necessárias para continuar no wizard e publicar a doação.
+3. **Fotos:** pelo menos uma e até cinco imagens JPEG, PNG, GIF ou WEBP, de até 5 MB cada, são necessárias para continuar no wizard e publicar a doação. Veja “Passo 3: fotos” abaixo.
 4. **Entrega:** modalidade (Retirada, Entrega ou A combinar) e cidade/UF do perfil, sem endereço específico.
 5. **Contato e publicação:** preferência (WhatsApp, E-mail ou Chat do DoaFácil), sem solicitar telefone ou outro identificador de contato.
 
@@ -157,6 +157,47 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 
 - **Seta de retorno:** fica no canto superior esquerdo, logo abaixo do cabeçalho, numa faixa de largura total com recuo lateral de 1,25 rem, como no PNG. Não acompanha a coluna centralizada do wizard, fica na mesma posição nas cinco etapas e leva à home (`/`), com o rótulo acessível “Voltar ao início”.
 - **Cor dos campos de texto:** em “Nome do item” e “Descrição”, o texto digitado ou colado usa `#1F1F1F`, opaco, aplicado direto no campo para não depender do tema claro ou escuro do sistema. O placeholder usa `#6B6B6B`, igual aos outros formulários, para não parecer texto digitado, e volta a aparecer quando o campo é apagado. Como o placeholder herda o `-webkit-text-fill-color` do campo, a cor dele também é definida nessa propriedade. Os prompts de seleção (“Selecione uma categoria” etc.) e as preferências de contato continuam `#333333`.
+- **Selects brancos (change fotos-formulario-doacao):** os quatro selects (Categoria, Condição do item, Forma de entrega e Preferência de contato) usam o select compartilhado de `doafacil/campos.py`, com o estilo no botão visível:
+  - fundo branco, borda `#C8C8C8`, 40 px, texto `#1F1F1F`, placeholder `#333333` e foco `#007A42`;
+  - antes, o estilo ficava no `Root`, e o botão aparecia cinza, como se estivesse desativado.
+
+### Passo 3: fotos (change fotos-formulario-doacao, sem frame novo no Figma)
+
+- **Texto:** “Adicione de 1 a 5 fotos. A primeira foto é a capa da doação.” No lugar de “Você pode publicar sem fotos.”, que contradizia a regra.
+- **Área de escolha:** a mesma área tracejada, agora acessível pelo teclado (Enter ou Espaço).
+  - A ajuda é “JPEG, PNG, GIF ou WEBP · até 5 MB · até 5 fotos · a primeira é a capa”, em `#555555`.
+  - O ícone é `#168447`.
+  - Com 5 fotos, a área fica desativada e mostra “Limite de 5 fotos atingido”.
+- **Cada escolha soma às anteriores:**
+  - aparece “Preparando fotos...” enquanto as fotos são preparadas, e depois o contador “N de 5 fotos”, anunciado ao leitor de tela;
+  - as mensagens de erro são as atuais: formato e limite (“Selecione até cinco imagens JPEG, PNG, GIF ou WEBP.”), tamanho (“A foto pode ter no máximo 5 MB.”), arquivo vazio e leitura;
+  - as fotos já aceitas ficam.
+- **Lista vertical** (o wizard tem até 360 px). Uma linha por foto:
+  - a miniatura de 72 px (`object-fit: cover`), com o texto alternativo “Foto N de M”;
+  - “Foto N” e, só na primeira, o selo **“Capa”** (pílula `#E8F5EC` com texto `#166B3B`, 5,8:1);
+  - quatro botões de ícone de 44 × 44 px, com contorno `#C8C8C8` e foco `#007A42`:
+
+    | Botão | Ícone | Desativado quando |
+    |---|---|---|
+    | “Mover foto N para a esquerda” | `chevron-left` | é a primeira foto |
+    | “Mover foto N para a direita” | `chevron-right` | é a última foto |
+    | “Tornar foto N a capa” | `star` | já é a capa |
+    | “Remover foto N” | `trash-2`, em `#B42318` | nunca |
+
+  - Os botões quebram para outra linha quando não cabem, sem rolagem horizontal. Desativados, ficam em cinza claro, sem opacidade parcial.
+- **Foco e avisos:** depois de mover, tornar capa ou remover, o foco volta ao botão correspondente, e um aviso curto (“Foto movida para a posição 2.”, “Foto definida como capa.”, “Foto removida.”) é anunciado.
+- **Sem arrastar.** Também saíram a lista de nomes de arquivo e “Remover todas”.
+- **A ordem da tela é a ordem salva:** a primeira foto é a capa nos cartões e no detalhe.
+- **Arquivo enviado:** sem metadados, em pé, com no máximo 1600 px. É PNG só quando há transparência real; nos outros casos, JPEG.
+- **Foco dos botões do wizard:** “Voltar”, “Continuar” e “Publicar doação” têm anel `2px solid #007A42`, no lugar do azul do tema.
+
+### Depois de publicar (change fotos-formulario-doacao)
+
+- A página vai para o detalhe da nova doação (`/doacao/<id>`). O passo 5 não mostra mais a mensagem de sucesso.
+- No detalhe, uma faixa `#E8F5EC` no topo do conteúdo mostra “Doação publicada!”, em `#166B3B` negrito, e o link sublinhado “Minhas doações” (`#007A42`, 44 px de altura), anunciados ao leitor de tela (`role="status"`).
+  - A faixa aparece só nessa chegada e fica até sair da página, sem botão de fechar.
+  - Recarregar o detalhe ou abrir outra doação não a mostra.
+  - Ela quebra a linha em 360 px e não tem animação própria.
 
 ## Recuperação de senha
 

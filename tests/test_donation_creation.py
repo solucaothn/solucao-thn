@@ -24,11 +24,42 @@ from doafacil.cadastro_doacao import (
     _step_one,
     _step_two,
     _validate_step,
-    _validated_photos,
     donation_creation_page,
     _wizard_content,
 )
 from doafacil.doafacil import FIELD_PLACEHOLDER_SELECTOR, FIELD_TEXT_SELECTOR, app
+from doafacil.fotos_doacao import FORMAT_MESSAGE, check_file
+
+# Fotos já preparadas (change fotos-formulario-doacao): a lista da tela e as
+# versões guardadas no servidor, na ordem escolhida.
+READY_PHOTOS = [{"id": "b", "thumb": "data:image/png;base64,AA"}, {"id": "a", "thumb": "data:image/png;base64,AA"}]
+READY_FILES = {"a": (b"bytes-a", "image/jpeg", "jpg"), "b": (b"bytes-b", "image/png", "png")}
+
+
+def _publish_state(**overrides) -> SimpleNamespace:
+    base = dict(
+        is_publishing=False,
+        published=False,
+        auth_token="test-token",
+        current_step=5,
+        title="Mesa",
+        description="Em bom estado",
+        category_id="3",
+        condition="Bom",
+        delivery_method="A combinar",
+        contact_preference="E-mail",
+        categories=[{"id": 3, "name": "Livros"}],
+        city="Recife",
+        state="PE",
+        donation_error_message="",
+        upload_progress="",
+        photos=list(READY_PHOTOS),
+        photos_busy=False,
+        photo_notice="",
+        _photo_files=dict(READY_FILES),
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
 
 
 class DonationCreationTests(unittest.TestCase):
@@ -229,29 +260,31 @@ class DonationCreationTests(unittest.TestCase):
             state="",
             donation_error_message="",
         )
-        DonationCreateState.advance.fn(state, [])
+        DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 1)
         self.assertIn("nome", state.donation_error_message)
 
         state.title = "Mesa"
         state.donation_error_message = ""
-        DonationCreateState.advance.fn(state, [])
+        DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 2)
         self.assertEqual(state.title, "Mesa")
         DonationCreateState.go_back.fn(state)
         self.assertEqual(state.current_step, 1)
         self.assertEqual(state.title, "Mesa")
 
-    def test_photo_step_requires_at_least_one_selected_file(self) -> None:
+    def test_photo_step_requires_at_least_one_photo(self) -> None:
         state = SimpleNamespace(
             is_loading_data=False,
             is_publishing=False,
             published=False,
             current_step=3,
             donation_error_message="",
+            photos=[],
+            photos_busy=False,
         )
 
-        DonationCreateState.advance.fn(state, [])
+        DonationCreateState.advance.fn(state)
 
         self.assertEqual(state.current_step, 3)
         self.assertEqual(
@@ -259,48 +292,34 @@ class DonationCreationTests(unittest.TestCase):
             "Adicione pelo menos uma foto para continuar.",
         )
 
-        selected_photo = SimpleNamespace(
-            name="brinquedo.jpg",
-            content_type="image/jpeg",
-        )
-        DonationCreateState.advance.fn(state, [selected_photo])
+        # Enquanto as fotos são preparadas, “Continuar” não avança.
+        state.photos = list(READY_PHOTOS)
+        state.photos_busy = True
+        DonationCreateState.advance.fn(state)
+        self.assertEqual(state.current_step, 3)
 
+        state.photos_busy = False
+        DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 4)
         self.assertEqual(state.donation_error_message, "")
 
+        # “Continuar” não envia arquivos: as fotos já estão no servidor.
         continue_button = next(
             node
             for node in _component_nodes(_wizard_content())
             if type(node).__name__ == "Button"
             and _component_text(node.children) == ["Continuar"]
         )
-        continue_event = continue_button.event_triggers["on_click"].events[0]
-        self.assertEqual(continue_event.client_handler_name, "uploadFiles")
-        self.assertIn(PHOTO_UPLOAD_ID, str(continue_event.args))
+        rendered = str(continue_button)
+        self.assertNotIn("uploadFiles", rendered)
+        self.assertIn("advance", rendered)
+        self.assertIn("photos_busy_rx_state_", rendered)
 
     def test_upload_validation_accepts_images_and_rejects_invalid_files(self) -> None:
-        image = SimpleNamespace(
-            name="mesa.webp",
-            content_type="image/webp",
-        )
-        self.assertEqual(
-            _validated_photos([image]),
-            [("mesa.webp", b"", IMAGE_TYPES[".webp"])],
-        )
-        for invalid in (
-            SimpleNamespace(name="documento.pdf", content_type="application/pdf"),
-            SimpleNamespace(name="mesa.jpg", content_type="image/png"),
-        ):
-            with self.subTest(filename=invalid.name):
-                with self.assertRaises(DonationServiceError):
-                    _validated_photos([invalid])
-        with self.assertRaises(DonationServiceError):
-            _validated_photos(
-                [
-                    SimpleNamespace(name=f"{index}.jpg", content_type="image/jpeg")
-                    for index in range(6)
-                ]
-            )
+        self.assertEqual(check_file("mesa.webp", IMAGE_TYPES[".webp"], 10), "")
+        for name, mime in (("documento.pdf", "application/pdf"), ("mesa.jpg", "image/png")):
+            with self.subTest(filename=name):
+                self.assertEqual(check_file(name, mime, 10), FORMAT_MESSAGE)
 
     def test_category_request_parses_returned_options(self) -> None:
         payload = [
@@ -443,7 +462,10 @@ class DonationCreationTests(unittest.TestCase):
             published=True,
             donation_error_message="Erro anterior",
             upload_progress="Upload anterior",
-            success_message="Doação publicada!",
+            photos=list(READY_PHOTOS),
+            photos_busy=True,
+            photo_notice="Foto removida.",
+            _photo_files=dict(READY_FILES),
         )
 
         async def load() -> list[object]:
@@ -476,8 +498,12 @@ class DonationCreationTests(unittest.TestCase):
         self.assertEqual(state.delivery_method, "")
         self.assertEqual(state.contact_preference, "")
         self.assertEqual(state.donation_error_message, "")
-        self.assertEqual(state.success_message, "")
         self.assertEqual(state.upload_progress, "")
+        # Reinício: as fotos guardadas no servidor e as miniaturas são apagadas.
+        self.assertEqual(state.photos, [])
+        self.assertEqual(state._photo_files, {})
+        self.assertFalse(state.photos_busy)
+        self.assertEqual(state.photo_notice, "")
         self.assertFalse(state.published)
         self.assertFalse(state.is_publishing)
         self.assertFalse(state.is_loading_data)
@@ -487,13 +513,13 @@ class DonationCreationTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertIn(PHOTO_UPLOAD_ID, repr(events[0]))
 
-        DonationCreateState.advance.fn(state, [])
+        DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 1)
         self.assertIn("nome", state.donation_error_message)
 
         state.current_step = 3
         state.donation_error_message = ""
-        DonationCreateState.advance.fn(state, [])
+        DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 3)
         self.assertEqual(
             state.donation_error_message,
@@ -670,28 +696,11 @@ class DonationCreationTests(unittest.TestCase):
             )
 
         client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
-        state = SimpleNamespace(
-            is_publishing=False,
-            published=False,
-            auth_token="test-token",
-            current_step=5,
-            title="Mesa",
-            description="Em bom estado",
-            category_id="3",
-            condition="Bom",
-            delivery_method="A combinar",
-            contact_preference="E-mail",
-            categories=[{"id": 3, "name": "Livros"}],
-            city="Recife",
-            state="PE",
-            donation_error_message="",
-            success_message="",
-            upload_progress="",
-        )
+        state = _publish_state()
 
         async def publish() -> list[object]:
             events = []
-            async for event in DonationCreateState.publish.fn(state, []):
+            async for event in DonationCreateState.publish.fn(state):
                 events.append(event)
             return events
 
@@ -722,8 +731,10 @@ class DonationCreationTests(unittest.TestCase):
         )
         self.assertFalse(state.published)
         self.assertFalse(state.is_publishing)
-        self.assertEqual(state.success_message, "")
         self.assertEqual(state.upload_progress, "")
+        # As fotos e a ordem ficam para uma nova tentativa.
+        self.assertEqual(state.photos, READY_PHOTOS)
+        self.assertEqual(state._photo_files, READY_FILES)
 
     def test_publication_rejects_success_response_without_valid_donation(
         self,
@@ -759,28 +770,11 @@ class DonationCreationTests(unittest.TestCase):
         client = httpx.AsyncClient(
             transport=httpx.MockTransport(respond)
         )
-        state = SimpleNamespace(
-            is_publishing=False,
-            published=False,
-            auth_token="test-token",
-            current_step=5,
-            title="Mesa",
-            description="Em bom estado",
-            category_id="3",
-            condition="Bom",
-            delivery_method="A combinar",
-            contact_preference="E-mail",
-            categories=[{"id": 3, "name": "Livros"}],
-            city="Recife",
-            state="PE",
-            donation_error_message="",
-            success_message="",
-            upload_progress="",
-        )
+        state = _publish_state()
 
         async def publish() -> list[object]:
             events = []
-            async for event in DonationCreateState.publish.fn(state, []):
+            async for event in DonationCreateState.publish.fn(state):
                 events.append(event)
             return events
 
@@ -800,80 +794,69 @@ class DonationCreationTests(unittest.TestCase):
         self.assertEqual(state.description, "Em bom estado")
         self.assertEqual(state.category_id, "3")
         self.assertFalse(state.published)
-        self.assertEqual(state.success_message, "")
         self.assertIn("mantidos", state.donation_error_message)
+        self.assertEqual(state.photos, READY_PHOTOS)
+        self.assertEqual(state._photo_files, READY_FILES)
 
-    def test_upload_read_failure_keeps_form_available_for_retry(self) -> None:
-        class UnreadablePhoto:
-            name = "mesa.jpg"
-            content_type = "image/jpeg"
+    def test_publish_without_photos_or_with_missing_file_does_not_send(self) -> None:
+        async def publish(state) -> list[object]:
+            return [event async for event in DonationCreateState.publish.fn(state)]
 
-            async def read(self) -> bytes:
-                raise OSError("file read failed")
+        with patch("doafacil.cadastro_doacao.httpx.AsyncClient") as client:
+            empty = _publish_state(photos=[], _photo_files={})
+            asyncio.run(publish(empty))
+            self.assertEqual(empty.donation_error_message, "Adicione pelo menos uma foto para continuar.")
+            missing = _publish_state(_photo_files={"a": READY_FILES["a"]})
+            asyncio.run(publish(missing))
+            self.assertIn("uma das imagens", missing.donation_error_message)
+        client.assert_not_called()
+        self.assertFalse(empty.published or missing.published)
 
-        state = SimpleNamespace(
-            is_publishing=False,
-            published=False,
-            auth_token="test-token",
-            current_step=5,
-            title="Mesa",
-            description="Em bom estado",
-            category_id="3",
-            condition="Bom",
-            delivery_method="A combinar",
-            contact_preference="E-mail",
-            categories=[{"id": 3, "name": "Livros"}],
-            city="Recife",
-            state="PE",
-            donation_error_message="",
-            success_message="",
-            upload_progress="",
-        )
-
-        async def publish(files: list[object]) -> list[object]:
-            events = []
-            async for event in DonationCreateState.publish.fn(state, files):
-                events.append(event)
-            return events
-
-        asyncio.run(publish([UnreadablePhoto()]))
-
-        self.assertFalse(state.published)
-        self.assertFalse(state.is_publishing)
-        self.assertEqual(state.title, "Mesa")
-        self.assertEqual(state.upload_progress, "")
-        self.assertEqual(state.success_message, "")
-        self.assertIn("uma das imagens", state.donation_error_message)
+    def test_successful_publication_sends_in_order_clears_photos_and_goes_to_detail(self) -> None:
+        bodies: list[bytes] = []
 
         async def respond(request: httpx.Request) -> httpx.Response:
+            bodies.append(await request.aread())
             return httpx.Response(
                 200,
-                json={
-                    "donation": {
-                        "id": 12,
-                        "status": "disponível",
-                    }
-                },
+                json={"donation": {"id": 12, "status": "disponível"}},
                 request=request,
             )
 
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(respond)
-        )
-        with (
-            patch.dict(
-                "os.environ",
-                {"XANO_API_URL": "https://xano.example/api:catalog"},
-            ),
-            patch(
-                "doafacil.cadastro_doacao.httpx.AsyncClient",
-                return_value=client,
-            ),
-        ):
-            asyncio.run(publish([]))
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        state = _publish_state()
 
+        async def publish() -> list[object]:
+            return [event async for event in DonationCreateState.publish.fn(state)]
+
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.cadastro_doacao.httpx.AsyncClient", return_value=client),
+            patch("doafacil.cadastro_doacao.rx.redirect", side_effect=lambda path: f"redirect:{path}"),
+        ):
+            events = asyncio.run(publish())
+
+        body = bodies[0]
+        # A ordem da tela (b, depois a) é a ordem das partes photos[], com os
+        # nomes foto-1.<ext> e foto-2.<ext> e os bytes preparados.
+        first = body.index(b'filename="foto-1.png"')
+        second = body.index(b'filename="foto-2.jpg"')
+        self.assertLess(first, second)
+        self.assertLess(body.index(b"bytes-b"), body.index(b"bytes-a"))
+        self.assertEqual(body.count(b'name="photos[]"'), 2)
+        # Publicada: as fotos guardadas são apagadas e a página vai ao detalhe
+        # com o aviso.
         self.assertTrue(state.published)
-        self.assertIn("publicada", state.success_message)
+        self.assertFalse(state.is_publishing)
+        self.assertEqual((state.photos, state._photo_files), ([], {}))
+        self.assertEqual(events[-1], "redirect:/doacao/12")
+        self.assertIn("set_published_notice", repr(events[-2]))
+        self.assertIn("12", repr(events[-2]))
+
+        # Um segundo clique não publica de novo.
+        with patch("doafacil.cadastro_doacao.httpx.AsyncClient") as again:
+            asyncio.run(publish())
+        again.assert_not_called()
 
     def test_form_page_is_registered_with_animation_and_five_step_indicator(
         self,
@@ -1031,7 +1014,16 @@ class DonationCreationTests(unittest.TestCase):
             node for node in nodes if type(node).__name__ == "SelectContent"
         ]
         self.assertEqual(len(select_roots), 4)
-        self.assertTrue(all(node.color == "#333333" for node in select_roots))
+        # Change fotos-formulario-doacao: o estilo fica no botão visível
+        # (Trigger), com fundo branco, borda #C8C8C8, texto #1F1F1F e foco
+        # verde, nos quatro selects; antes, no Root, o botão ficava cinza.
+        for field_id, trigger in select_triggers.items():
+            with self.subTest(trigger=field_id):
+                rendered_trigger = str(trigger)
+                self.assertIn('["background"] : "#FFFFFF"', rendered_trigger)
+                self.assertIn('["border"] : "1px solid #C8C8C8"', rendered_trigger)
+                self.assertIn('["color"] : "#1F1F1F"', rendered_trigger)
+                self.assertIn("2px solid #007A42", rendered_trigger)
         self.assertEqual(len(select_contents), 4)
         self.assertTrue(
             all(_literal(node.high_contrast) is True for node in select_contents)
@@ -1083,6 +1075,21 @@ def _component_nodes(component: object) -> list[object]:
 
 def _literal(value: object) -> object:
     return getattr(value, "_var_value", value)
+
+
+class WizardFocusTests(unittest.TestCase):
+    """Foco verde dos botões do wizard (change fotos-formulario-doacao, decisão 5c)."""
+
+    def test_back_continue_and_publish_have_green_focus(self) -> None:
+        from doafacil.cadastro_doacao import WIZARD_FOCUS, _wizard_content
+
+        rendered = str(_wizard_content())
+        self.assertEqual(WIZARD_FOCUS["outline"], "2px solid #007A42")
+        for label in ('"Voltar"', '"Continuar"', '"Publicar doa\\u00e7\\u00e3o"'):
+            with self.subTest(button=label):
+                self.assertIn(label, rendered)
+        # Os três botões do wizard com o anel verde, sem o azul do tema.
+        self.assertGreaterEqual(rendered.count('["&:focus-visible"] : ({ ["outline"] : "2px solid #007A42", ["outlineOffset"] : "2px", ["boxShadow"] : "none" })'), 3)
 
 
 if __name__ == "__main__":
