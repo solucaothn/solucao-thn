@@ -92,7 +92,7 @@ python -m unittest discover -s tests -v
 - Páginas "Como funciona" e "Categorias".
 - Botões e links da home que ainda não levam a lugar nenhum.
 
-Em aberto com o grupo: status e transições da doação, mensagens entre usuários, avaliações, moderação e o destino dos 3 endpoints antigos do modelo do Xano (`request_reset_link`, `magic-link-login` e `update_password`).
+Em aberto com o grupo: status e transições da doação, mensagens entre usuários, avaliações e moderação. O destino dos endpoints antigos do modelo do Xano foi decidido: a change endpoints-publicos os remove (veja “Endpoints antigos do modelo do Xano” na seção 8).
 
 ## 8. Decisões já tomadas (não reabrir sem o grupo)
 
@@ -127,6 +127,42 @@ A senha é enviada ao Xano para validação no início e novamente na verificaç
 O estado de cadastro pendente é transitório no servidor Reflex: reiniciar o servidor ou abrir outra aba pode perdê-lo. Se a guarda da tela `/verificar-email` não encontrar o e-mail no estado, redireciona para `/recuperar-senha`; iniciar novamente o cadastro permite obter um novo estado de fluxo. No fluxo de cadastro, “Usar outro e-mail” limpa e-mail e senha e retorna a `/cadastro`.
 
 Nas validações Xano desse fluxo, e-mail e código usam verificações de comprimento com `strlen` em vez de padrões de regex com barra invertida. A senha segue as regras da conta: mínimo de oito caracteres, com letra e dígito.
+
+### Endpoints antigos do modelo do Xano (change endpoints-publicos)
+
+O workspace veio com endpoints do modelo “Quick Start” que o site nunca usou. A change endpoints-publicos remove estes cinco objetos, apagados pelo painel do Xano e não por push:
+
+| Objeto | Por que saiu |
+|---|---|
+| `POST /message/send_welcome_email` (Authentication) | público; enviava e-mail e gravava evento para qualquer `user_id`, e o erro revelava quais ids existem |
+| `GET /reset/request-reset-link` (Authentication) | público; gerava link mágico para qualquer e-mail, e o erro revelava quais e-mails têm conta |
+| `POST /reset/magic-link-login` (Authentication) | público; trocava o link mágico por uma sessão, fora do login |
+| `POST /reset/update_password` (Authentication) | trocava a senha com qualquer sessão, sem a regra da recuperação por código |
+| função `Quick Start/generate_magic_link` | usada só pelo `request-reset-link` |
+
+- **A recuperação de senha é só pelo código** (`reset/request_code`, `reset/verify_code` e `reset/confirm_password`). Não recrie link mágico nem troca de senha fora desse fluxo sem uma change aprovada.
+- **Ficam:** o campo `user.password_reset` (sem uso), a função `Quick Start/log_event`, a tabela `event_log` e o `logs/user/my_events`.
+- **Teste:** `tests/test_endpoints_publicos.py` confere que o site não cita essas rotas.
+
+#### Conferir os endpoints contra o Xano real
+
+O script `scripts/teste_endpoints_publicos_real.py` confere que os quatro endpoints removidos respondem 404 e que os de login, cadastro e recuperação continuam existindo. Não pede login e não cria dados: todo pedido usa uma entrada que falha mesmo com o endpoint no ar, então nenhum e-mail é enviado e nenhuma senha é trocada.
+
+Com a variável `XANO_AUTH_API_URL` definida (seção 4) e o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_endpoints_publicos_real.py --antes   # antes de apagar no painel
+python scripts/teste_endpoints_publicos_real.py           # depois
+```
+
+| Cenário | O que confere |
+|---|---|
+| EP1 a EP4 | `send_welcome_email`, `request-reset-link`, `magic-link-login` e `update_password`: com `--antes`, ainda existem (status diferente de 404); depois, respondem 404 |
+| EP5 | `auth/login` continua existindo |
+| EP6 | `reset/request_code`, `reset/verify_code` e `reset/confirm_password` continuam existindo |
+| EP7 | `auth/signup` continua existindo |
+
+O script imprime só o cenário, o status HTTP e OK/FALHOU. A pausa entre pedidos (1,5 s) pode ser trocada com a variável `TESTE_ENDPOINTS_PAUSA`.
 
 ### Fotos obrigatórias na publicação de doações
 
@@ -873,14 +909,11 @@ Não confunda: **pull** traz do GitHub para o seu PC, **push** leva do seu PC pa
 
 ## 10.1 Arquivos do Xano que nunca entram em commit
 
-Depois de um `xano pull`, 8 arquivos aparecem como modificados só por causa da quebra de linha (LF/CRLF). Eles **nunca** entram em commit:
+Depois de um `xano pull`, 5 arquivos aparecem como modificados só por causa da quebra de linha (LF/CRLF). Eles **nunca** entram em commit:
 
 - `xano/api/authentication/auth/login_POST.xs`
 - `xano/api/authentication/auth/me_GET.xs`
 - `xano/api/authentication/auth/signup_POST.xs`
-- `xano/api/authentication/message/send_welcome_email_POST.xs`
-- `xano/api/authentication/reset/magic_link_login_POST.xs`
-- `xano/api/authentication/reset/update_password_POST.xs`
 - `xano/function/quick_start/log_event.xs`
 - `xano/table/user.xs`
 
