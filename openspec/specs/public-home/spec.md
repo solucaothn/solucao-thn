@@ -16,8 +16,9 @@ A home SHALL apresentar o cabeçalho, a frase de destaque, as estatísticas “D
 
 #### Scenario: Links do menu do cabeçalho
 - **WHEN** uma pessoa aciona um item do menu do cabeçalho
-- **THEN** “Explorar Doações” MUST levar a `/explorar`, “Como funciona” a `/como-funciona` e “Categorias” a `/categorias`
-- **AND** os itens MUST ser links acessíveis pelo teclado, com foco visível
+- **THEN** “Explorar Doações” MUST levar a `/explorar` e “Como funciona” a `/como-funciona`
+- **AND** “Categorias” MUST abrir a gaveta de categorias (spec `donation-categories`), em vez de navegar
+- **AND** os itens MUST ser acessíveis pelo teclado, com foco visível
 
 #### Scenario: Cabeçalho em 360 px
 - **WHEN** a home é exibida com 360 px de largura, com ou sem sessão

@@ -707,9 +707,14 @@ class LoginPageTests(unittest.TestCase):
         self.assertIn("home-account-menu", str(page))
         self.assertIn("account_name", str(page))
 
-        # Só o “Entrar”, os itens do menu da conta e a busca têm eventos.
-        allowed = {"DropdownMenuItem", "Form"}
+        # Só o “Entrar”, os itens do menu da conta, a busca e a gaveta de
+        # categorias (change explorar-categorias) têm eventos.
+        allowed = {"DropdownMenuItem", "Form", "DialogRoot"}
         for node in nodes:
+            # O link de cada categoria da gaveta fecha a gaveta ao navegar.
+            if getattr(node, "class_name", None) == "category-link":
+                self.assertIn("close_drawer", str(node.event_triggers.get("on_click")))
+                continue
             if node is not enter and type(node).__name__ not in allowed:
                 self.assertFalse(getattr(node, "event_triggers", {}))
 

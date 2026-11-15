@@ -329,7 +329,8 @@ class PublicHomeTests(unittest.TestCase):
         state = self._load_home({"count": 8, "completed": 5})
         self.assertEqual((state.donation_count, state.completed_count), (8, 5))
         self.assertEqual((state.count_error, state.completed_error), ("", ""))
-        self.assertEqual(state.categories, [{"id": "4", "name": "Livros"}])
+        # O ícone serve à gaveta de categorias (change explorar-categorias).
+        self.assertEqual(state.categories, [{"id": "4", "name": "Livros", "icon": "book-open"}])
 
     def test_completed_error_keeps_the_available_count(self) -> None:
         state = self._load_home({"count": 8})
@@ -1016,13 +1017,22 @@ class PublicHomeTests(unittest.TestCase):
             {
                 "Explorar Doações": "/explorar",
                 "Como funciona": FUTURE_ROUTES["como_funciona"],
-                "Categorias": FUTURE_ROUTES["categorias"],
             },
         )
+        # “Categorias” abre a gaveta (change explorar-categorias) e deixou de
+        # ser rota futura.
+        self.assertNotIn("categorias", FUTURE_ROUTES)
+        header = str(page.children[0].children[0])
+        self.assertIn('className:"home-categories-trigger"', header)
+        self.assertIn("categories-drawer", header)
+        self.assertNotIn('to:"/categorias"', header)
 
-        # Eventos só no “Entrar”, nos itens do menu da conta e na busca.
+        # Eventos só no “Entrar”, nos itens do menu da conta, na busca e na
+        # gaveta de categorias.
         for node in _component_nodes(page):
-            if node is not enter_button and type(node).__name__ not in {"DropdownMenuItem", "Form"}:
+            if getattr(node, "class_name", None) == "category-link":
+                continue  # fecha a gaveta ao navegar (test_categories)
+            if node is not enter_button and type(node).__name__ not in {"DropdownMenuItem", "Form", "DialogRoot"}:
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
     def test_header_fits_360_px(self) -> None:
