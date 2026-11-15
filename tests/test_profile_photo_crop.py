@@ -19,6 +19,7 @@ from doafacil.recorte_foto import (
     ImageCropper,
     PhotoImageError,
     crop_box,
+    encode_limited,
     encode_square,
     image_cropper,
     make_preview,
@@ -286,6 +287,66 @@ class EncodeSquareTests(unittest.TestCase):
         box = crop_box(source.image.size, {"x": 0, "y": 0, "width": 250, "height": 250}, source.image.size)
         square, _, _ = encode_square(source, box)
         self.assertTrue(close_to(center_color(square), BLUE))
+
+
+class EncodeLimitedTests(unittest.TestCase):
+    """Fotos de doação (change fotos-formulario-doacao): imagem inteira, lado
+    maior de até 1600 px, sem ampliar, sem metadados; PNG só com transparência
+    real, e JPEG (qualidade 82, optimize) nos outros casos."""
+
+    def test_large_image_is_reduced_keeping_proportion(self) -> None:
+        source = prepare_source(encode(quadrants(4000, 3000), "PNG"))
+        content, mime, extension = encode_limited(source)
+        result = Image.open(BytesIO(content))
+        self.assertEqual(result.size, (1600, 1200))
+        # PNG sem transparência vira JPEG.
+        self.assertEqual((result.format, mime, extension), ("JPEG", "image/jpeg", "jpg"))
+
+    def test_png_only_with_real_transparency(self) -> None:
+        transparent = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
+        transparent.paste((20, 160, 60, 255), (100, 100, 200, 200))
+        content, mime, _ = encode_limited(prepare_source(encode(transparent, "PNG")))
+        result = Image.open(BytesIO(content))
+        self.assertEqual((result.format, mime), ("PNG", "image/png"))
+        self.assertEqual(result.convert("RGBA").getpixel((5, 5))[3], 0)
+        # Canal alfa, mas todo opaco: JPEG.
+        opaque = Image.new("RGBA", (300, 300), (20, 160, 60, 255))
+        content, mime, _ = encode_limited(prepare_source(encode(opaque, "PNG")))
+        self.assertEqual((Image.open(BytesIO(content)).format, mime), ("JPEG", "image/jpeg"))
+
+    def test_jpeg_quality_82_is_smaller_than_90(self) -> None:
+        from PIL import ImageFilter
+
+        noisy = Image.effect_noise((1200, 900), 60).convert("RGB").filter(ImageFilter.SMOOTH)
+        source = prepare_source(encode(noisy, "JPEG", quality=95))
+        q82, _, _ = encode_limited(source)
+        q90, _, _ = encode_limited(source, jpeg_quality=90)
+        self.assertLess(len(q82), len(q90))
+
+    def test_small_image_is_not_enlarged(self) -> None:
+        source = prepare_source(encode(quadrants(300, 200), "JPEG"))
+        content, mime, extension = encode_limited(source)
+        result = Image.open(BytesIO(content))
+        self.assertEqual(result.size, (300, 200))
+        self.assertEqual((result.format, mime, extension), ("JPEG", "image/jpeg", "jpg"))
+
+    def test_custom_limit_and_portrait(self) -> None:
+        source = prepare_source(encode(quadrants(1000, 3000), "PNG"))
+        content, _, _ = encode_limited(source, max_side=1500)
+        self.assertEqual(Image.open(BytesIO(content)).size, (500, 1500))
+        content, _, _ = encode_limited(source)
+        self.assertEqual(Image.open(BytesIO(content)).size, (533, 1600))
+
+    def test_no_metadata_and_orientation_applied(self) -> None:
+        source = prepare_source(with_orientation(quadrants(800, 600), 6))
+        content, mime, _ = encode_limited(source)
+        result = Image.open(BytesIO(content))
+        self.assertEqual(mime, "image/jpeg")
+        self.assertEqual(result.size, (600, 800))
+        self.assertEqual(dict(result.getexif()), {})
+        self.assertNotIn(b"CameraTeste", content)
+        self.assertNotIn(b"ModeloTeste", content)
+        self.assertNotIn("icc_profile", result.info)
 
 
 class ImageCropperComponentTests(unittest.TestCase):

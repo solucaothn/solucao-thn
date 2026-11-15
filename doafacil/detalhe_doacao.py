@@ -229,6 +229,15 @@ class DonationDetailState(LoginState):
     viewer_open: bool = False
     viewer_index: int = 0
     viewer_zoomed: bool = False
+    # Aviso “Doação publicada!” (change fotos-formulario-doacao): o cadastro
+    # informa o id antes de redirecionar; o load_donation mostra o aviso só
+    # para essa doação e consome o id (recarregar não mostra de novo).
+    published_notice_id: int = 0
+    show_published_notice: bool = False
+
+    @rx.event
+    def set_published_notice(self, donation_id: int) -> None:
+        self.published_notice_id = int(donation_id)
 
     @rx.var
     def donor_initial(self) -> str:
@@ -304,6 +313,13 @@ class DonationDetailState(LoginState):
         self.viewer_index = 0
         self.viewer_zoomed = False
         donation_id = self.router.page.params.get("id", "")
+        # O aviso de publicação vale uma vez, só para a doação recém-publicada.
+        notice_id = self.published_notice_id
+        self.published_notice_id = 0
+        try:
+            self.show_published_notice = notice_id > 0 and int(donation_id) == notice_id
+        except (TypeError, ValueError):
+            self.show_published_notice = False
 
         try:
             _positive_donation_id(donation_id)
@@ -1112,6 +1128,60 @@ def _donor_card_content() -> rx.Component:
     )
 
 
+PUBLISHED_NOTICE_TEXT = "Doação publicada!"
+PUBLISHED_NOTICE_LINK = "Minhas doações"
+TITLE_GREEN_NOTICE = "#166B3B"
+NOTICE_GREEN_BACKGROUND = "#E8F5EC"
+
+
+def _published_notice() -> rx.Component:
+    """Aviso depois de publicar pelo cadastro: “Doação publicada!” e o link
+    “Minhas doações”. Fica até sair da página, sem botão de fechar. Sem o
+    aviso, não ocupa espaço."""
+    notice = rx.flex(
+        rx.text(
+            PUBLISHED_NOTICE_TEXT,
+            color=TITLE_GREEN_NOTICE,
+            font_weight="700",
+        ),
+        rx.link(
+            PUBLISHED_NOTICE_LINK,
+            href="/minhas-doacoes",
+            display="inline-flex",
+            align_items="center",
+            min_height="44px",
+            color=PRIMARY_GREEN,
+            font_weight="700",
+            text_decoration="underline",
+            _focus_visible={
+                "outline": f"2px solid {PRIMARY_GREEN}",
+                "outlineOffset": "2px",
+            },
+        ),
+        role="status",
+        class_name="detail-published-notice",
+        align="center",
+        justify="between",
+        wrap="wrap",
+        column_gap="16px",
+        width="100%",
+        max_width="1440px",
+        margin="0 auto",
+        padding="4px 16px",
+        background=NOTICE_GREEN_BACKGROUND,
+        border_radius="8px",
+    )
+    return rx.cond(
+        DonationDetailState.show_published_notice,
+        rx.box(
+            notice,
+            padding=rx.breakpoints(initial="16px 16px 0", md="20px 24px 0"),
+            width="100%",
+        ),
+        rx.fragment(),
+    )
+
+
 def _donation_content() -> rx.Component:
     """Duas colunas no computador (como no Figma) e uma no celular.
 
@@ -1119,6 +1189,7 @@ def _donation_content() -> rx.Component:
     localização e quem doa. As áreas da grade fazem a troca de posição.
     """
     return rx.box(
+        _published_notice(),
         rx.box(
             rx.box(_gallery(), grid_area="gallery", min_width="0"),
             rx.box(_summary_card(), grid_area="summary", min_width="0"),

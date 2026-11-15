@@ -23,6 +23,7 @@ from doafacil.cadastro_doacao import (
     _api_endpoint,
     _fetch_categories,
 )
+from doafacil.campos import FIELD_BORDER, FIELD_TEXT, SELECT_PLACEHOLDER, field_label, select_field
 from doafacil.cartoes_doacao import GENERIC_DONATION_IMAGE
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
 from doafacil.detalhe_doacao import (
@@ -1434,70 +1435,13 @@ def my_donations_page() -> rx.Component:
 # Página: edição ---------------------------------------------------------------
 
 
-def _field_label(text: str, html_for: str) -> rx.Component:
-    return rx.el.label(
-        text,
-        html_for=html_for,
-        color="#333333",
-        font_weight="700",
-        font_size="0.8rem",
-        width="100%",
-    )
-
-
-EDIT_FIELD_TEXT = "#1F1F1F"
-EDIT_FIELD_BORDER = "1px solid #C8C8C8"
-EDIT_SELECT_PLACEHOLDER = "#333333"
-
-
-def _edit_select(
-    label: str,
-    options: tuple[str, ...] | rx.Var,
-    value: rx.Var,
-    on_change: Any,
-    placeholder: str,
-    field_id: str,
-) -> rx.Component:
-    """Select da edição com o estilo no Trigger (o botão visível): fundo
-    branco, borda e altura dos campos de texto, texto #1F1F1F e foco visível.
-    No Root, o estilo não chega ao botão, que ficava com o fundo cinza."""
-    if isinstance(options, rx.Var):
-        items = rx.foreach(options, lambda option: rx.select.item(option, value=option))
-    else:
-        items = [rx.select.item(option, value=option) for option in options]
-    return rx.vstack(
-        _field_label(label, field_id),
-        rx.select.root(
-            rx.select.trigger(
-                placeholder=placeholder,
-                id=field_id,
-                class_name="edit-donation-select",
-                width="100%",
-                height="40px",
-                background=WHITE,
-                color=EDIT_FIELD_TEXT,
-                border=EDIT_FIELD_BORDER,
-                border_radius="8px",
-                box_shadow="none",
-                cursor="pointer",
-                _focus_visible={
-                    "outline": f"2px solid {LINK_GREEN}",
-                    "outlineOffset": "1px",
-                },
-                style={
-                    "&[data-placeholder] .rt-SelectTriggerInner": {
-                        "color": EDIT_SELECT_PLACEHOLDER,
-                    },
-                },
-            ),
-            rx.select.content(rx.select.group(items), high_contrast=True),
-            value=value,
-            on_change=on_change,
-        ),
-        align="start",
-        spacing="2",
-        width="100%",
-    )
+# O rótulo e o select com o estilo no Trigger ficam em doafacil/campos.py
+# (compartilhados com o cadastro de doação); os nomes antigos continuam aqui.
+_field_label = field_label
+_edit_select = select_field
+EDIT_FIELD_TEXT = FIELD_TEXT
+EDIT_FIELD_BORDER = FIELD_BORDER
+EDIT_SELECT_PLACEHOLDER = SELECT_PLACEHOLDER
 
 
 def _edit_form() -> rx.Component:

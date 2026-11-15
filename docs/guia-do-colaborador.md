@@ -138,6 +138,62 @@ O campo `donation_photo.photo` é obrigatório. A auditoria confirmou que não h
 
 O endpoint `publish` foi criado por outro integrante e pode ter outros consumidores. Antes do push real de mudanças nele, avise o grupo, obtenha o OK explícito do grupo e a confirmação necessária para publicar. Revise o dry-run e interrompa a publicação se ele mostrar alterações fora do escopo aprovado.
 
+### Fotos no cadastro de doação (change fotos-formulario-doacao)
+
+O Xano não mudou.
+
+- **Ordem e capa:**
+  - o `publish_POST.xs` grava as fotos na ordem das partes `photos[]` (a `position` vai de 1 a N) e usa a primeira como capa (`donation.photo`);
+  - os cartões (`recent`, `donor` e `mine`) mostram a capa, e o detalhe mostra a capa e depois as `donation_photo` por `position`;
+  - por isso o site envia as fotos na ordem da tela.
+- **Fluxo no site** (`doafacil/cadastro_doacao.py`):
+  - cada escolha vai na hora ao servidor do Reflex (`add_photos`, pelo `on_drop` do `rx.upload`) e **soma** às fotos já aceitas, até 5;
+  - recusas pela própria tela (tipo, mais de 5 MB, mais de 5 numa escolha) passam pelo `photos_rejected`, sem requisição;
+  - remover, mover e tornar capa (`remove_photo`, `move_photo` e `make_cover`) só mudam a lista `photos`;
+  - o `publish` envia na ordem de `photos`, com os nomes `foto-1.<ext>`, `foto-2.<ext>` e assim por diante, e no sucesso vai para `/doacao/<id>` com o aviso “Doação publicada!”.
+- **Preparo de cada foto** (`doafacil/fotos_doacao.py`, com as funções de `doafacil/recorte_foto.py`):
+  - confere o tipo e o **limite de 5 MB** (“A foto pode ter no máximo 5 MB.”);
+  - corrige a orientação EXIF e **remove todos os metadados**, inclusive o GPS;
+  - reduz o lado maior para **no máximo 1600 px**, sem ampliar;
+  - usa **PNG só quando há algum pixel transparente**. Nos outros casos, inclusive PNG, GIF e WEBP sem transparência, usa **JPEG com qualidade 82 e `optimize`**;
+  - motivo: 5 fotos de celular passaram de cerca de 7 MB para 3,2 MB no envio, e 5 prints PNG, de 16,7 MB para 1,8 MB (decisão 4c do design);
+  - gera a miniatura de 240 px;
+  - uma imagem que o Pillow não abre recebe a mensagem de formato.
+- **Onde as fotos ficam:**
+  - na variável de backend `_photo_files` do `DonationCreateState`: só a versão preparada, nunca o arquivo como foi escolhido;
+  - sem Redis configurado, esse estado fica **na memória do processo do servidor do Reflex**. O navegador recebe só as miniaturas;
+  - elas são apagadas **ao remover** a foto, **ao publicar** com sucesso e **ao reiniciar** o cadastro (entrar, recarregar ou trocar de conta). Numa falha de publicação, ficam para uma nova tentativa.
+- **Selects:** os quatro selects do cadastro usam o `select_field` de `doafacil/campos.py`, com o estilo no Trigger (fundo branco). O `_edit_select` de `minhas_doacoes.py` é o mesmo componente.
+- **Foto pequena ou com a marca “POWERED BY XANO NOCODE BACKEND” no detalhe:** o Xano entrega o arquivo como foi guardado, o mesmo para qualquer `Accept`. Se a foto aparece pequena ou com marca, confira o arquivo de origem: no diagnóstico desta change, eram as fotos de teste que já vinham assim (decisão 5b do design).
+- **Foco:** “Voltar”, “Continuar” e “Publicar doação” têm o anel de foco verde `#007A42`.
+- **Testes:**
+  - `tests/test_donation_photos.py`: funções puras, estado, passo 3 e aviso no detalhe;
+  - `tests/test_donation_creation.py`: ordem e nomes no multipart, redirecionamento, selects e o foco verde dos botões do wizard;
+  - `tests/test_profile_photo_crop.py`: o `encode_limited`.
+
+#### Testar as fotos do cadastro contra o Xano real
+
+O script `scripts/teste_fotos_formulario_real.py` roda os cenários FF1 a FF8. Ele **cria uma doação de teste e a apaga no fim**, mesmo se der erro no meio. A medição FF8 cria e apaga mais duas.
+
+Antes de rodar, tenha **uma conta com cidade e estado no perfil** e as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas (seção 4). Com o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_fotos_formulario_real.py
+```
+
+| Cenário | O que confere |
+|---|---|
+| FF1 | a publicação com três fotos (vermelha, verde e azul, reordenadas para azul, vermelha, verde) cria uma doação disponível, com os nomes `foto-N` |
+| FF2 | o detalhe traz as fotos nessa ordem |
+| FF3 | a capa do detalhe e a de “Minhas doações” são a azul |
+| FF4 | a capa no perfil público é a azul |
+| FF5 | a foto com EXIF, marca, modelo e GPS chega sem metadados e em pé |
+| FF6 | a doação de teste é apagada |
+| FF7 | o detalhe dela responde 404 |
+| FF8 | medição: 5 fotos de celular publicadas com a regra antiga (2048 px, JPEG q90) e com a nova (1600 px, q82); imprime o preparo, os KB e o tempo da requisição ao Xano, e apaga as duas doações |
+
+O script não imprime nomes, e-mails, URLs, títulos nem corpos de resposta. A pausa entre requisições (2,5 s) pode ser trocada com a variável `TESTE_FOTOS_FORMULARIO_PAUSA`.
+
 ### Chat da doação (backend)
 
 O chat entre quem doa e quem tem interesse tem o backend no Xano (abaixo) e a tela em `/chat` (veja “Tela do chat” no fim desta seção).
@@ -590,7 +646,7 @@ A foto de perfil é da própria pessoa: os endpoints usam sempre o token, nunca 
   | `GET /catalog/chat/messages` | `other_user_photo`, só da **outra** pessoa |
 
   A foto vem nas respostas que já existiam, sem requisição a mais e sem consulta nova ao banco. O `start` do chat e o envio e a edição de mensagens não trazem a foto.
-- **Fotos de doação:** continuam sem limite de tamanho. Esse limite vale só para a foto de perfil.
+- **Fotos de doação:** desde a change fotos-formulario-doacao, também têm limite de 5 MB por foto, mas só na tela, e são preparadas antes do envio. O Xano continua sem limite de tamanho para elas. Veja “Fotos no cadastro de doação”.
 
 #### Foto de perfil nas telas
 

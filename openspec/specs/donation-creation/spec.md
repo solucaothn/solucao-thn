@@ -43,7 +43,7 @@ O sistema MUST permitir informar título do objeto, descrição, uma categoria e
 - **THEN** essa informação MUST ser coletada na segunda etapa e persistida com um dos três valores permitidos
 
 ### Requirement: Seleção de fotos da doação
-O sistema MUST permitir selecionar de uma a cinco imagens aceitas para uma doação e MUST informar visualmente o progresso de cada arquivo enquanto ele é processado. Arquivos que não sejam formatos de imagem aceitos pelo armazenamento do Xano, incluindo documentos PDF, MUST ser rejeitados com mensagem compreensível. O doador MUST selecionar pelo menos uma foto para avançar da etapa 3 e publicar pelo wizard, e o backend MUST também rejeitar publicações sem fotos.
+O sistema MUST permitir selecionar de uma a cinco imagens aceitas, de até 5 MB cada, para uma doação, mostrar uma miniatura de cada uma antes da publicação e permitir remover cada foto e mudar a ordem delas. A primeira foto é a capa. Arquivos que não sejam formatos de imagem aceitos pelo armazenamento do Xano, incluindo documentos PDF, MUST ser rejeitados com mensagem compreensível. O doador MUST selecionar pelo menos uma foto para avançar da etapa 3 e publicar pelo wizard, e o backend MUST também rejeitar publicações sem fotos.
 
 #### Scenario: Avanço com ao menos uma foto
 - **WHEN** o doador seleciona uma imagem aceita
@@ -51,21 +51,79 @@ O sistema MUST permitir selecionar de uma a cinco imagens aceitas para uma doaç
 - **THEN** o wizard MUST avançar para a etapa 4
 
 #### Scenario: Tentativa de avançar sem fotos
-- **WHEN** o doador clica em “Continuar” na etapa 3 sem selecionar arquivos
+- **WHEN** o doador clica em “Continuar” na etapa 3 sem fotos escolhidas, inclusive depois de remover todas
 - **THEN** o wizard MUST permanecer na etapa 3
 - **AND** MUST apresentar a mensagem “Adicione pelo menos uma foto para continuar.”
 
 #### Scenario: Seleção dentro do limite
 - **WHEN** o doador seleciona até cinco imagens aceitas
-- **THEN** o sistema MUST apresentar a quantidade e o progresso dos arquivos e enviar suas referências para persistência na publicação
+- **THEN** o sistema MUST apresentar a quantidade e uma miniatura de cada foto e enviá-las, na ordem escolhida, para persistência na publicação
+
+#### Scenario: Miniaturas logo após a escolha
+- **WHEN** o doador escolhe imagens aceitas na etapa 3
+- **THEN** a interface MUST mostrar, antes da publicação, uma miniatura de cada foto, na ordem atual, com a quantidade “N de 5”
+- **AND** MUST indicar que as fotos estão sendo preparadas enquanto as miniaturas não ficam prontas
+- **AND** cada miniatura MUST ter texto alternativo com a posição, como “Foto 2 de 3”
+
+#### Scenario: Capa
+- **WHEN** há fotos escolhidas
+- **THEN** a primeira foto MUST ser a capa e MUST mostrar o selo “Capa”, com texto e não só cor
+- **AND** nenhuma outra foto MUST mostrar o selo
+
+#### Scenario: Remover uma foto
+- **WHEN** o doador aciona “Remover foto N” numa miniatura
+- **THEN** somente essa foto MUST sair da seleção, e as demais MUST manter a ordem relativa
+- **AND** se a foto removida era a capa, a próxima MUST passar a ser a capa
+
+#### Scenario: Reordenar sem arrastar
+- **WHEN** o doador aciona “Mover para a esquerda” ou “Mover para a direita” numa foto
+- **THEN** a foto MUST trocar de lugar com a vizinha daquele lado
+- **AND** “Mover para a esquerda” MUST ficar indisponível na primeira foto e “Mover para a direita” na última
+- **WHEN** o doador aciona “Tornar capa” numa foto que não é a primeira
+- **THEN** essa foto MUST passar para a primeira posição, e as demais MUST manter a ordem relativa
+- **AND** “Tornar capa” MUST ficar indisponível na foto que já é a capa
+
+#### Scenario: Escolher mais fotos soma às já escolhidas
+- **WHEN** o doador, já com fotos escolhidas, escolhe mais imagens aceitas
+- **THEN** as novas MUST entrar depois das já escolhidas, sem substituí-las
 
 #### Scenario: Tentativa de ultrapassar o limite
-- **WHEN** o doador tenta manter mais de cinco imagens selecionadas
-- **THEN** o sistema MUST impedir a seleção excedente, informar o limite e manter os arquivos já aceitos
+- **WHEN** o doador tenta manter mais de cinco imagens escolhidas, numa escolha só ou somando escolhas
+- **THEN** o sistema MUST aceitar somente as imagens até completar cinco, na ordem da escolha, informar o limite e manter os arquivos já aceitos
+- **AND** com cinco fotos, a área de escolha MUST indicar que o limite foi atingido
+
+#### Scenario: Foto com mais de 5 MB
+- **WHEN** o doador escolhe uma imagem com mais de 5 MB
+- **THEN** a interface MUST recusá-la antes de aceitá-la, com a mensagem “A foto pode ter no máximo 5 MB.”, e MUST manter as fotos já aceitas
+
+#### Scenario: Foto preparada antes do envio
+- **WHEN** uma foto é aceita
+- **THEN** o arquivo enviado na publicação MUST estar na orientação em que a foto foi tirada (orientação EXIF aplicada)
+- **AND** MUST NOT conter metadados do original, como a localização (GPS), a data ou o modelo da câmera
+- **AND** MUST ter no máximo 1600 px no lado maior, mantendo a proporção, sem ampliar uma imagem menor
+- **AND** MUST ser PNG somente quando a imagem tem algum pixel transparente, preservando a transparência; nos outros casos, inclusive PNG, GIF (primeiro quadro) e WEBP sem transparência, MUST ser JPEG com compressão otimizada
+- **AND** o nome enviado MUST ser `foto-N.<ext>`, com N igual à posição na ordem escolhida, sem o nome original do arquivo
+
+#### Scenario: Arquivos guardados durante o cadastro
+- **WHEN** fotos escolhidas ficam guardadas no servidor da aplicação até a publicação
+- **THEN** o servidor MUST guardar somente a versão preparada de cada foto, nunca o arquivo como foi escolhido, e MUST NOT enviá-la ao navegador além da miniatura
+- **AND** MUST apagar a foto guardada quando ela é removida, todas as fotos guardadas quando a publicação é concluída e todas quando o cadastro é reiniciado
+- **AND** numa falha de publicação, MUST manter as fotos guardadas para uma nova tentativa
 
 #### Scenario: Arquivo não aceito ou falha no upload
-- **WHEN** um arquivo não é uma imagem aceita ou o upload falha
-- **THEN** o sistema MUST identificar a falha, permitir correção ou nova tentativa e MUST NOT apresentar a doação como publicada
+- **WHEN** um arquivo não é uma imagem aceita, não pode ser lido como imagem ou o upload falha
+- **THEN** o sistema MUST identificar a falha com a mensagem atual, permitir correção ou nova tentativa, manter as fotos já aceitas e MUST NOT apresentar a doação como publicada
+
+#### Scenario: A ordem escolhida é a ordem salva
+- **WHEN** a doação é publicada
+- **THEN** as fotos MUST ser enviadas e persistidas na ordem mostrada na etapa 3
+- **AND** a capa nos cartões de listagem e a primeira foto do detalhe MUST ser a primeira dessa ordem, seguida das demais na mesma ordem
+
+#### Scenario: Teclado e tela estreita
+- **WHEN** a etapa 3 é usada pelo teclado ou numa largura de 360 px
+- **THEN** escolher arquivos, remover, mover e tornar capa MUST ser acionáveis pelo teclado, com rótulos acessíveis que incluam a posição da foto (por exemplo, “Remover foto 2”) e foco visível
+- **AND** os controles MUST ter área de toque de pelo menos 44 px e contraste mínimo AA
+- **AND** as miniaturas e os controles MUST caber sem rolagem horizontal
 
 #### Scenario: Publicação sem fotos pelo endpoint
 - **WHEN** uma requisição autenticada ao endpoint de publicação contém `photos` ausente, nulo ou vazio
@@ -118,6 +176,15 @@ A interface MUST apresentar os textos de exemplo dos campos de texto do cadastro
 - **WHEN** a quinta etapa apresenta o prompt e as opções de forma de contato
 - **THEN** os textos “Selecione uma forma de contato”, “E-mail” e “Chat do DoaFácil” MUST permanecer em cor escura legível, sem aparência apagada
 
+#### Scenario: Selects com fundo branco
+- **WHEN** qualquer etapa apresenta um select (Categoria, Condição do item, Forma de entrega ou Preferência de contato), com ou sem valor escolhido
+- **THEN** o botão visível do select MUST ter fundo branco, borda `#C8C8C8`, texto `#1F1F1F` e foco visível em `#007A42`, como os campos de texto
+- **AND** MUST NOT aparecer com fundo cinza, como se estivesse desativado
+
+#### Scenario: Foco dos botões do cadastro
+- **WHEN** a pessoa navega pelo teclado até “Voltar”, “Continuar” ou “Publicar doação”
+- **THEN** o foco MUST aparecer como um anel verde `#007A42`, igual aos outros controles do site, e MUST NOT usar o anel azul do tema
+
 #### Scenario: Texto digitado legível
 - **WHEN** a pessoa digita no campo “Nome do item” da etapa 1 ou no campo “Descrição” da etapa 2
 - **THEN** o texto digitado MUST usar cor escura equivalente a `#1F1F1F` ou mais escura, com opacidade total
@@ -137,11 +204,13 @@ A interface MUST apresentar os textos de exemplo dos campos de texto do cadastro
 - **AND** o valor do campo guardado pelo formulário MUST ficar vazio
 
 ### Requirement: Publicação autenticada e persistente
-O sistema MUST publicar a doação por meio de uma operação autenticada no Xano. O backend MUST derivar o responsável da sessão autenticada, validar a categoria, a condição, a modalidade de entrega, a preferência de contato e o limite de uma a cinco fotos, e persistir os dados completos. Uma publicação aceita MUST iniciar com status “disponível”. Falhas de validação, autenticação, rede ou persistência MUST ser informadas sem apagar os dados ainda não publicados nem exibir uma confirmação de sucesso.
+O sistema MUST publicar a doação por meio de uma operação autenticada no Xano. O backend MUST derivar o responsável da sessão autenticada, validar a categoria, a condição, a modalidade de entrega, a preferência de contato e o limite de uma a cinco fotos, e persistir os dados completos. Uma publicação aceita MUST iniciar com status “disponível”, e a interface MUST levar ao detalhe da doação criada. Falhas de validação, autenticação, rede ou persistência MUST ser informadas sem apagar os dados ainda não publicados nem exibir uma confirmação de sucesso.
 
 #### Scenario: Publicação aceita
 - **WHEN** uma pessoa autenticada envia dados válidos e o Xano conclui a persistência
 - **THEN** a resposta MUST identificar a doação criada, associada ao usuário autenticado, com status “disponível” e com os dados submetidos
+- **AND** a interface MUST levar a `/doacao/<id>` da doação criada, que mostra o aviso de publicação (veja “Aviso de doação recém-publicada” em `donation-detail`)
+- **AND** um segundo clique em “Publicar doação” durante ou depois do envio MUST NOT criar outra doação
 
 #### Scenario: Requisição sem sessão válida
 - **WHEN** uma pessoa não autenticada tenta publicar uma doação
@@ -149,7 +218,7 @@ O sistema MUST publicar a doação por meio de uma operação autenticada no Xan
 
 #### Scenario: Falha durante a publicação
 - **WHEN** o Xano rejeita a requisição ou ocorre uma falha de rede/persistência
-- **THEN** a interface MUST apresentar uma mensagem de erro, manter os valores do wizard e MUST NOT mostrar a doação como publicada
+- **THEN** a interface MUST apresentar uma mensagem de erro, manter os valores do wizard, inclusive as fotos e a ordem delas, e MUST NOT mostrar a doação como publicada nem sair do cadastro
 
 #### Scenario: Xano rejeita publicação sem fotos
 - **WHEN** o backend rejeita a publicação por não receber fotos
@@ -163,27 +232,27 @@ Cada nova entrada em `/cadastro-doacao` MUST iniciar um novo cadastro vazio e ha
 - **WHEN** a pessoa publica uma doação com sucesso e depois entra novamente em `/cadastro-doacao`
 - **THEN** o formulário MUST voltar ao passo 1 com título, descrição, categoria, condição, forma de entrega e preferência de contato vazios
 - **AND** MUST limpar mensagens de erro e sucesso, estado de publicação e progresso de upload
-- **AND** MUST limpar os arquivos selecionados no componente de upload
+- **AND** MUST limpar as fotos escolhidas e as miniaturas
 
 #### Scenario: Troca de conta na mesma aba
 - **WHEN** a pessoa publica uma doação, sai da conta, entra com outra conta na mesma aba e abre `/cadastro-doacao`
-- **THEN** o formulário MUST iniciar vazio no passo 1, sem dados ou estado de publicação da conta anterior
+- **THEN** o formulário MUST iniciar vazio no passo 1, sem dados, fotos ou estado de publicação da conta anterior
 - **AND** MUST carregar categorias e cidade/UF do perfil da conta atualmente autenticada
 
 #### Scenario: Recarregar a página de cadastro
 - **WHEN** a pessoa recarrega `/cadastro-doacao`
-- **THEN** o formulário MUST iniciar vazio no passo 1, limpando também os arquivos selecionados
+- **THEN** o formulário MUST iniciar vazio no passo 1, limpando também as fotos escolhidas
 - **AND** MUST carregar categorias e cidade/UF do perfil autenticado
 
 #### Scenario: Publicação concluída na visita atual
-- **WHEN** a publicação é concluída com sucesso e a pessoa permanece na mesma visita de `/cadastro-doacao`
-- **THEN** o formulário MUST manter o aviso de sucesso e o estado que impede uma segunda publicação
-- **AND** a reinicialização MUST ocorrer somente na próxima entrada na página
+- **WHEN** a publicação é concluída com sucesso
+- **THEN** a interface MUST sair do cadastro e abrir o detalhe da doação criada
+- **AND** voltar a `/cadastro-doacao` depois disso MUST iniciar um cadastro novo, sem permitir publicar de novo a mesma doação
 
 #### Scenario: Navegação entre os passos preserva os dados
 - **WHEN** a pessoa usa “Continuar” e “Voltar” para navegar entre os passos dentro de `/cadastro-doacao`
 - **THEN** o sistema MUST NOT reiniciar o formulário durante essa navegação
-- **AND** os dados preenchidos nos passos anteriores MUST permanecer preenchidos ao retornar a eles
+- **AND** os dados preenchidos nos passos anteriores, inclusive as fotos e a ordem delas, MUST permanecer ao retornar a eles
 - **AND** o reinício MUST ocorrer somente na entrada da página, inclusive ao recarregá-la
 
 ### Requirement: Posição da seta de retorno do cadastro de doação

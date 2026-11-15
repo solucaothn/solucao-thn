@@ -1,26 +1,36 @@
 import os
+import uuid
 from collections.abc import AsyncGenerator, Sequence
-from pathlib import PurePath
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 import reflex as rx
 
+from doafacil.campos import select_field
+from doafacil.fotos_doacao import (
+    EMPTY_MESSAGE,
+    FORMAT_MESSAGE,
+    IMAGE_TYPES,
+    MAX_PHOTO_BYTES,
+    MAX_PHOTOS,
+    READ_ERROR_MESSAGE,
+    PhotoImageError,
+    check_file,
+    make_cover as order_make_cover,
+    move as order_move,
+    process_photo,
+    rejection_message,
+    remove as order_remove,
+)
 from doafacil.login import LoginState
 
 
 CATALOG_API_ENV = "XANO_API_URL"
 AUTH_API_ENV = "XANO_AUTH_API_URL"
-MAX_PHOTOS = 5
 PHOTO_UPLOAD_ID = "donation-photo-upload"
-IMAGE_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-}
+PHOTOS_PREPARING_MESSAGE = "Preparando fotos..."
+PHOTO_STEP_TEXT = "Adicione de 1 a 5 fotos. A primeira foto é a capa da doação."
 IMAGE_ACCEPT = {
     mime_type: [
         extension
@@ -162,24 +172,34 @@ async def _fetch_profile(
     return city.strip(), state.strip()
 
 
-def _validated_photos(
-    files: Sequence[rx.UploadFile],
+def _photos_payload(
+    photos: Sequence[dict[str, Any]],
+    files: dict[str, tuple[bytes, str, str]],
 ) -> list[tuple[str, bytes, str]]:
-    if len(files) > MAX_PHOTOS:
-        raise DonationServiceError
+    """As fotos preparadas na ordem da tela, com os nomes foto-1.<ext>,
+    foto-2.<ext>... (o Xano grava nessa ordem e usa a primeira como capa)."""
+    payload: list[tuple[str, bytes, str]] = []
+    for position, photo in enumerate(photos, 1):
+        contents, mime_type, extension = files[photo["id"]]
+        payload.append((f"foto-{position}.{extension}", contents, mime_type))
+    return payload
 
-    validated: list[tuple[str, bytes, str]] = []
-    for file in files:
-        filename = file.name
-        expected_mime = IMAGE_TYPES.get(PurePath(filename).suffix.lower())
-        actual_mime = file.content_type or ""
-        if (
-            expected_mime is None
-            or (actual_mime and actual_mime != expected_mime)
-        ):
-            raise DonationServiceError
-        validated.append((filename, b"", expected_mime))
-    return validated
+
+def _clear_photos(state: Any) -> None:
+    """Apaga as fotos guardadas no servidor (variável de backend) e as
+    miniaturas. Usada ao reiniciar o cadastro e ao publicar com sucesso."""
+    state.photos = []
+    state._photo_files = {}
+    state.photos_busy = False
+    state.photo_notice = ""
+
+
+def _focus_script(element_id: str) -> str:
+    # Depois de redesenhar a lista, devolve o foco ao botão certo.
+    return (
+        "setTimeout(() => { const el = document.getElementById("
+        f"{element_id!r}); if (el) {{ el.focus(); }} }}, 0)"
+    )
 
 
 def _validate_step(
@@ -288,11 +308,26 @@ class DonationCreateState(LoginState):
     published: bool = False
     donation_error_message: str = ""
     upload_progress: str = ""
-    success_message: str = ""
+    # Fotos (change fotos-formulario-doacao). As versões preparadas ficam só
+    # no servidor, em _photo_files (variável de backend, que não vai ao
+    # navegador): {id: (bytes, tipo, extensão)}. O navegador recebe só as
+    # miniaturas, em photos, na ordem da tela (a primeira é a capa).
+    photos: list[dict[str, str]] = []
+    photos_busy: bool = False
+    photo_notice: str = ""
+    _photo_files: dict[str, tuple[bytes, str, str]] = {}
 
     @rx.var
     def progress_percentage(self) -> int:
         return self.current_step * 20
+
+    @rx.var
+    def photo_count(self) -> int:
+        return len(self.photos)
+
+    @rx.var
+    def photos_full(self) -> bool:
+        return len(self.photos) >= MAX_PHOTOS
 
     @rx.var
     def category_options(self) -> list[str]:
@@ -319,7 +354,8 @@ class DonationCreateState(LoginState):
         self.published = False
         self.donation_error_message = ""
         self.upload_progress = ""
-        self.success_message = ""
+        # Reinício: apaga as fotos guardadas da visita anterior.
+        _clear_photos(self)
 
         if not self.auth_token:
             yield rx.redirect("/login")
@@ -407,12 +443,134 @@ class DonationCreateState(LoginState):
     def set_contact_preference(self, value: str) -> None:
         self.contact_preference = value
 
+    # Fotos ----------------------------------------------------------------
+
     @rx.event
-    def advance(self, files: list[rx.UploadFile]) -> None:
+    async def add_photos(
+        self, files: list[rx.UploadFile]
+    ) -> AsyncGenerator[rx.event.EventSpec | None, None]:
+        """Soma as fotos escolhidas às já aceitas (até 5). Cada foto é
+        conferida (tipo e 5 MB), preparada (orientação, sem metadados, até
+        1600 px, JPEG ou, com transparência, PNG) e guardada só nessa versão
+        preparada."""
+        if self.photos_busy or self.is_publishing or self.published:
+            return
+        self.donation_error_message = ""
+        self.photo_notice = ""
+        self.photos_busy = True
+        yield
+        error = ""
+        accepted = 0
+        for file in files or []:
+            if len(self.photos) >= MAX_PHOTOS:
+                error = error or FORMAT_MESSAGE
+                break
+            try:
+                contents = await file.read()
+            except OSError:
+                error = error or READ_ERROR_MESSAGE
+                continue
+            problem = check_file(file.name or "", file.content_type or "", len(contents))
+            if problem:
+                error = error or problem
+                continue
+            try:
+                processed = process_photo(contents)
+            except PhotoImageError:
+                error = error or FORMAT_MESSAGE
+                continue
+            # Só a versão preparada fica guardada; o arquivo recebido é descartado.
+            del contents
+            photo_id = uuid.uuid4().hex
+            self._photo_files = {
+                **self._photo_files,
+                photo_id: (processed.contents, processed.mime, processed.extension),
+            }
+            self.photos = [
+                *self.photos,
+                {"id": photo_id, "thumb": processed.thumb},
+            ]
+            accepted += 1
+        self.photos_busy = False
+        if error:
+            self.donation_error_message = error
+        if accepted:
+            self.photo_notice = (
+                "Foto adicionada." if accepted == 1 else f"{accepted} fotos adicionadas."
+            )
+        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
+
+    @rx.event
+    def photos_rejected(self, rejections: list[dict[str, Any]]) -> None:
+        """Arquivos recusados pelo próprio componente (tipo, mais de 5 MB ou
+        mais de 5 numa escolha): nenhuma requisição; as fotos aceitas ficam."""
+        self.photo_notice = ""
+        self.donation_error_message = rejection_message(rejections)
+
+    @rx.event
+    def remove_photo(self, photo_id: str):
+        if self.photos_busy or self.is_publishing or self.published:
+            return
+        position = next(
+            (index for index, photo in enumerate(self.photos) if photo["id"] == photo_id),
+            -1,
+        )
+        if position < 0:
+            return
+        self.photos = order_remove(self.photos, photo_id)
+        # Apaga do servidor a versão guardada da foto removida.
+        self._photo_files = {
+            key: value for key, value in self._photo_files.items() if key != photo_id
+        }
+        self.donation_error_message = ""
+        self.photo_notice = "Foto removida."
+        if self.photos:
+            next_photo = self.photos[min(position, len(self.photos) - 1)]
+            return rx.call_script(_focus_script(f"photo-{next_photo['id']}-remove"))
+        return rx.call_script(_focus_script(PHOTO_UPLOAD_ID))
+
+    @rx.event
+    def move_photo(self, photo_id: str, delta: int):
+        if self.photos_busy or self.is_publishing or self.published:
+            return
+        moved = order_move(self.photos, photo_id, int(delta))
+        if [photo["id"] for photo in moved] == [photo["id"] for photo in self.photos]:
+            return
+        self.photos = moved
+        position = next(index for index, photo in enumerate(moved) if photo["id"] == photo_id)
+        self.photo_notice = f"Foto movida para a posição {position + 1}."
+        direction = "left" if int(delta) < 0 else "right"
+        # Na ponta, o botão daquele lado fica desativado: o foco vai ao outro.
+        if (direction == "left" and position == 0) or (
+            direction == "right" and position == len(moved) - 1
+        ):
+            direction = "right" if direction == "left" else "left"
+        return rx.call_script(_focus_script(f"photo-{photo_id}-{direction}"))
+
+    @rx.event
+    def make_cover(self, photo_id: str):
+        if self.photos_busy or self.is_publishing or self.published:
+            return
+        reordered = order_make_cover(self.photos, photo_id)
+        if [photo["id"] for photo in reordered] == [photo["id"] for photo in self.photos]:
+            return
+        self.photos = reordered
+        self.photo_notice = "Foto definida como capa."
+        # “Tornar capa” fica desativado na capa: o foco vai a “Mover para a direita”
+        # (ou a “Remover”, se ela for a única foto).
+        target = "right" if len(reordered) > 1 else "remove"
+        return rx.call_script(_focus_script(f"photo-{photo_id}-{target}"))
+
+    # Navegação -------------------------------------------------------------
+
+    @rx.event
+    def advance(self) -> None:
         if self.is_loading_data or self.is_publishing or self.published:
             return
         if self.current_step == 3:
-            if not files:
+            if self.photos_busy:
+                return
+            if not self.photos:
                 self.donation_error_message = MISSING_PHOTOS_MESSAGE
                 return
             self.current_step = 4
@@ -447,9 +605,7 @@ class DonationCreateState(LoginState):
         self.donation_error_message = ""
 
     @rx.event
-    async def publish(
-        self, files: list[rx.UploadFile]
-    ) -> AsyncGenerator[rx.event.EventSpec, None]:
+    async def publish(self) -> AsyncGenerator[rx.event.EventSpec, None]:
         if not self.auth_token:
             yield rx.redirect("/login")
             return
@@ -475,41 +631,24 @@ class DonationCreateState(LoginState):
             self.donation_error_message = validation_error
             return
 
+        if not self.photos:
+            self.donation_error_message = MISSING_PHOTOS_MESSAGE
+            return
+        if len(self.photos) > MAX_PHOTOS:
+            self.donation_error_message = FORMAT_MESSAGE
+            return
         try:
-            photo_metadata = _validated_photos(files)
-        except DonationServiceError:
+            # As fotos preparadas, na ordem da tela, com os nomes foto-N.<ext>.
+            photos = _photos_payload(self.photos, self._photo_files)
+        except KeyError:
             self.donation_error_message = (
-                "Selecione até cinco imagens JPEG, PNG, GIF ou WEBP."
+                "Não foi possível ler uma das imagens. "
+                "Remova-a e tente novamente."
             )
             return
 
         self.is_publishing = True
         self.donation_error_message = ""
-        self.success_message = ""
-        photos: list[tuple[str, bytes, str]] = []
-        for index, (filename, _, mime_type) in enumerate(photo_metadata, 1):
-            self.upload_progress = (
-                f"Preparando imagem {index} de {len(photo_metadata)}..."
-            )
-            try:
-                contents = await files[index - 1].read()
-            except OSError:
-                self.is_publishing = False
-                self.upload_progress = ""
-                self.donation_error_message = (
-                    "Não foi possível ler uma das imagens. "
-                    "Remova-a e tente novamente."
-                )
-                return
-            if not contents:
-                self.is_publishing = False
-                self.upload_progress = ""
-                self.donation_error_message = (
-                    "Uma das imagens está vazia. Remova-a e tente novamente."
-                )
-                return
-            photos.append((filename, contents, mime_type))
-
         self.upload_progress = "Enviando sua doação..."
         payload: dict[str, object] = {
             "category_id": int(self.category_id),
@@ -524,7 +663,7 @@ class DonationCreateState(LoginState):
                 CATALOG_API_ENV, "/catalog/donations/publish"
             )
             async with httpx.AsyncClient(timeout=60.0) as client:
-                await _publish_donation(
+                donation = await _publish_donation(
                     client,
                     endpoint,
                     self.auth_token,
@@ -545,10 +684,19 @@ class DonationCreateState(LoginState):
                 "Seus dados foram mantidos; tente novamente."
             )
         else:
+            # Importação local: chat.py importa deste módulo e
+            # detalhe_doacao.py importa de chat.py (evita o ciclo).
+            from doafacil.detalhe_doacao import DonationDetailState
+
             self.published = True
-            self.success_message = (
-                "Doação publicada! Obrigado por compartilhar."
-            )
+            self.is_publishing = False
+            self.upload_progress = ""
+            # Publicada: as fotos guardadas no servidor são apagadas.
+            _clear_photos(self)
+            donation_id = donation["id"]
+            yield DonationDetailState.set_published_notice(donation_id)
+            yield rx.redirect(f"/doacao/{donation_id}")
+            return
         self.is_publishing = False
         self.upload_progress = ""
 
@@ -571,26 +719,12 @@ def _select_field(
     placeholder: str,
     field_id: str,
 ) -> rx.Component:
-    return rx.vstack(
-        _field_label(label),
-        rx.select(
-            options,
-            id=field_id,
-            value=value,
-            on_change=on_change,
-            placeholder=placeholder,
-            width="100%",
-            height="40px",
-            background="white",
-            color="#333333",
-            high_contrast=True,
-            border="1px solid #C8C8C8",
-            border_radius="8px",
-        ),
-        align="start",
-        spacing="2",
-        width="100%",
-    )
+    """O select com o estilo no Trigger (doafacil/campos.py): fundo branco,
+    borda #C8C8C8, texto #1F1F1F e foco verde, nos quatro selects do cadastro.
+    O atalho rx.select(...) punha o estilo no Root e deixava o botão cinza."""
+    if not isinstance(options, rx.Var):
+        options = tuple(options)
+    return select_field(label, options, value, on_change, placeholder, field_id)
 
 
 def _step_one() -> rx.Component:
@@ -677,6 +811,148 @@ def _step_two() -> rx.Component:
     )
 
 
+PHOTO_GREEN = "#007A42"
+# Foco dos botões do wizard (Voltar, Continuar e Publicar): verde, como os
+# outros controles do site, no lugar do anel azul do tema Radix.
+WIZARD_FOCUS = {"outline": "2px solid #007A42", "outlineOffset": "2px", "boxShadow": "none"}
+PHOTO_ICON_GREEN = "#168447"
+PHOTO_TEXT = "#333333"
+PHOTO_MUTED = "#555555"
+PHOTO_DANGER = "#B42318"
+COVER_BADGE_BACKGROUND = "#E8F5EC"
+COVER_BADGE_TEXT = "#166B3B"
+
+
+def _photo_button(
+    icon: str,
+    label: rx.Var,
+    element_id: rx.Var,
+    on_click: Any,
+    disabled: rx.Var,
+    color: str = PHOTO_TEXT,
+) -> rx.Component:
+    """Botão de ícone de 44 px, com rótulo acessível que inclui a posição."""
+    return rx.el.button(
+        rx.icon(icon, size=20, aria_hidden="true"),
+        type="button",
+        id=element_id,
+        aria_label=label,
+        title=label,
+        on_click=on_click,
+        disabled=disabled,
+        class_name="donation-photo-action",
+        display="inline-flex",
+        align_items="center",
+        justify_content="center",
+        width="44px",
+        height="44px",
+        min_width="44px",
+        padding="0",
+        border="1px solid #C8C8C8",
+        border_radius="8px",
+        background="#FFFFFF",
+        color=color,
+        cursor="pointer",
+        # Desativado por cor (sem opacidade parcial, como os campos do cadastro).
+        _disabled={"color": "#A3A3A3", "borderColor": "#E4E4E4", "cursor": "default"},
+        _focus_visible={"outline": f"2px solid {PHOTO_GREEN}", "outlineOffset": "2px"},
+    )
+
+
+def _photo_row(photo: rx.Var, index: rx.Var) -> rx.Component:
+    """Uma foto: miniatura, “Foto N”, o selo “Capa” na primeira e os botões
+    mover, tornar capa e remover."""
+    number = (index + 1).to_string()
+    total = DonationCreateState.photo_count.to_string()
+    photo_id = photo["id"].to(str)
+    busy = DonationCreateState.photos_busy | DonationCreateState.is_publishing
+    is_first = index == 0
+    is_last = index == DonationCreateState.photo_count - 1
+    return rx.flex(
+        rx.image(
+            src=photo["thumb"],
+            alt=rx.Var.create("Foto ") + number + " de " + total,
+            width="72px",
+            height="72px",
+            min_width="72px",
+            object_fit="cover",
+            border_radius="8px",
+            background="#F2F2F2",
+            flex_shrink="0",
+        ),
+        rx.vstack(
+            rx.hstack(
+                rx.text(
+                    rx.Var.create("Foto ") + number,
+                    color=PHOTO_TEXT,
+                    font_weight="700",
+                ),
+                rx.cond(
+                    is_first,
+                    rx.text(
+                        "Capa",
+                        class_name="donation-photo-cover",
+                        color=COVER_BADGE_TEXT,
+                        background=COVER_BADGE_BACKGROUND,
+                        font_size="0.75rem",
+                        font_weight="700",
+                        padding="2px 8px",
+                        border_radius="999px",
+                    ),
+                    rx.fragment(),
+                ),
+                align="center",
+                spacing="2",
+            ),
+            rx.flex(
+                _photo_button(
+                    "chevron-left",
+                    rx.Var.create("Mover foto ") + number + " para a esquerda",
+                    rx.Var.create("photo-") + photo_id + "-left",
+                    DonationCreateState.move_photo(photo["id"], -1),
+                    is_first | busy,
+                ),
+                _photo_button(
+                    "chevron-right",
+                    rx.Var.create("Mover foto ") + number + " para a direita",
+                    rx.Var.create("photo-") + photo_id + "-right",
+                    DonationCreateState.move_photo(photo["id"], 1),
+                    is_last | busy,
+                ),
+                _photo_button(
+                    "star",
+                    rx.Var.create("Tornar foto ") + number + " a capa",
+                    rx.Var.create("photo-") + photo_id + "-cover",
+                    DonationCreateState.make_cover(photo["id"]),
+                    is_first | busy,
+                ),
+                _photo_button(
+                    "trash-2",
+                    rx.Var.create("Remover foto ") + number,
+                    rx.Var.create("photo-") + photo_id + "-remove",
+                    DonationCreateState.remove_photo(photo["id"]),
+                    busy,
+                    color=PHOTO_DANGER,
+                ),
+                wrap="wrap",
+                gap="8px",
+            ),
+            align="start",
+            spacing="2",
+            min_width="0",
+            flex="1",
+        ),
+        class_name="donation-photo-row",
+        gap="12px",
+        align="start",
+        width="100%",
+        padding="8px",
+        border="1px solid #E1E9E3",
+        border_radius="8px",
+        background="#FFFFFF",
+    )
+
+
 def _step_three() -> rx.Component:
     return rx.vstack(
         rx.heading(
@@ -687,24 +963,33 @@ def _step_three() -> rx.Component:
             width="100%",
         ),
         rx.text(
-            "Fotos ajudam as pessoas a conhecerem melhor o objeto. "
-            "Você pode publicar sem fotos.",
+            PHOTO_STEP_TEXT,
             color="#666666",
             width="100%",
         ),
         rx.upload(
             rx.vstack(
-                rx.icon("image", size=32, color="#00A859"),
-                rx.text(
-                    "Arraste as imagens para cá ou escolha os arquivos",
-                    color="#333333",
-                    font_weight="600",
-                    text_align="center",
+                rx.icon("image", size=32, color=PHOTO_ICON_GREEN, aria_hidden="true"),
+                rx.cond(
+                    DonationCreateState.photos_full,
+                    rx.text(
+                        "Limite de 5 fotos atingido",
+                        color=PHOTO_TEXT,
+                        font_weight="600",
+                        text_align="center",
+                    ),
+                    rx.text(
+                        "Arraste as imagens para cá ou escolha os arquivos",
+                        color=PHOTO_TEXT,
+                        font_weight="600",
+                        text_align="center",
+                    ),
                 ),
                 rx.text(
-                    "JPEG, PNG, GIF ou WEBP · até 5 fotos",
-                    color="#666666",
+                    "JPEG, PNG, GIF ou WEBP · até 5 MB · até 5 fotos · a primeira é a capa",
+                    color=PHOTO_MUTED,
                     font_size="0.9rem",
+                    text_align="center",
                 ),
                 align="center",
                 spacing="3",
@@ -715,58 +1000,54 @@ def _step_three() -> rx.Component:
             multiple=True,
             accept=IMAGE_ACCEPT,
             max_files=MAX_PHOTOS,
-            no_keyboard=True,
+            max_size=MAX_PHOTO_BYTES,
+            disabled=(
+                DonationCreateState.photos_full
+                | DonationCreateState.photos_busy
+                | DonationCreateState.is_publishing
+            ),
+            on_drop=DonationCreateState.add_photos(
+                rx.upload_files(upload_id=PHOTO_UPLOAD_ID)
+            ),
+            on_drop_rejected=DonationCreateState.photos_rejected,
             width="100%",
             border="2px dashed #9DBFA9",
             border_radius="12px",
             background="#F9FCF9",
             cursor="pointer",
         ),
-        rx.hstack(
-            rx.text(
-                "Fotos selecionadas: ",
-                rx.selected_files(PHOTO_UPLOAD_ID).length(),
-                " / ",
-                MAX_PHOTOS,
-                color="#333333",
-            ),
-            rx.spacer(),
-            rx.button(
-                "Remover todas",
-                type="button",
-                on_click=rx.clear_selected_files(PHOTO_UPLOAD_ID),
-                disabled=DonationCreateState.is_publishing,
-                variant="soft",
-                color="#166B3B",
-                background="#E8F5EC",
-            ),
-            width="100%",
-            align="center",
-            wrap="wrap",
+        rx.text(
+            DonationCreateState.photo_count,
+            " de 5 fotos",
+            aria_live="polite",
+            class_name="donation-photo-count",
+            color=PHOTO_TEXT,
         ),
-        rx.foreach(
-            rx.selected_files(PHOTO_UPLOAD_ID),
-            lambda filename: rx.hstack(
-                rx.icon("image", size=16, color="#168447"),
-                rx.text(
-                    filename,
-                    color="#333333",
-                    overflow="hidden",
-                    text_overflow="ellipsis",
-                    white_space="nowrap",
-                ),
-                rx.spacer(),
-                rx.text(
-                    "Pronta para enviar",
-                    color="#168447",
-                    font_size="0.85rem",
-                    flex_shrink="0",
-                ),
-                width="100%",
-                padding="0.6rem 0.8rem",
-                border="1px solid #E1E9E3",
-                border_radius="8px",
+        rx.cond(
+            DonationCreateState.photos_busy,
+            rx.text(
+                PHOTOS_PREPARING_MESSAGE,
+                role="status",
+                color=COVER_BADGE_TEXT,
+                font_weight="600",
             ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            DonationCreateState.photo_notice != "",
+            rx.text(
+                DonationCreateState.photo_notice,
+                role="status",
+                color=COVER_BADGE_TEXT,
+                font_size="0.9rem",
+            ),
+            rx.fragment(),
+        ),
+        rx.vstack(
+            rx.foreach(DonationCreateState.photos, _photo_row),
+            class_name="donation-photo-list",
+            spacing="2",
+            width="100%",
         ),
         align="start",
         spacing="3",
@@ -854,20 +1135,6 @@ def _step_five() -> rx.Component:
                 color="#166B3B",
                 background="#E8F5EC",
                 padding="0.85rem 1rem",
-                border_radius="8px",
-                width="100%",
-            ),
-            rx.fragment(),
-        ),
-        rx.cond(
-            DonationCreateState.success_message != "",
-            rx.text(
-                DonationCreateState.success_message,
-                role="status",
-                color="#166B3B",
-                font_weight="700",
-                background="#E8F5EC",
-                padding="0.9rem 1rem",
                 border_radius="8px",
                 width="100%",
             ),
@@ -1011,6 +1278,8 @@ def _wizard_content() -> rx.Component:
                     background="white",
                     min_width="120px",
                     height="40px",
+                    # Anel de foco verde, no lugar do azul do tema.
+                    _focus_visible=WIZARD_FOCUS,
                 ),
                 rx.fragment(),
             ),
@@ -1019,13 +1288,15 @@ def _wizard_content() -> rx.Component:
                 rx.button(
                     "Continuar",
                     type="button",
-                    on_click=DonationCreateState.advance(
-                        rx.upload_files(PHOTO_UPLOAD_ID)
+                    on_click=DonationCreateState.advance,
+                    disabled=(
+                        DonationCreateState.is_loading_data
+                        | DonationCreateState.photos_busy
                     ),
-                    disabled=DonationCreateState.is_loading_data,
                     background="#007A42",
                     color="white",
                     _hover={"background": "#006B39"},
+                    _focus_visible=WIZARD_FOCUS,
                     flex="1",
                     height="40px",
                 ),
@@ -1040,9 +1311,7 @@ def _wizard_content() -> rx.Component:
                         ),
                     ),
                     type="button",
-                    on_click=DonationCreateState.publish(
-                        rx.upload_files(PHOTO_UPLOAD_ID)
-                    ),
+                    on_click=DonationCreateState.publish,
                     disabled=(
                         DonationCreateState.is_publishing
                         | DonationCreateState.published
@@ -1050,6 +1319,7 @@ def _wizard_content() -> rx.Component:
                     background="#007A42",
                     color="white",
                     _hover={"background": "#006B39"},
+                    _focus_visible=WIZARD_FOCUS,
                     flex="1",
                     height="40px",
                 ),

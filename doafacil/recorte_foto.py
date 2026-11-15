@@ -177,21 +177,58 @@ def crop_box(
     return left_px, top_px, left_px + side_px, top_px + side_px
 
 
+def _encode(
+    image: Image.Image,
+    output_format: str,
+    jpeg_quality: int = 90,
+    jpeg_optimize: bool = False,
+) -> bytes:
+    """Codifica sem metadados: copia só os pixels para uma imagem nova e salva
+    em JPEG (RGB) ou PNG otimizado (mantém a transparência)."""
+    clean = Image.new(image.mode, image.size)
+    clean.paste(image)
+    buffer = BytesIO()
+    if output_format == "JPEG":
+        clean.convert("RGB").save(
+            buffer, format="JPEG", quality=jpeg_quality, optimize=jpeg_optimize
+        )
+    else:
+        clean.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
+
+
 def encode_square(source: SourceImage, box: tuple[int, int, int, int]) -> tuple[bytes, str, str]:
     """Recorta a caixa, gera 512 × 512 e codifica no formato de saída, sem
     metadados. Devolve ``(conteúdo, nome fixo do arquivo, tipo)``."""
     square = source.image.crop(box).resize(
         (OUTPUT_SIZE, OUTPUT_SIZE), Image.Resampling.LANCZOS
     )
-    clean = Image.new(square.mode, square.size)
-    clean.paste(square)
-    buffer = BytesIO()
-    if source.output_format == "JPEG":
-        clean.convert("RGB").save(buffer, format="JPEG", quality=90)
-    else:
-        clean.save(buffer, format="PNG", optimize=True)
     filename, mime = OUTPUT_FILES[source.output_format]
-    return buffer.getvalue(), filename, mime
+    return _encode(square, source.output_format), filename, mime
+
+
+LIMITED_MAX_SIDE = 1600
+LIMITED_JPEG_QUALITY = 82
+
+
+def encode_limited(
+    source: SourceImage,
+    max_side: int = LIMITED_MAX_SIDE,
+    jpeg_quality: int = LIMITED_JPEG_QUALITY,
+) -> tuple[bytes, str, str]:
+    """Imagem inteira com o lado maior de no máximo ``max_side`` px (mantém a
+    proporção e nunca amplia), sem metadados. Usada nas fotos de doação
+    (change fotos-formulario-doacao): PNG só quando há algum pixel
+    transparente; sem transparência, JPEG (qualidade ``jpeg_quality``, com
+    ``optimize``), mesmo que o original seja PNG ou GIF. Devolve
+    ``(conteúdo, tipo, extensão)``."""
+    image = source.image.copy()
+    image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+    output_format = "PNG" if _has_transparency(image) else "JPEG"
+    filename, mime = OUTPUT_FILES[output_format]
+    extension = filename.rsplit(".", 1)[1]
+    content = _encode(image, output_format, jpeg_quality=jpeg_quality, jpeg_optimize=True)
+    return content, mime, extension
 
 
 # Componente --------------------------------------------------------------------

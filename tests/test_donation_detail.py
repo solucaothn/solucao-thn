@@ -1082,6 +1082,7 @@ class DonationDetailTests(unittest.TestCase):
             viewer_open=True,
             viewer_index=3,
             viewer_zoomed=True,
+            published_notice_id=0,
         )
         asyncio.run(DonationDetailState.load_donation.fn(state))
         self.assertEqual((state.viewer_open, state.viewer_index, state.viewer_zoomed), (False, 0, False))
@@ -1156,6 +1157,8 @@ def _state_for_route_id(route_id: str) -> SimpleNamespace:
         auth_token="",
         contact_message="",
         contact_message_is_error=False,
+        published_notice_id=0,
+        show_published_notice=False,
     )
 
 
