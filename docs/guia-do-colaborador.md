@@ -170,7 +170,7 @@ A foto da doação é obrigatória tanto no wizard quanto no backend. O endpoint
 
 O corpo do erro contém os campos `code` (`ERROR_CODE_INPUT_ERROR`), `message` e `payload`. O site procura a mensagem “Adicione pelo menos uma foto para continuar.” em qualquer campo textual do JSON de erro e, quando a encontra, mostra a mesma mensagem sem limpar os dados do formulário nem marcar a doação como publicada. Outros erros continuam usando o tratamento genérico.
 
-O campo `donation_photo.photo` é obrigatório. A auditoria confirmou que não havia linhas dessa tabela sem foto antes da alteração. Doações antigas com `donation.photo` vazio não foram alteradas.
+O campo `donation_photo.photo` é obrigatório. A auditoria confirmou que não havia linhas dessa tabela sem foto antes da alteração. Na change esquema-xano (2026-11-14), o painel mostrou o campo com **Required** marcado e 0 linhas com a foto vazia. A exportação do CLI mostra `image? photo` mesmo assim (veja a seção 10.1). Doações antigas com `donation.photo` vazio não foram alteradas.
 
 O endpoint `publish` foi criado por outro integrante e pode ter outros consumidores. Antes do push real de mudanças nele, avise o grupo, obtenha o OK explícito do grupo e a confirmação necessária para publicar. Revise o dry-run e interrompa a publicação se ele mostrar alterações fora do escopo aprovado.
 
@@ -919,6 +919,16 @@ Depois de um `xano pull`, 5 arquivos aparecem como modificados só por causa da 
 
 Se a formatação real de algum deles precisar mudar, isso vai num commit separado e combinado com o grupo.
 
+Também **nunca** entram em commit as três tabelas em que a exportação do CLI difere da `main` sem o Xano ter mudado (change esquema-xano). A `main` guarda a versão escrita à mão, e o pull traz a versão exportada:
+
+| Arquivo | Na `main` | Depois do pull | No painel (a verdade) |
+|---|---|---|---|
+| `xano/table/donation_photo.xs` | `image photo` | `image? photo` | `photo` com **Required** marcado |
+| `xano/table/signup_pending.xs` | `int attempts?=0` e `bool code_used?=false` | `int attempts?` e `bool code_used?` | padrão `0` e `false`, não nuláveis |
+| `xano/table/user.xs` | `bool email_verified?=false` | `bool email_verified?` | padrão `false`, não nulável |
+
+Um push desses arquivos não muda nada: o dry-run responde “No changes to push”.
+
 ## 11. Trabalhando com o Xano
 
 - Antes de editar o Xano, confira o status e peça confirmação explícita antes de rodar `xano workspace pull -d ./xano`; preserve todas as alterações preexistentes.
@@ -927,6 +937,24 @@ Se a formatação real de algum deles precisar mudar, isso vai num commit separa
 - Avise o grupo e obtenha o OK antes de publicar mudanças que afetam consumidores compartilhados. Obtenha a confirmação explícita necessária imediatamente antes do push real.
 - Depois da aprovação, faça o push apenas das alterações previstas. Ao preparar commits, revise cada caminho e adicione arquivos individualmente; nunca use `git add .` em `xano/`, pois o workspace contém alterações compartilhadas que podem não pertencer à tarefa.
 - Depois do push, confira o estado do workspace e versione somente os arquivos Xano aprovados para a change.
+- **O painel é a fonte da verdade** para o valor padrão, a obrigatoriedade e a possibilidade de nulo de cada campo. A exportação do CLI omite o `=valor` do padrão e mostra `?` mesmo em campo com **Required** marcado. Antes de concluir que falta algo no Xano, confira o campo no painel e rode um dry-run com `-i` só do arquivo: “No changes to push” quer dizer que não falta nada.
+- **Nomes dos arquivos:** o nome de cada `.xs` é o que o pull gera (por exemplo, a rota `catalog/donations/contact-email` vira `contact_email_GET.xs`). Um arquivo com outro nome para a mesma rota e o mesmo `guid` é uma sobra local, que o pull não reescreve. Apague só o arquivo local; **nunca apague no painel**, porque ali o objeto é um só e é o que o site usa.
+
+### Conferir o esquema contra o Xano real
+
+O script `scripts/teste_esquema_xano_real.py` só lê dados: não cria, não altera nem apaga nada e não envia e-mail. Com as variáveis `XANO_API_URL` e `XANO_AUTH_API_URL` definidas (seção 4) e o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_esquema_xano_real.py
+```
+
+| Cenário | O que confere |
+|---|---|
+| ES1 | `GET catalog/donations/contact-email` sem token responde 401: a rota existe e exige sessão |
+| ES2 | o detalhe das doações recentes traz as fotos só como URL, nunca nulas |
+| ES3 | com login (o script pede e-mail e senha, só em memória), `auth/profile` traz `email_verified` como verdadeiro ou falso |
+
+O script imprime só o cenário, o status, contagens e OK/FALHOU. A pausa entre pedidos (1,5 s) pode ser trocada com a variável `TESTE_ESQUEMA_PAUSA`.
 
 ## 12. Dicas para agentes de código
 
