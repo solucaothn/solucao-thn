@@ -1800,12 +1800,25 @@ class ChatFabTests(unittest.TestCase):
             "/recuperar-senha": main.request_recovery_page,
             "/nova-senha": main.new_password_page,
             "/cadastro-doacao": main.donation_creation_page,
-            # Página provisória da change landing-nova.
-            "/explorar": main.explore_page,
         }
         for route, page in pages.items():
             with self.subTest(route=route):
                 self.assertNotIn("chat-fab", str(page()))
+
+    def test_button_on_explore_and_categories(self) -> None:
+        """Change explorar-categorias: o botão aparece na /explorar (como no
+        Figma) e na /categorias, com o total de não lidas no carregamento."""
+        import doafacil.doafacil as main
+
+        for route, page in (("/explorar", main.explore_page), ("/categorias", main.categories_page)):
+            with self.subTest(route=route):
+                rendered = str(page())
+                self.assertEqual(rendered.count("chat-fab"), 1)
+                # Espaço livre do botão no fim da página.
+                self.assertIn('["paddingBottom"] : "88px"', rendered)
+                on_load = main.app._unevaluated_pages[route.strip("/")].on_load
+                handlers = on_load if isinstance(on_load, list) else [on_load]
+                self.assertIn(ChatState.load_unread_total.fn, [h.fn for h in handlers])
 
 
 if __name__ == "__main__":

@@ -84,12 +84,12 @@ python -m unittest discover -s tests -v
 
 ## 7. O que ainda falta
 
-- Explorar Doações (ainda sem design). Hoje `/explorar` é uma página provisória, que só mostra os filtros recebidos da home.
+- Explorar Doações: seções por categoria na página sem filtro, outras ordenações e subcategorias (a listagem com filtros já existe; veja “Explorar doações e categorias” na seção 8).
 - Detalhe da doação.
 - Perfil: editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
 - **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
-- As páginas para onde a home já aponta, mas que ainda não existem (mostram a página “não encontrada”): `/como-funciona`, `/categorias`, `/quem-somos`, `/contato`, `/privacidade`, `/termos`, `/duvidas` e `/seguranca`. As rotas ficam em `FUTURE_ROUTES` (`doafacil/doafacil.py`); ao criar uma página, basta registrar a rota.
+- As páginas para onde a home já aponta, mas que ainda não existem (mostram a página “não encontrada”): `/como-funciona`, `/quem-somos`, `/contato`, `/privacidade`, `/termos`, `/duvidas` e `/seguranca`. As rotas ficam em `FUTURE_ROUTES` (`doafacil/doafacil.py`); ao criar uma página, basta registrar a rota.
 - Fotos próprias para os 4 cartões institucionais (hoje com o degradê de placeholder).
 
 Em aberto com o grupo: status e transições da doação, mensagens entre usuários, avaliações e moderação. O destino dos endpoints antigos do modelo do Xano foi decidido: a change endpoints-publicos os remove (veja “Endpoints antigos do modelo do Xano” na seção 8).
@@ -128,7 +128,7 @@ O estado de cadastro pendente é transitório no servidor Reflex: reiniciar o se
 
 Nas validações Xano desse fluxo, e-mail e código usam verificações de comprimento com `strlen` em vez de padrões de regex com barra invertida. A senha segue as regras da conta: mínimo de oito caracteres, com letra e dígito.
 
-### Home e página provisória de Explorar doações (change landing-nova)
+### Home (change landing-nova)
 
 A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprovadas em relação ao Figma estão no `docs/design/README.md`.
 
@@ -139,9 +139,7 @@ A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprova
 - **Busca:** a barra é um formulário (Enter no campo também busca).
   - As categorias vêm de `/catalog/categories`, com as mesmas exclusões do cadastro, e a localização lista as 27 UFs.
   - “Buscar” abre `/explorar` com `q`, `categoria` (id) e `uf` (sigla), só para os filtros escolhidos (`build_explore_url` em `doafacil/explorar.py`).
-- **`/explorar` provisória:** `ExploreState.load_filters` valida os parâmetros (categoria inteira positiva e UF entre as 27) e mostra o resumo com o nome da categoria, sem lista de doações.
-  - A próxima change substitui a página e mantém a rota, os parâmetros e as funções.
-  - Não tem o botão flutuante do chat.
+- **`/explorar`:** desde a change explorar-categorias, é a listagem real (veja “Explorar doações e categorias” abaixo).
 - **Links da home:**
 
   | Origem | Destino |
@@ -149,11 +147,12 @@ A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprova
   | menu “Explorar Doações”, “Ver mais...”, cartão “Para você mesmo”, rodapé “Doações” | `/explorar` |
   | cartão “Ajude quem precisa”, rodapé “Criar doações”, “Quero Doar” | `/cadastro-doacao` |
   | rodapé “Doações mais recentes” | `/#doacoes-recentes` |
-  | menu “Como funciona” e “Categorias”; rodapé “Clique aqui para falar conosco”, “Quem somos”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” | rotas futuras em `FUTURE_ROUTES` |
+  | menu “Categorias” | abre a gaveta de categorias (change explorar-categorias) |
+  | menu “Como funciona”; rodapé “Clique aqui para falar conosco”, “Quem somos”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” | rotas futuras em `FUTURE_ROUTES` |
 
 - **Cartões institucionais:** `INSTITUTIONAL_CARDS` com `image: None` usa o degradê. Para trocar por uma foto própria, coloque o arquivo em `assets/landing/` e preencha `image` (por exemplo, `"/landing/historias.jpg"`). Um véu escuro embaixo mantém o texto legível. Não use as fotos do Figma: elas têm marca d'água de banco de imagens.
 - **Contraste:** sobre o creme `#FFF6E8`, use `#166B3B` (6,1:1) para texto verde. O `#168447` dá só 4,4:1 ali e fica para fundo branco (4,75:1) e botões.
-- **Testes:** `tests/test_public_home.py` (números, busca, links, menu da conta, cartões e 360 px) e `tests/test_explore.py` (página provisória).
+- **Testes:** `tests/test_public_home.py` (números, busca, links, menu da conta, cartões e 360 px).
 
 #### Conferir os números e as categorias contra o Xano real
 
@@ -167,6 +166,50 @@ python scripts/teste_landing_real.py
 |---|---|
 | LN1 | `catalog/donations/count` sem token traz só `count` e `completed`, inteiros e não negativos |
 | LN2 | `catalog/categories` traz uma lista não vazia de categorias com id e nome |
+
+### Explorar doações e categorias (change explorar-categorias)
+
+As referências visuais são `docs/design/17-explorar.png`, `18-categorias-01.png` e `18-categorias-02.png`. As diferenças aprovadas em relação ao Figma estão no `docs/design/README.md`.
+
+- **Busca no Xano:** `GET /catalog/donations/search` é público e só de leitura.
+  - Filtros opcionais: `q` (no título ou na descrição, sem diferenciar maiúsculas), `category_id` e `state` (UF, comparada em maiúsculas por causa das doações antigas), mais `page`.
+  - Só doações disponíveis, da mais nova para a mais antiga, 12 por página.
+  - Resposta: `{items, page, per_page, total, page_total}`. Cada item tem só `id`, `created_at`, `title`, `photo` (URL pública) e `condition`.
+  - Uma página menor que 1 ou uma UF com mais de 2 letras dão 400.
+  - No XanoScript, o `includes` só é aceito como operador (`($db.donation.title|to_lower) includes $search`); a forma `|includes:` não passa no validador.
+  - O `GET /catalog/donations` antigo não mudou: ele devolve doações de qualquer status e não é usado pelo site.
+- **`/explorar`** (`doafacil/explorar.py`):
+  - o cabeçalho tem busca por texto, UF e lupa. Ao buscar, mantém a categoria atual (só na própria `/explorar`);
+  - o título segue os filtros (“Adicionadas recentemente”, “Categoria “Roupas””, “Resultados para “cadeira””, com “em SP” quando houver UF);
+  - a categoria aplicada vira um chip removível;
+  - a grade usa o `donation_grid_card` (`minmax(min(100%, 220px), 1fr)`; uma coluna em 360 px);
+  - “Carregar mais” traz mais 12 sem repetir cartões;
+  - sem resultados, mostra “Nenhuma doação encontrada”, com “Limpar filtros”. Numa falha, mostra a mensagem e “Tentar de novo”;
+  - tem o botão flutuante do chat e o link “Ver categorias”.
+- **Categorias** (`doafacil/categorias.py`):
+  - o item “Categorias” do menu da home abre uma gaveta à esquerda. É um `rx.dialog`: prende o foco, fecha com X, Esc ou clique fora;
+  - a rota `/categorias` mostra a mesma lista, com o cabeçalho da Explorar;
+  - cada categoria leva a `/explorar?categoria=<id>`. Os ícones saem do `CATEGORY_ICONS` (pelo nome sem acento; outro nome usa `tag`);
+  - as categorias excluídas do cadastro (Alimentos e Móveis) também ficam fora daqui.
+- **Cabeçalho compartilhado:** `doafacil/cabecalho.py` tem o menu da conta e os controles “Entrar”/“Quero Doar”, usados pela home, pela `/explorar` e pela `/categorias`.
+- **Testes:** `tests/test_explore.py` e `tests/test_categories.py`.
+
+#### Conferir a busca contra o Xano real
+
+O script `scripts/teste_explorar_real.py` só lê endpoints públicos: não pede login nem cria dados. Com `XANO_API_URL` definida (seção 4) e o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_explorar_real.py
+```
+
+| Cenário | O que confere |
+|---|---|
+| EX1 | sem filtros: itens só com os campos do cartão, e totais coerentes |
+| EX2 | o filtro por uma categoria do backend responde, e o total não passa do total sem filtros |
+| EX3 | o título de uma doação, em MAIÚSCULAS e em minúsculas, encontra a mesma doação |
+| EX4 | uma página além do total vem vazia, com os mesmos totais |
+| EX5 | UF com mais de 2 letras e `page=0` dão 400 |
+| EX6 | nenhuma chave além das do cartão e da paginação |
 
 ### Endpoints antigos do modelo do Xano (change endpoints-publicos)
 

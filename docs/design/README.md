@@ -71,7 +71,7 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 
 > No PNG, os 4 cartões institucionais estão cobertos por blocos cinza com “foto a definir”. As fotos do Figma têm marca d'água de banco de imagens e não entram no repositório nem no site.
 
-- **Cabeçalho:** “Explorar Doações” (`/explorar`), “Como funciona” (`/como-funciona`) e “Categorias” (`/categorias`) são links. Com sessão, o **menu da conta** (círculo com a inicial, primeiro nome e seta) reúne “Minhas doações”, “Editar perfil” e “Sair”; abaixo de 768 px fica só a inicial. Sem sessão, **Entrar**. **Quero Doar** sempre.
+- **Cabeçalho:** “Explorar Doações” (`/explorar`) e “Como funciona” (`/como-funciona`) são links; “Categorias” abre a gaveta de categorias (veja “18-categorias”, abaixo). Com sessão, o **menu da conta** (círculo com a inicial, primeiro nome e seta) reúne “Minhas doações”, “Editar perfil” e “Sair”; abaixo de 768 px fica só a inicial. Sem sessão, **Entrar**. **Quero Doar** sempre.
 - **Título:** como no nó `615:2345` do Figma: LINE Seed JP Bold 36 px, altura de linha normal, `#2A2A2A`, centralizado, 1376 px de largura em 1512 px, quebrando em “…recomeço para” / “alguém.”. Em telas menores, a fonte diminui com a largura (`clamp(1.5rem, 2.4vw, 2.25rem)`).
 - **Números:** “Doações em circulação!” (doações disponíveis) e “Pessoas alcançadas” (doações concluídas), ambos vindos de `catalog/donations/count`. Número em Bold 24 px e rótulo em Regular 16 px, em `#005723` (8,9:1 sobre o creme), centralizados na altura dos cartões das recentes.
 - **Cartões das recentes:** quadrados entre 220 e 260 px de lado, dividindo a largura do carrossel entre os 4. A linha dos números e do carrossel usa as mesmas bordas do conteúdo do cabeçalho (até 1200 px, com margens de 16 e 24 px), e a coluna dos números tem 11rem. Assim, os 4 cartões cabem em 1512 px; quando não cabem, o carrossel rola dentro dele.
@@ -95,9 +95,38 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 | linha dos números e cartões quase até a borda | mesmas bordas do conteúdo do cabeçalho | pedido do grupo |
 | números no topo da linha | centralizados na altura dos cartões | pedido do grupo |
 
+### 17-explorar.png e 18-categorias — Explorar doações e categorias (change explorar-categorias)
+
+Referências: os quadros `438:1426` (Explorar), `474:1650` (home com a gaveta de categorias) e `476:2478` (a lista de uma categoria) do Figma. As fotos são das doações de teste do grupo, sem marca d'água.
+
+- **Explorar (`/explorar`):**
+  - cabeçalho com o logotipo, a busca (campo “Buscar”, seletor de UF e lupa) e os controles de conta;
+  - “Voltar ao início”, o título conforme os filtros (“Adicionadas recentemente”, “Categoria “Roupas””, “Resultados para “…””, com “em SP”) e “Ver categorias”;
+  - a categoria aplicada como chip removível;
+  - a grade de cartões, “Carregar mais” (12 por vez), o estado vazio com “Limpar filtros” e o botão flutuante do chat.
+- **Gaveta de categorias (home):**
+  - painel branco à esquerda, com até 500 px de largura e a altura toda da tela;
+  - título “Categorias”, o X de fechar e a lista: ícone verde `#168447`, nome em negrito e seta;
+  - cada categoria leva a `/explorar?categoria=<id>`.
+- **Página `/categorias`:** a mesma lista num cartão branco, com o cabeçalho da Explorar.
+- **Lista de uma categoria (476:2478):** é a própria `/explorar?categoria=<id>`.
+
+**Diferenças aprovadas em relação ao Figma:**
+
+| No Figma | Na implementação | Motivo |
+|---|---|---|
+| “Estado: Ótimo” | “Condição: Ótimo” | termo do domínio (decisão 6) |
+| gaveta com “Móveis” | categorias do Xano, sem Alimentos e Móveis | as mesmas exclusões do cadastro |
+| seta de “expandir” em cada categoria | seta de “ir” (`chevron-right`) | não há subcategorias |
+| `/explorar` sem filtro com “Da categoria “Roupas”” | só “Adicionadas recentemente” | decisão do grupo |
+| grade fixa de 5 × 245 px | grade flexível, de 220 px para cima | responsivo; uma coluna em 360 px |
+| “Voltar ao inicio” | “Voltar ao início” | acento |
+| cabeçalho da Explorar sem “Entrar” | “Entrar” ou o menu da conta | consistência da sessão |
+| sem link para categorias na Explorar | “Ver categorias” | caminho no celular |
+
 ## Telas ainda sem desenho
 
-Login e cadastro, catálogo (Explorar Doações; hoje há só a página provisória `/explorar`), detalhe da doação, formulário de cadastro da doação, Como funciona, Categorias.
+Login e cadastro, detalhe da doação, formulário de cadastro da doação, Como funciona.
 
 ## Referência de estrutura (Vakinha)
 
@@ -141,6 +170,12 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 ![Seção institucional e rodapé](03-secao-institucional-e-rodape.png)
 
 ![Nova landing (change landing-nova)](16-landing-nova.png)
+
+![Explorar doações (change explorar-categorias)](17-explorar.png)
+
+![Gaveta de categorias na home](18-categorias-01.png)
+
+![Lista de uma categoria](18-categorias-02.png)
 
 ## Novas telas
 

@@ -177,7 +177,7 @@ Em telas estreitas, a página MUST mostrar a lista ou a conversa, uma de cada ve
 - **THEN** a conversa MUST ocupar a largura da tela, com um controle “Voltar às conversas”
 
 ### Requirement: Entrada no chat pelo cabeçalho da home
-A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto inferior direito, com o total de mensagens não lidas quando houver. Com login, o botão MUST levar a `/chat`; sem login, MUST levar a `/login`. O cabeçalho da home MUST NOT mostrar o link “Mensagens”, nem para quem está logado nem para visitantes.
+A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto inferior direito, com o total de mensagens não lidas quando houver. Com login, o botão MUST levar a `/chat`; sem login, MUST levar a `/login`. O cabeçalho da home MUST NOT mostrar o link “Mensagens”, nem para quem está logado nem para visitantes. O mesmo botão MUST aparecer em `/explorar` e `/categorias`, como no Figma.
 
 #### Scenario: Pessoa logada na home
 - **WHEN** a home está com o cabeçalho autenticado
@@ -207,9 +207,14 @@ A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto 
 - **AND** MUST ficar fixo a 24 px das bordas inferior e direita no computador, e a 16 px no celular
 
 #### Scenario: Páginas sem o botão
-- **WHEN** a pessoa está no detalhe da doação (`/doacao/<id>`), que já tem o botão “Chat” da própria doação, ou em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha`, `/cadastro-doacao`, `/minhas-doacoes`, `/minhas-doacoes/<id>/editar` ou na página provisória `/explorar`
+- **WHEN** a pessoa está no detalhe da doação (`/doacao/<id>`), que já tem o botão “Chat” da própria doação, ou em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha`, `/cadastro-doacao`, `/minhas-doacoes` ou `/minhas-doacoes/<id>/editar`
 - **THEN** o botão flutuante MUST NOT aparecer
 - **AND** o detalhe da doação MUST NOT consultar o total de não lidas
+
+#### Scenario: Botão em Explorar e Categorias
+- **WHEN** a pessoa está em `/explorar` ou `/categorias`
+- **THEN** a página MUST mostrar o botão flutuante com o mesmo comportamento da home, inclusive o total de não lidas consultado uma vez por carregamento
+- **AND** o fim da página MUST ter o espaço livre do botão, para nenhum cartão ou botão ficar coberto
 
 #### Scenario: Celular sem cobrir ações
 - **WHEN** a home é vista numa largura de 360 px
