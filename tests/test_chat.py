@@ -1800,6 +1800,8 @@ class ChatFabTests(unittest.TestCase):
             "/recuperar-senha": main.request_recovery_page,
             "/nova-senha": main.new_password_page,
             "/cadastro-doacao": main.donation_creation_page,
+            # Página provisória da change landing-nova.
+            "/explorar": main.explore_page,
         }
         for route, page in pages.items():
             with self.subTest(route=route):

@@ -72,25 +72,25 @@ python -m unittest discover -s tests -v
 
 ## 6. O que já está pronto (na `main`)
 
-- Home pública (carrossel, contagem de doações, "Comece por aqui", seção institucional, rodapé).
+- Home pública no layout da nova landing (change landing-nova): carrossel, “Doações em circulação!” e “Pessoas alcançadas”, “Comece por aqui” com a busca funcionando, seção institucional e rodapé com links. Veja “Home e página provisória de Explorar doações” na seção 8.
 - Login (`/login`) e cadastro (`/cadastro`).
-- Cabeçalho logado ("Olá, nome" e "Sair").
+- Cabeçalho logado: o menu da conta (inicial e primeiro nome), com “Minhas doações”, “Editar perfil” e “Sair”.
 - Animação de entrada nas páginas.
 - Recuperação de senha por código: API no Xano e as três telas (`/recuperar-senha`, `/verificar-email`, `/nova-senha`).
 - Cadastro de doação em 5 etapas (`/cadastro-doacao`) e endpoint `catalog/donations/publish`.
 - Chat da doação: página `/chat` (lista de conversas e mensagens), botão “Chat” no detalhe da doação e link “Mensagens” no cabeçalho logado da home. Veja “Chat da doação” na seção 8.
-- Minhas doações: `/minhas-doacoes` (lista com status, contadores e ações) e `/minhas-doacoes/<id>/editar`, com o link “Minhas doações” no cabeçalho logado da home. Veja “Minhas doações” na seção 8.
+- Minhas doações: `/minhas-doacoes` (lista com status, contadores e ações) e `/minhas-doacoes/<id>/editar`, com “Minhas doações” no menu da conta, no cabeçalho logado da home. Veja “Minhas doações” na seção 8.
 - Editar perfil: `/perfil/editar` (nome, Sobre, cidade e estado; e-mail só de leitura), pelo botão “Editar perfil” de “Minhas doações”. O Sobre aparece no perfil público e em “Minhas doações”. Veja “Perfil da conta” na seção 8.
 
 ## 7. O que ainda falta
 
-- Explorar Doações (ainda sem design).
+- Explorar Doações (ainda sem design). Hoje `/explorar` é uma página provisória, que só mostra os filtros recebidos da home.
 - Detalhe da doação.
 - Perfil: editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
 - **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
 - Interesse, avaliações e administração (sem tabelas ainda).
-- Páginas "Como funciona" e "Categorias".
-- Botões e links da home que ainda não levam a lugar nenhum.
+- As páginas para onde a home já aponta, mas que ainda não existem (mostram a página “não encontrada”): `/como-funciona`, `/categorias`, `/quem-somos`, `/contato`, `/privacidade`, `/termos`, `/duvidas` e `/seguranca`. As rotas ficam em `FUTURE_ROUTES` (`doafacil/doafacil.py`); ao criar uma página, basta registrar a rota.
+- Fotos próprias para os 4 cartões institucionais (hoje com o degradê de placeholder).
 
 Em aberto com o grupo: status e transições da doação, mensagens entre usuários, avaliações e moderação. O destino dos endpoints antigos do modelo do Xano foi decidido: a change endpoints-publicos os remove (veja “Endpoints antigos do modelo do Xano” na seção 8).
 
@@ -127,6 +127,46 @@ A senha é enviada ao Xano para validação no início e novamente na verificaç
 O estado de cadastro pendente é transitório no servidor Reflex: reiniciar o servidor ou abrir outra aba pode perdê-lo. Se a guarda da tela `/verificar-email` não encontrar o e-mail no estado, redireciona para `/recuperar-senha`; iniciar novamente o cadastro permite obter um novo estado de fluxo. No fluxo de cadastro, “Usar outro e-mail” limpa e-mail e senha e retorna a `/cadastro`.
 
 Nas validações Xano desse fluxo, e-mail e código usam verificações de comprimento com `strlen` em vez de padrões de regex com barra invertida. A senha segue as regras da conta: mínimo de oito caracteres, com letra e dígito.
+
+### Home e página provisória de Explorar doações (change landing-nova)
+
+A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprovadas em relação ao Figma estão no `docs/design/README.md`.
+
+- **Números:** `GET /catalog/donations/count` é público e responde `{count, completed}`.
+  - `count` são as doações disponíveis (“Doações em circulação!”), e `completed` as concluídas (“Pessoas alcançadas”).
+  - A resposta só tem as duas contagens.
+  - No site, `_fetch_donation_counts` valida cada uma: um `count` inválido derruba as duas estatísticas, e um `completed` ausente ou inválido derruba só “Pessoas alcançadas”. Nunca há número fictício.
+- **Busca:** a barra é um formulário (Enter no campo também busca).
+  - As categorias vêm de `/catalog/categories`, com as mesmas exclusões do cadastro, e a localização lista as 27 UFs.
+  - “Buscar” abre `/explorar` com `q`, `categoria` (id) e `uf` (sigla), só para os filtros escolhidos (`build_explore_url` em `doafacil/explorar.py`).
+- **`/explorar` provisória:** `ExploreState.load_filters` valida os parâmetros (categoria inteira positiva e UF entre as 27) e mostra o resumo com o nome da categoria, sem lista de doações.
+  - A próxima change substitui a página e mantém a rota, os parâmetros e as funções.
+  - Não tem o botão flutuante do chat.
+- **Links da home:**
+
+  | Origem | Destino |
+  |---|---|
+  | menu “Explorar Doações”, “Ver mais...”, cartão “Para você mesmo”, rodapé “Doações” | `/explorar` |
+  | cartão “Ajude quem precisa”, rodapé “Criar doações”, “Quero Doar” | `/cadastro-doacao` |
+  | rodapé “Doações mais recentes” | `/#doacoes-recentes` |
+  | menu “Como funciona” e “Categorias”; rodapé “Clique aqui para falar conosco”, “Quem somos”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” | rotas futuras em `FUTURE_ROUTES` |
+
+- **Cartões institucionais:** `INSTITUTIONAL_CARDS` com `image: None` usa o degradê. Para trocar por uma foto própria, coloque o arquivo em `assets/landing/` e preencha `image` (por exemplo, `"/landing/historias.jpg"`). Um véu escuro embaixo mantém o texto legível. Não use as fotos do Figma: elas têm marca d'água de banco de imagens.
+- **Contraste:** sobre o creme `#FFF6E8`, use `#166B3B` (6,1:1) para texto verde. O `#168447` dá só 4,4:1 ali e fica para fundo branco (4,75:1) e botões.
+- **Testes:** `tests/test_public_home.py` (números, busca, links, menu da conta, cartões e 360 px) e `tests/test_explore.py` (página provisória).
+
+#### Conferir os números e as categorias contra o Xano real
+
+O script `scripts/teste_landing_real.py` só lê endpoints públicos: não pede login nem cria dados. Com `XANO_API_URL` definida (seção 4) e o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_landing_real.py
+```
+
+| Cenário | O que confere |
+|---|---|
+| LN1 | `catalog/donations/count` sem token traz só `count` e `completed`, inteiros e não negativos |
+| LN2 | `catalog/categories` traz uma lista não vazia de categorias com id e nome |
 
 ### Endpoints antigos do modelo do Xano (change endpoints-publicos)
 

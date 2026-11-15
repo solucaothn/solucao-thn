@@ -9,8 +9,15 @@ query "catalog/donations/count" verb=GET {
       where = $db.donation.status == "disponível"
       return = {type: "count"}
     } as $count
+
+    // Doações concluídas: a estatística “Pessoas alcançadas” da home
+    // (change landing-nova). Só a contagem, sem dados das doações.
+    db.query donation {
+      where = $db.donation.status == "concluída"
+      return = {type: "count"}
+    } as $completed
   }
 
-  response = {count: $count}
+  response = {count: $count, completed: $completed}
   guid = "YEXKnQBYZADVz16JATEzR0T7mPs"
 }

@@ -823,42 +823,40 @@ class HomeHeaderLinkTests(unittest.TestCase):
             and "Sair" in str(node.children[0])
         )
 
+    # Change landing-nova: “Minhas doações” virou item do menu da conta.
     def test_link_only_in_authenticated_header(self) -> None:
         authenticated, visitor = (str(child) for child in self._header_cond().children)
-        self.assertIn('to:"/minhas-doacoes"', authenticated)
+        self.assertIn("home-account-menu", authenticated)
+        self.assertIn('"/minhas-doacoes"', authenticated)
         self.assertIn("Minhas doa\\u00e7\\u00f5es", authenticated)
         self.assertNotIn("/minhas-doacoes", visitor)
         for header in (authenticated, visitor):
             self.assertNotIn("Mensagens", header)
 
-    def test_link_is_spaced_like_the_menu_items(self) -> None:
+    def test_menu_has_my_donations_profile_and_logout(self) -> None:
         authenticated = str(self._header_cond().children[0])
-        # 12 px do gap do grupo + 20 px (a partir de 1280 px) = 32 px, o
-        # espaçamento do menu nessa largura.
-        self.assertIn('gap:"3"', authenticated)
-        self.assertIn(
-            '["@media screen and (min-width: 80em)"] : ({ ["marginRight"] : "20px" })',
-            authenticated,
-        )
-        self.assertIn('["marginRight"] : "0px"', authenticated)
-        # O menu da home: 12 px abaixo de 1280 px e 32 px a partir dele
-        # (gap responsivo do Radix; o lg do Radix é 1280 px).
-        rendered = str(index())
-        self.assertIn('gap:({ ["initial"] : "3", ["lg"] : "6" })', rendered)
+        for label, target in (
+            ("Minhas doa\\u00e7\\u00f5es", '"/minhas-doacoes"'),
+            ("Editar perfil", '"/perfil/editar"'),
+            ("Sair", "logout"),
+        ):
+            with self.subTest(item=label):
+                self.assertIn(label, authenticated)
+                self.assertIn(target, authenticated)
+        self.assertIn("RadixThemesDropdownMenu", authenticated)
 
     def test_header_never_wraps_between_768_and_1512(self) -> None:
         authenticated = str(self._header_cond().children[0])
-        start = authenticated.index('className:"home-greeting"')
-        greeting_css = authenticated[start : authenticated.index("})},", start)]
-        # “Olá, <nome>” sempre visível (spec user-account), numa linha só e
-        # com reticências num nome longo.
-        self.assertIn('["whiteSpace"] : "nowrap"', greeting_css)
-        self.assertIn('["textOverflow"] : "ellipsis"', greeting_css)
-        self.assertIn('["overflow"] : "hidden"', greeting_css)
-        self.assertNotIn("overflowWrap", greeting_css)
-        self.assertNotIn('"display"', greeting_css)
-        self.assertIn('(min-width: 0px)"] : ({ ["maxWidth"] : "100px" })', greeting_css)
-        self.assertIn('(min-width: 80em)"] : ({ ["maxWidth"] : "120px" })', greeting_css)
+        start = authenticated.index('className:"home-account-name"')
+        name_css = authenticated[start : authenticated.index("})},", start)]
+        # O primeiro nome numa linha só, com reticências num nome longo; abaixo
+        # de 768 px fica só a inicial (o nome segue no rótulo acessível).
+        self.assertIn('["whiteSpace"] : "nowrap"', name_css)
+        self.assertIn('["textOverflow"] : "ellipsis"', name_css)
+        self.assertIn('["overflow"] : "hidden"', name_css)
+        self.assertIn('(min-width: 0px)"] : ({ ["maxWidth"] : "80px", ["display"] : "none" })', name_css)
+        self.assertIn('(min-width: 48em)"] : ({ ["display"] : "block" })', name_css)
+        self.assertIn('(min-width: 80em)"] : ({ ["maxWidth"] : "120px" })', name_css)
 
         # Entre 992 e 1279 px, o espaço sai do menu: fonte de 14 px e 12 px
         # entre os itens; a partir de 1280 px, 16 px e 32 px.
@@ -869,21 +867,12 @@ class HomeHeaderLinkTests(unittest.TestCase):
         )
         self.assertEqual(rendered.count(nav_rule), 3)
         self.assertIn('gap:({ ["initial"] : "3", ["lg"] : "6" })', rendered)
-        # O texto do link “Minhas doações” só aparece a partir de 1280 px.
-        self.assertIn(
-            '["@media screen and (min-width: 80em)"] : ({ ["display"] : "inline" })',
-            authenticated,
-        )
-        self.assertNotIn(
-            '["@media screen and (min-width: 62em)"] : ({ ["display"] : "inline" })',
-            authenticated,
-        )
 
-    def test_link_keeps_accessible_label_on_mobile(self) -> None:
+    def test_menu_trigger_keeps_accessible_label_and_touch_area(self) -> None:
         authenticated = str(self._header_cond().children[0])
-        self.assertIn('"aria-label":"Minhas doa\\u00e7\\u00f5es"', authenticated)
-        self.assertIn("LucidePackage", authenticated)
+        self.assertIn('"aria-label":("Menu da conta de "+', authenticated)
         self.assertIn('"minHeight"] : "44px"', authenticated)
+        self.assertIn("LucideChevronDown", authenticated)
 
 
 class EditDonationStateTests(unittest.TestCase):
