@@ -12,7 +12,8 @@ from doafacil.doafacil import (
     COUNT_ERROR_MESSAGE,
     FIELD_PLACEHOLDER_SELECTOR,
     FOOTER_LINK_GROUPS,
-    FUTURE_ROUTES,
+    HOW_IT_WORKS_ANCHOR,
+    INSTITUTIONAL_ROUTES,
     INSTITUTIONAL_CARDS,
     HomeState,
     _fetch_donation_counts,
@@ -656,7 +657,7 @@ class PublicHomeTests(unittest.TestCase):
                 self.assertIn("&:focus-visible", str(node))
         self.assertEqual(
             {href for group in FOOTER_LINK_GROUPS for _, href in group} - {"/explorar", "/cadastro-doacao", "/#doacoes-recentes"},
-            {FUTURE_ROUTES[key] for key in ("quem_somos", "privacidade", "termos", "duvidas", "seguranca")},
+            {INSTITUTIONAL_ROUTES[key] for key in ("quem_somos", "privacidade", "termos", "duvidas", "seguranca")},
         )
         link_stacks = [
             node
@@ -1016,12 +1017,12 @@ class PublicHomeTests(unittest.TestCase):
             nav_links,
             {
                 "Explorar Doações": "/explorar",
-                "Como funciona": FUTURE_ROUTES["como_funciona"],
+                "Como funciona": HOW_IT_WORKS_ANCHOR,
             },
         )
         # “Categorias” abre a gaveta (change explorar-categorias) e deixou de
         # ser rota futura.
-        self.assertNotIn("categorias", FUTURE_ROUTES)
+        self.assertNotIn("categorias", INSTITUTIONAL_ROUTES)
         header = str(page.children[0].children[0])
         self.assertIn('className:"home-categories-trigger"', header)
         self.assertIn("categories-drawer", header)
@@ -1034,6 +1035,15 @@ class PublicHomeTests(unittest.TestCase):
                 continue  # fecha a gaveta ao navegar (test_categories)
             if node is not enter_button and type(node).__name__ not in {"DropdownMenuItem", "Form", "DialogRoot"}:
                 self.assertFalse(getattr(node, "event_triggers", {}))
+
+    def test_how_it_works_goes_to_the_institutional_section(self) -> None:
+        """Change paginas-institucionais: “Como funciona” leva à seção
+        “Doar no DoaFácil é simples e seguro”, sem página própria."""
+        self.assertEqual(HOW_IT_WORKS_ANCHOR, "/#como-funciona")
+        self.assertEqual(self._value(institutional_section().id), "como-funciona")
+        header = str(index().children[0].children[0])
+        self.assertIn('to:"/#como-funciona"', header)
+        self.assertNotIn("/como-funciona", header.replace("/#como-funciona", ""))
 
     def test_header_fits_360_px(self) -> None:
         header = str(index().children[0].children[0])

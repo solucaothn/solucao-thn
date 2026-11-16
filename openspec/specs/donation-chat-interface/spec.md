@@ -177,7 +177,7 @@ Em telas estreitas, a página MUST mostrar a lista ou a conversa, uma de cada ve
 - **THEN** a conversa MUST ocupar a largura da tela, com um controle “Voltar às conversas”
 
 ### Requirement: Entrada no chat pelo cabeçalho da home
-A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto inferior direito, com o total de mensagens não lidas quando houver. Com login, o botão MUST levar a `/chat`; sem login, MUST levar a `/login`. O cabeçalho da home MUST NOT mostrar o link “Mensagens”, nem para quem está logado nem para visitantes. O mesmo botão MUST aparecer em `/explorar` e `/categorias`, como no Figma.
+A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto inferior direito, com o total de mensagens não lidas quando houver. Com login, o botão MUST levar a `/chat`; sem login, MUST levar a `/login`. O cabeçalho da home MUST NOT mostrar o link “Mensagens”, nem para quem está logado nem para visitantes. O mesmo botão MUST aparecer em `/explorar`, `/categorias` e nas páginas institucionais, como no Figma.
 
 #### Scenario: Pessoa logada na home
 - **WHEN** a home está com o cabeçalho autenticado
@@ -215,6 +215,11 @@ A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto 
 - **WHEN** a pessoa está em `/explorar` ou `/categorias`
 - **THEN** a página MUST mostrar o botão flutuante com o mesmo comportamento da home, inclusive o total de não lidas consultado uma vez por carregamento
 - **AND** o fim da página MUST ter o espaço livre do botão, para nenhum cartão ou botão ficar coberto
+
+#### Scenario: Botão nas páginas institucionais
+- **WHEN** a pessoa está em `/duvidas`, `/duvidas/<categoria>`, `/seguranca`, `/termos`, `/privacidade`, `/quem-somos` ou `/contato`
+- **THEN** a página MUST mostrar o botão flutuante com o mesmo comportamento da home, inclusive o total de não lidas consultado uma vez por carregamento
+- **AND** o fim da página MUST ter o espaço livre do botão, para nenhum texto ou link do rodapé ficar coberto
 
 #### Scenario: Celular sem cobrir ações
 - **WHEN** a home é vista numa largura de 360 px

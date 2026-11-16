@@ -36,11 +36,26 @@ class HeaderState(LoginState):
 
 
 def _account_avatar() -> rx.Component:
-    """Inicial do nome ou, sem nome ainda, o ícone de pessoa."""
+    """Foto de perfil, redonda e cortada (cover); sem foto, a inicial do nome
+    ou, sem nome ainda, o ícone de pessoa. O círculo é decorativo (o nome está
+    no rótulo do botão), por isso a foto tem alt vazio."""
     return rx.cond(
-        HeaderState.account_initial != "",
-        rx.text(HeaderState.account_initial, as_="span"),
-        rx.icon("user", size=18, aria_hidden="true"),
+        LoginState.account_photo != "",
+        rx.image(
+            src=LoginState.account_photo,
+            alt="",
+            class_name="home-account-photo",
+            width="100%",
+            height="100%",
+            object_fit="cover",
+            border_radius="50%",
+            display="block",
+        ),
+        rx.cond(
+            HeaderState.account_initial != "",
+            rx.text(HeaderState.account_initial, as_="span"),
+            rx.icon("user", size=18, aria_hidden="true"),
+        ),
     )
 
 
@@ -62,6 +77,7 @@ def account_menu() -> rx.Component:
                     height="32px",
                     flex_shrink="0",
                     border_radius="50%",
+                    overflow="hidden",
                     background="#EDEDED",
                     border="1px solid #D6D6D6",
                     color="#555555",
@@ -113,6 +129,64 @@ def account_menu() -> rx.Component:
             ),
             align="end",
         ),
+    )
+
+
+BACK_LINK_COLOR = "#166B3B"  # 6,1:1 sobre o creme
+
+
+def back_link(label: str = "Voltar ao início", href: str = "/", class_name: str = "institutional-back-link") -> rx.Component:
+    """“Voltar” das páginas com o cabeçalho de logotipo, da /explorar e da
+    /categorias: seta e texto em verde escuro. A cor vale também visitado e
+    com o mouse em cima, para não herdar o azul do tema do Radix."""
+    fixed_color = {"color": BACK_LINK_COLOR}
+    return rx.link(
+        rx.icon("chevron-left", size=18, aria_hidden="true"),
+        label,
+        href=href,
+        class_name=class_name,
+        color=BACK_LINK_COLOR,
+        display="inline-flex",
+        align_items="center",
+        gap="4px",
+        min_height="44px",
+        underline="hover",
+        _visited=fixed_color,
+        _hover=fixed_color,
+        _focus_visible=FOCUS_RING,
+    )
+
+
+LOGO_WIDTH = rx.breakpoints(initial="100px", md="190px")
+
+
+def logo_header() -> rx.Component:
+    """Cabeçalho das páginas institucionais (Figma): só o logotipo,
+    centralizado, levando à home. O mesmo tamanho do logotipo da home."""
+    return rx.box(
+        rx.link(
+            rx.image(
+                src="/logo.svg",
+                alt="DoaFácil — início",
+                style={"width": LOGO_WIDTH},
+                height="72px",
+                object_fit="contain",
+            ),
+            href="/",
+            aria_label="DoaFácil — início",
+            display="inline-flex",
+            align_items="center",
+            min_height="44px",
+            _focus_visible=FOCUS_RING,
+        ),
+        class_name="institutional-header",
+        display="flex",
+        justify_content="center",
+        align_items="center",
+        width="100%",
+        padding=HEADER_PADDING,
+        box_sizing="border-box",
+        background="white",
     )
 
 

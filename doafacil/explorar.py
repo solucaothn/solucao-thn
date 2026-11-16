@@ -18,6 +18,7 @@ import httpx
 import reflex as rx
 
 from doafacil.cabecalho import (
+    back_link,
     FOCUS_RING,
     HEADER_MAX_WIDTH,
     HEADER_PADDING,
@@ -418,11 +419,8 @@ def explore_header() -> rx.Component:
 
 
 def back_home_link() -> rx.Component:
-    return _text_link(
-        "Voltar ao início",
-        "/",
-        class_name="explore-back-link",
-    )
+    """O mesmo “Voltar ao início” das páginas institucionais."""
+    return back_link("Voltar ao início", "/", class_name="explore-back-link")
 
 
 def _category_chip() -> rx.Component:

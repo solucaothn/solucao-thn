@@ -16,7 +16,7 @@ A home SHALL apresentar o cabeçalho, a frase de destaque, as estatísticas “D
 
 #### Scenario: Links do menu do cabeçalho
 - **WHEN** uma pessoa aciona um item do menu do cabeçalho
-- **THEN** “Explorar Doações” MUST levar a `/explorar` e “Como funciona” a `/como-funciona`
+- **THEN** “Explorar Doações” MUST levar a `/explorar`, e “Como funciona” MUST levar à seção “Doar no DoaFácil é simples e seguro” da home, pela âncora `/#como-funciona`
 - **AND** “Categorias” MUST abrir a gaveta de categorias (spec `donation-categories`), em vez de navegar
 - **AND** os itens MUST ser acessíveis pelo teclado, com foco visível
 
@@ -111,7 +111,7 @@ A home SHALL apresentar, abaixo de “Doações em circulação!”, a estatíst
 - **AND** a estatística “Doações em circulação!” continua sendo exibida quando a sua quantidade for válida
 
 ### Requirement: Menu da conta no cabeçalho
-Com sessão, o cabeçalho da home SHALL apresentar um menu da conta com a inicial e o primeiro nome da pessoa, no lugar dos controles “Minhas doações”, “Olá, nome” e “Sair”, mantendo o botão “Quero Doar”.
+Com sessão, o cabeçalho da home SHALL apresentar um menu da conta com a foto de perfil (ou, sem foto, a inicial) e o primeiro nome da pessoa, no lugar dos controles “Minhas doações”, “Olá, nome” e “Sair”, mantendo o botão “Quero Doar”.
 
 #### Scenario: Abrir o menu
 - **WHEN** uma pessoa com sessão aciona o menu da conta, pelo mouse ou pelo teclado
@@ -126,6 +126,13 @@ Com sessão, o cabeçalho da home SHALL apresentar um menu da conta com a inicia
 #### Scenario: Sem sessão
 - **WHEN** não há sessão
 - **THEN** o cabeçalho MUST mostrar “Entrar” e “Quero Doar”, sem o menu da conta
+
+#### Scenario: Foto de perfil no círculo
+- **WHEN** a pessoa com sessão tem foto de perfil
+- **THEN** o círculo do menu MUST mostrar a foto, redonda e com `object-fit: cover`, com texto alternativo vazio (o nome já está no rótulo do botão)
+- **AND** sem foto, o círculo MUST mostrar a inicial do nome ou, sem nome ainda, o ícone de pessoa
+- **AND** a foto MUST vir do `GET auth/profile` numa só requisição, feita no carregamento da conta e só na primeira vez para cada sessão; uma falha nessa requisição MUST manter a inicial, sem afetar a página
+- **AND** ao trocar ou remover a foto em Editar perfil, o círculo MUST refletir a mudança sem nova requisição
 
 ### Requirement: Link “Ver mais...” das doações recentes
 A seção “Doações mais recentes:” SHALL apresentar o link “Ver mais...”, que leva a `/explorar`.
