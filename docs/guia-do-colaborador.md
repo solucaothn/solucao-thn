@@ -87,9 +87,11 @@ python -m unittest discover -s tests -v
 - Explorar Doações: seções por categoria na página sem filtro, outras ordenações e subcategorias (a listagem com filtros já existe; veja “Explorar doações e categorias” na seção 8).
 - Detalhe da doação.
 - Perfil: editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
-- **Pendência:** apagar uma doação remove as linhas de `donation_photo`, mas não os arquivos de imagem no armazenamento do Xano. Corrigir numa change própria, combinada com o grupo.
+- **Pendência (Xano): apagar os arquivos das fotos ao apagar uma doação.** O `DELETE /catalog/donations` remove as linhas de `donation_photo`, mas não chama `storage.delete_file` (a remoção da foto de perfil chama). Os arquivos de imagem continuam no armazenamento do Xano, e a Política de privacidade (seção 6) avisa isso. Corrigir numa change própria, combinada com o grupo; ao corrigir, atualizar também o texto da Privacidade e a resposta “Posso cancelar uma doação?” da Central de ajuda (`doafacil/institucional.py`).
+- **Pendência (Xano): recusar “Alimentos” no backend.** O domínio não aceita doação de alimentos, mas só o front aplica a regra: o formulário esconde a categoria (`EXCLUDED_CATEGORY_NAMES` em `doafacil/cadastro_doacao.py`). O `POST /catalog/donations/publish` e o `PATCH /catalog/donations` aceitam qualquer categoria que exista, inclusive “Alimentos”, numa chamada direta. Como a validação deve ficar no Xano, corrigir numa change própria (decidir com o grupo se “Móveis”, também escondida no formulário, entra na mesma regra).
 - Interesse, avaliações e administração (sem tabelas ainda).
-- As páginas para onde a home já aponta, mas que ainda não existem (mostram a página “não encontrada”): `/como-funciona`, `/quem-somos`, `/contato`, `/privacidade`, `/termos`, `/duvidas` e `/seguranca`. As rotas ficam em `FUTURE_ROUTES` (`doafacil/doafacil.py`); ao criar uma página, basta registrar a rota.
+- **Pendência: e-mail de contato do projeto.** O grupo ainda não definiu um. Enquanto `CONTACT_EMAIL` (`doafacil/rodape.py`) estiver vazio, “Fale com a gente” e “Clique aqui para falar conosco” levam a `/contato`, que avisa que o canal vai ser publicado. Quando houver um e-mail real, basta preenchê-lo ali. Nunca use um endereço que o projeto não tenha.
+- Fotos próprias para Segurança e Quem somos (hoje com placeholder em degradê).
 - Fotos próprias para os 4 cartões institucionais (hoje com o degradê de placeholder).
 
 Em aberto com o grupo: status e transições da doação, mensagens entre usuários, avaliações e moderação. O destino dos endpoints antigos do modelo do Xano foi decidido: a change endpoints-publicos os remove (veja “Endpoints antigos do modelo do Xano” na seção 8).
@@ -148,7 +150,9 @@ A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprova
   | cartão “Ajude quem precisa”, rodapé “Criar doações”, “Quero Doar” | `/cadastro-doacao` |
   | rodapé “Doações mais recentes” | `/#doacoes-recentes` |
   | menu “Categorias” | abre a gaveta de categorias (change explorar-categorias) |
-  | menu “Como funciona”; rodapé “Clique aqui para falar conosco”, “Quem somos”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” | rotas futuras em `FUTURE_ROUTES` |
+  | menu “Como funciona” | `/#como-funciona` (a seção “Doar no DoaFácil é simples e seguro”) |
+  | rodapé “Clique aqui para falar conosco” | `/contato` (ou `mailto:`, quando `CONTACT_EMAIL` for definido) |
+  | rodapé “Quem somos”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” | as páginas institucionais (`INSTITUTIONAL_ROUTES` em `doafacil/rodape.py`) |
 
 - **Cartões institucionais:** `INSTITUTIONAL_CARDS` com `image: None` usa o degradê. Para trocar por uma foto própria, coloque o arquivo em `assets/landing/` e preencha `image` (por exemplo, `"/landing/historias.jpg"`). Um véu escuro embaixo mantém o texto legível. Não use as fotos do Figma: elas têm marca d'água de banco de imagens.
 - **Contraste:** sobre o creme `#FFF6E8`, use `#166B3B` (6,1:1) para texto verde. O `#168447` dá só 4,4:1 ali e fica para fundo branco (4,75:1) e botões.
@@ -166,6 +170,38 @@ python scripts/teste_landing_real.py
 |---|---|
 | LN1 | `catalog/donations/count` sem token traz só `count` e `completed`, inteiros e não negativos |
 | LN2 | `catalog/categories` traz uma lista não vazia de categorias com id e nome |
+
+### Páginas institucionais (change paginas-institucionais)
+
+As referências visuais são `docs/design/19-duvidas-01.png` a `23-quem-somos.png`. As diferenças em relação ao Figma estão no `docs/design/README.md`.
+
+- **Rotas:**
+
+  | Rota | Página |
+  |---|---|
+  | `/duvidas` | Central de ajuda |
+  | `/duvidas/<categoria>` | as perguntas de uma categoria |
+  | `/seguranca` | Segurança e transparência |
+  | `/termos` | Termos de uso |
+  | `/privacidade` | Política de privacidade |
+  | `/quem-somos` | Quem somos |
+  | `/contato` | Fale com a gente |
+
+  Todas são estáticas, sem Xano. Têm o cabeçalho com o logotipo centralizado (`logo_header` em `cabecalho.py`), “Voltar ao início”, o rodapé da home e o botão flutuante do chat.
+- **Módulos:**
+  - `doafacil/institucional.py` tem o conteúdo e as páginas;
+  - `doafacil/rodape.py` tem o rodapé (movido de `doafacil.py`), `INSTITUTIONAL_ROUTES`, `CONTACT_EMAIL` e `HOW_IT_WORKS_ANCHOR`. O antigo `FUTURE_ROUTES` acabou.
+- **Conteúdo verdadeiro:** os Termos e a Privacidade do Figma eram de uma plataforma de doações em dinheiro e foram reescritos para o DoaFácil. As duas páginas mostram “Documento de projeto acadêmico, sem valor jurídico.”. As frases falsas das outras telas foram trocadas.
+  - Para mudar um texto, edite as constantes de `institucional.py` (`HELP_CATEGORIES`, `SECURITY_BENEFITS`, `SECURITY_CARDS`, `ABOUT_STORY`, `TERMS_SECTIONS`, `PRIVACY_SECTIONS` e `PRIVACY_DATA_ROWS`).
+  - O teste `tests/test_institucional.py` barra palavras de serviços e dados que o projeto não tem (Pix, cartão, CPF, CNPJ, `doafacil.com.br`, 2019…).
+- **Central de ajuda:**
+  - 6 categorias e 27 perguntas em `HELP_CATEGORIES`, e a quantidade de cada categoria é calculada;
+  - “Mais perguntadas” referencia perguntas das categorias (`MOST_ASKED_IDS`);
+  - a busca (`HelpState`) não diferencia maiúsculas nem acentos, e procura na pergunta e na resposta;
+  - as perguntas usam o `rx.accordion` do Radix, em que abrir uma fecha a outra, com teclado e `aria-expanded`.
+- **“Como funciona”:** não tem página. O menu leva à seção institucional da home (`id="como-funciona"`).
+- **Pendência:** o e-mail de contato (veja a seção 7).
+- **Testes:** `tests/test_institucional.py`.
 
 ### Explorar doações e categorias (change explorar-categorias)
 

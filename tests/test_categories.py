@@ -108,9 +108,9 @@ class CategoriesPageTests(unittest.TestCase):
         self.assertIsNone(re.search(r'\["(?:min)?[wW]idth"\] : "(3[7-9]\d|[4-9]\d\d|\d{4,})px"', r))
 
     def test_route_is_registered(self) -> None:
-        from doafacil.doafacil import FUTURE_ROUTES, app
+        from doafacil.doafacil import INSTITUTIONAL_ROUTES, app
 
-        self.assertNotIn("categorias", FUTURE_ROUTES)
+        self.assertNotIn("categorias", INSTITUTIONAL_ROUTES)
         on_load = app._unevaluated_pages["categorias"].on_load
         handlers = on_load if isinstance(on_load, list) else [on_load]
         self.assertIn(CategoriesState.load_categories.fn, [h.fn for h in handlers])

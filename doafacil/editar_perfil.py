@@ -313,6 +313,7 @@ def _new_client() -> httpx.AsyncClient:
 def _clear_session(state: Any) -> None:
     state.auth_token = ""
     state.account_name = ""
+    state.account_photo = ""
 
 
 def _clear_form(state: Any) -> None:
@@ -423,6 +424,7 @@ class EditProfileState(LoginState):
         self.uf = profile["state"] if profile["state"] in BRAZILIAN_STATES else ""
         self.about = profile["about"]
         self.photo = profile["photo"]
+        self.account_photo = profile["photo"]
         self.email_verified = profile["email_verified"]
         self.active_count = profile["active"]
         self.completed_count = profile["completed"]
@@ -528,6 +530,7 @@ class EditProfileState(LoginState):
             self.photo_error = PHOTO_ERROR_MESSAGE
         else:
             self.photo = url
+            self.account_photo = url  # o menu da conta já mostra a nova
             self.photo_notice = PHOTO_SAVED_MESSAGE
         self.photo_busy = False
 
@@ -561,6 +564,7 @@ class EditProfileState(LoginState):
             self.photo_error = PHOTO_ERROR_MESSAGE
         else:
             self.photo = ""
+            self.account_photo = ""  # o menu da conta volta à inicial
             self.photo_notice = PHOTO_REMOVED_MESSAGE
         self.photo_busy = False
 

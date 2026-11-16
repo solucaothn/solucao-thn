@@ -9,6 +9,8 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.perfil_publico import parse_photo_url
+
 
 AUTH_API_ENV = "XANO_AUTH_API_URL"
 AUTH_LOGIN_PATH = "/auth/login"
@@ -16,6 +18,8 @@ AUTH_SIGNUP_PATH = "/auth/signup"
 AUTH_SIGNUP_RESEND_PATH = "/auth/signup_resend"
 AUTH_SIGNUP_VERIFY_PATH = "/auth/signup_verify"
 AUTH_ME_PATH = "/auth/me"
+# A foto do menu da conta vem do GET auth/profile (o auth/me não traz a foto).
+AUTH_PROFILE_PATH = "/auth/profile"
 PASSWORD_RESET_REQUEST_PATH = "/reset/request_code"
 PASSWORD_RESET_VERIFY_PATH = "/reset/verify_code"
 PASSWORD_RESET_CONFIRM_PATH = "/reset/confirm_password"
@@ -155,6 +159,10 @@ def auth_me_endpoint() -> str:
     return _auth_api_endpoint(AUTH_ME_PATH)
 
 
+def auth_profile_endpoint() -> str:
+    return _auth_api_endpoint(AUTH_PROFILE_PATH)
+
+
 def password_reset_request_endpoint() -> str:
     return _auth_api_endpoint(PASSWORD_RESET_REQUEST_PATH)
 
@@ -250,6 +258,33 @@ async def request_password_reset_confirmation(
         raise RecoveryTokenRejectedError from None
     if payload.get("success") is not True:
         raise PasswordRecoveryUnavailableError from None
+
+
+async def request_account_photo(
+    client: httpx.AsyncClient, endpoint: str, auth_token: str
+) -> str:
+    """URL da foto de perfil (GET auth/profile), ou "" sem foto.
+
+    401/403 vira AuthTokenRejectedError, como no nome. Qualquer outra falha
+    (rede, erro do serviço, resposta inválida) vira "": o menu mostra a
+    inicial, e a página continua funcionando.
+    """
+    try:
+        response = await client.get(
+            endpoint,
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+    except httpx.RequestError:
+        return ""
+    if response.status_code in {401, 403}:
+        raise AuthTokenRejectedError from None
+    if response.is_error:
+        return ""
+    try:
+        payload = response.json()
+        return parse_photo_url(payload.get("photo")) if isinstance(payload, dict) else ""
+    except ValueError:
+        return ""
 
 
 async def request_authenticated_name(
@@ -462,6 +497,10 @@ class LoginState(rx.State):
     error_message: str = ""
     auth_token: str = ""
     account_name: str = ""
+    # Foto do menu da conta: buscada uma vez por sessão (por token), no
+    # load_account, e atualizada pelo Editar perfil ao trocar a foto.
+    account_photo: str = ""
+    _account_photo_token: str = ""
     password_visible: bool = False
     signup_password_visible: bool = False
     signup_confirmation_visible: bool = False
@@ -856,6 +895,8 @@ class LoginState(rx.State):
     async def load_account(self) -> None:
         if not self.auth_token:
             self.account_name = ""
+            self.account_photo = ""
+            self._account_photo_token = ""
             return
 
         self.account_name = ACCOUNT_FALLBACK_NAME
@@ -865,9 +906,17 @@ class LoginState(rx.State):
                 self.account_name = await request_authenticated_name(
                     client, endpoint, self.auth_token
                 )
+                # Uma requisição só, e só na primeira carga deste token.
+                if self._account_photo_token != self.auth_token:
+                    self.account_photo = await request_account_photo(
+                        client, auth_profile_endpoint(), self.auth_token
+                    )
+                    self._account_photo_token = self.auth_token
         except AuthTokenRejectedError:
             self.auth_token = ""
             self.account_name = ""
+            self.account_photo = ""
+            self._account_photo_token = ""
         except LoginError:
             self.account_name = ACCOUNT_FALLBACK_NAME
 
@@ -875,6 +924,8 @@ class LoginState(rx.State):
     def logout(self) -> None:
         self.auth_token = ""
         self.account_name = ""
+        self.account_photo = ""
+        self._account_photo_token = ""
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
         self.signup_notice_pending = False

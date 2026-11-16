@@ -48,6 +48,22 @@ from doafacil.cabecalho import (
     header_auth_controls,
 )
 from doafacil.login import LoginState, login_page
+from doafacil.institucional import (
+    HelpCategoryState,
+    about_page,
+    contact_page,
+    help_category_page,
+    help_page,
+    privacy_page,
+    security_page,
+    terms_page,
+)
+from doafacil.rodape import (  # noqa: F401 (FOOTER_LINK_GROUPS reexportado para os testes)
+    FOOTER_LINK_GROUPS,
+    HOW_IT_WORKS_ANCHOR,
+    INSTITUTIONAL_ROUTES,
+    public_home_footer,
+)
 from doafacil.minhas_doacoes import (
     EditDonationState,
     MyDonationsState,
@@ -84,28 +100,10 @@ STAT_COLOR = "#005723"
 COUNT_ERROR_MESSAGE = "Não foi possível carregar a contagem de doações."
 COMPLETED_ERROR_MESSAGE = "Não foi possível carregar este número."
 
-# Rotas das páginas que ainda não existem (change landing-nova). Quando uma
-# delas for criada, basta registrar a rota: os links já apontam para ela.
-# /categorias deixou de ser futura na change explorar-categorias.
-FUTURE_ROUTES = {
-    "como_funciona": "/como-funciona",
-    "quem_somos": "/quem-somos",
-    "contato": "/contato",
-    "privacidade": "/privacidade",
-    "termos": "/termos",
-    "duvidas": "/duvidas",
-    "seguranca": "/seguranca",
-}
 # “Categorias” não é link: abre a gaveta de categorias (categorias.py).
 NAV_LINKS = (
     ("Explorar Doações", EXPLORE_ROUTE),
-    ("Como funciona", FUTURE_ROUTES["como_funciona"]),
-)
-FOOTER_LINK_GROUPS = (
-    (("Quem somos", FUTURE_ROUTES["quem_somos"]), ("Doações", EXPLORE_ROUTE)),
-    (("Criar doações", "/cadastro-doacao"), ("Doações mais recentes", RECENT_DONATIONS_ANCHOR)),
-    (("Política de privacidade", FUTURE_ROUTES["privacidade"]), ("Termos de uso", FUTURE_ROUTES["termos"])),
-    (("Dúvidas frequentes", FUTURE_ROUTES["duvidas"]), ("Segurança e transparência", FUTURE_ROUTES["seguranca"])),
+    ("Como funciona", HOW_IT_WORKS_ANCHOR),
 )
 
 
@@ -815,112 +813,8 @@ def institutional_section() -> rx.Component:
         width="100%",
         background=CREAM,
         class_name="page-fade-enter",
-    )
-
-
-FOOTER_FOCUS_RING = {"outline": "2px solid #2DBF72", "outlineOffset": "2px"}
-
-
-def _footer_link(label: str, href: str) -> rx.Component:
-    """Link do rodapé: #F5F5F5 sobre #252525 (14,6:1), sem sublinhado."""
-    return rx.link(
-        label,
-        href=href,
-        color="#F5F5F5",
-        font_size="13px",
-        underline="hover",
-        _focus_visible=FOOTER_FOCUS_RING,
-    )
-
-
-def public_home_footer() -> rx.Component:
-    return rx.box(
-        rx.vstack(
-            rx.image(
-                src="/logo.svg",
-                alt="DoaFácil",
-                width="160px",
-                height="58px",
-                object_fit="contain",
-            ),
-            rx.flex(
-                rx.vstack(
-                    rx.text(
-                        "Fale conosco",
-                        font_size="15px",
-                        font_weight="700",
-                        color="#2DBF72",
-                    ),
-                    _footer_link("Clique aqui para falar conosco", FUTURE_ROUTES["contato"]),
-                    align="start",
-                    spacing="1",
-                    style={"width": rx.breakpoints(initial="100%", md="28%")},
-                ),
-                rx.vstack(
-                    rx.text(
-                        "Links rápidos",
-                        font_size="15px",
-                        font_weight="700",
-                        color="#2DBF72",
-                    ),
-                    rx.flex(
-                        *[
-                            rx.vstack(
-                                *[_footer_link(label, href) for label, href in group],
-                                align="start",
-                                spacing="0",
-                                style={
-                                    "rowGap": "6px",
-                                    "width": rx.breakpoints(
-                                        initial="50%", md="25%"
-                                    )
-                                },
-                            )
-                            for group in FOOTER_LINK_GROUPS
-                        ],
-                        wrap="wrap",
-                        align="start",
-                        gap="0",
-                        width="100%",
-                    ),
-                    align="start",
-                    spacing="2",
-                    style={
-                        "width": rx.breakpoints(
-                            initial="100%", md="calc(72% - 16px)"
-                        )
-                    },
-                ),
-                style={
-                    "flexDirection": rx.breakpoints(
-                        initial="column", md="row"
-                    )
-                },
-                align="start",
-                gap="4",
-                width="100%",
-            ),
-            rx.text(
-                "Projeto acadêmico DoaFácil",
-                color="#D7D7D7",
-                font_size="12px",
-                border_top="1px solid #515151",
-                padding_top="20px",
-                width="100%",
-            ),
-            align="start",
-            spacing="5",
-            width="100%",
-            max_width="1200px",
-            margin="0 auto",
-            padding_top="48px",
-            padding_x="24px",
-            # Espaço do botão flutuante: nada do rodapé fica sob ele.
-            padding_bottom=CHAT_FAB_CLEARANCE,
-        ),
-        width="100%",
-        background="#252525",
-        color="white",
+        # Destino de “Como funciona” no menu (change paginas-institucionais).
+        id="como-funciona",
     )
 
 
@@ -1278,3 +1172,16 @@ app.add_page(
         ChatState.load_unread_total,
     ],
 )
+# Páginas institucionais (change paginas-institucionais): estáticas, com o
+# botão flutuante do chat (total de não lidas uma vez por carregamento).
+_CHAT_ON_LOAD = [LoginState.load_account, ChatState.load_unread_total]
+for _page, _route, _title, _extra in (
+    (help_page, INSTITUTIONAL_ROUTES["duvidas"], "Central de ajuda", []),
+    (help_category_page, INSTITUTIONAL_ROUTES["duvidas"] + "/[categoria]", "Central de ajuda", [HelpCategoryState.load]),
+    (security_page, INSTITUTIONAL_ROUTES["seguranca"], "Segurança e transparência", []),
+    (terms_page, INSTITUTIONAL_ROUTES["termos"], "Termos de uso", []),
+    (privacy_page, INSTITUTIONAL_ROUTES["privacidade"], "Política de privacidade", []),
+    (about_page, INSTITUTIONAL_ROUTES["quem_somos"], "Quem somos", []),
+    (contact_page, INSTITUTIONAL_ROUTES["contato"], "Fale com a gente", []),
+):
+    app.add_page(_page, route=_route, title=f"{_title} | DoaFácil", on_load=[*_extra, *_CHAT_ON_LOAD])

@@ -1810,7 +1810,18 @@ class ChatFabTests(unittest.TestCase):
         Figma) e na /categorias, com o total de não lidas no carregamento."""
         import doafacil.doafacil as main
 
-        for route, page in (("/explorar", main.explore_page), ("/categorias", main.categories_page)):
+        # Change paginas-institucionais: também nas páginas institucionais.
+        for route, page in (
+            ("/explorar", main.explore_page),
+            ("/categorias", main.categories_page),
+            ("/duvidas", main.help_page),
+            ("/duvidas/[categoria]", main.help_category_page),
+            ("/seguranca", main.security_page),
+            ("/termos", main.terms_page),
+            ("/privacidade", main.privacy_page),
+            ("/quem-somos", main.about_page),
+            ("/contato", main.contact_page),
+        ):
             with self.subTest(route=route):
                 rendered = str(page())
                 self.assertEqual(rendered.count("chat-fab"), 1)

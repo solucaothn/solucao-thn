@@ -656,6 +656,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
         # A área (220, 20, 160x160) da prévia 400x300 cai no quadrante verde.
         self.assertTrue(all(abs(a - b) <= 40 for a, b in zip(sent.getpixel((256, 256)), (20, 160, 60))))
         self.assertEqual(state.photo, PHOTO_URL)
+        self.assertEqual(state.account_photo, PHOTO_URL)  # o menu da conta já mostra a nova
         self.assertEqual(state.photo_notice, PHOTO_SAVED_MESSAGE)
         self.assertFalse(state.photo_busy)
         self.assertFalse(state.crop_open)
@@ -694,6 +695,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
         ):
             _events(EditProfileState.load_profile.fn(state))
         self.assertEqual(state.photo, PHOTO_URL)
+        self.assertEqual(state.account_photo, PHOTO_URL)
 
     def test_invalid_file_is_refused_without_request(self) -> None:
         for label, files, message in (
@@ -755,6 +757,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
             _events(EditProfileState.remove_photo.fn(state))
         self.assertEqual(remove.await_args.args[1], TOKEN)
         self.assertEqual(state.photo, "")
+        self.assertEqual(state.account_photo, "")  # o menu volta à inicial
         self.assertEqual(state.photo_notice, PHOTO_REMOVED_MESSAGE)
         self.assertEqual(state.name, "Nome digitado")
         self.assertFalse(state.photo_busy)

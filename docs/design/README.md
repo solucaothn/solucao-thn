@@ -71,7 +71,7 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 
 > No PNG, os 4 cartões institucionais estão cobertos por blocos cinza com “foto a definir”. As fotos do Figma têm marca d'água de banco de imagens e não entram no repositório nem no site.
 
-- **Cabeçalho:** “Explorar Doações” (`/explorar`) e “Como funciona” (`/como-funciona`) são links; “Categorias” abre a gaveta de categorias (veja “18-categorias”, abaixo). Com sessão, o **menu da conta** (círculo com a inicial, primeiro nome e seta) reúne “Minhas doações”, “Editar perfil” e “Sair”; abaixo de 768 px fica só a inicial. Sem sessão, **Entrar**. **Quero Doar** sempre.
+- **Cabeçalho:** “Explorar Doações” (`/explorar`) e “Como funciona” (`/#como-funciona`, a seção institucional da home) são links; “Categorias” abre a gaveta de categorias (veja “18-categorias”, abaixo). Com sessão, o **menu da conta** (círculo com a inicial, primeiro nome e seta) reúne “Minhas doações”, “Editar perfil” e “Sair”; abaixo de 768 px fica só a inicial. Sem sessão, **Entrar**. **Quero Doar** sempre.
 - **Título:** como no nó `615:2345` do Figma: LINE Seed JP Bold 36 px, altura de linha normal, `#2A2A2A`, centralizado, 1376 px de largura em 1512 px, quebrando em “…recomeço para” / “alguém.”. Em telas menores, a fonte diminui com a largura (`clamp(1.5rem, 2.4vw, 2.25rem)`).
 - **Números:** “Doações em circulação!” (doações disponíveis) e “Pessoas alcançadas” (doações concluídas), ambos vindos de `catalog/donations/count`. Número em Bold 24 px e rótulo em Regular 16 px, em `#005723` (8,9:1 sobre o creme), centralizados na altura dos cartões das recentes.
 - **Cartões das recentes:** quadrados entre 220 e 260 px de lado, dividindo a largura do carrossel entre os 4. A linha dos números e do carrossel usa as mesmas bordas do conteúdo do cabeçalho (até 1200 px, com margens de 16 e 24 px), e a coluna dos números tem 11rem. Assim, os 4 cartões cabem em 1512 px; quando não cabem, o carrossel rola dentro dele.
@@ -124,9 +124,52 @@ Referências: os quadros `438:1426` (Explorar), `474:1650` (home com a gaveta de
 | cabeçalho da Explorar sem “Entrar” | “Entrar” ou o menu da conta | consistência da sessão |
 | sem link para categorias na Explorar | “Ver categorias” | caminho no celular |
 
+### 19 a 23 — Páginas institucionais (change paginas-institucionais)
+
+Referências do Figma:
+
+| PNG | Quadros | Página |
+|---|---|---|
+| `19-duvidas-01.png` a `19-duvidas-04.png` | 479:2738, 621:2530, 621:2648 e 621:2752 | Central de ajuda e as categorias (`/duvidas`, `/duvidas/<categoria>`) |
+| `20-seguranca.png` | 406:1243 | Segurança e transparência (`/seguranca`) |
+| `21-termos.png` | 399:1608 | Termos de uso (`/termos`) |
+| `22-privacidade.png` | 396:1040 | Política de privacidade (`/privacidade`) |
+| `23-quem-somos.png` | 354:851 | Quem somos (`/quem-somos`) |
+
+Os PNGs não têm marca d'água; as fotos de Segurança e Quem somos são de banco de imagens e ficam só na referência.
+
+- **Comum:** cabeçalho branco só com o logotipo centralizado, “Voltar ao início”, fundo creme, o rodapé da home e o botão flutuante do chat.
+- **Central de ajuda:**
+  - busca “Buscar por uma dúvida” e os atalhos “Tem taxa?”, “Quem paga a entrega” e “O que não pode doar”;
+  - 6 cartões de categoria (nome em `#166B3B` e a quantidade);
+  - “Mais perguntadas” num acordeão branco com divisórias, em que o item aberto fica em `#F3F4F6`;
+  - a caixa “Não encontrou o que procurava?” com “Fale com a gente”.
+- **Segurança:** etiqueta, título e texto à esquerda e a imagem à direita (placeholder); o painel cinza com os 4 benefícios e os 2 cartões brancos.
+- **Termos e Privacidade:** título, a linha “Documento de projeto acadêmico, sem valor jurídico.”, o link para a outra e seções numeradas. A Privacidade tem a tabela dos dados tratados.
+- **Quem somos:** a frase de missão com o traço oval em “doar”, a imagem (placeholder), os blocos verdes decorativos e “COMO FOI” / “O início do DoaFácil”.
+- **Contato (`/contato`, sem tela):** “Fale com a gente”, com o aviso de que o canal ainda vai ser publicado.
+
+**Diferenças em relação ao Figma:**
+
+| Tela | No Figma | Na implementação | Motivo |
+|---|---|---|---|
+| Termos | vaquinha em dinheiro: Pix, cartão, BCB, saques, CPF, telefone, endereço, CNPJ, foro, URLs | textos novos para a doação de objetos, num projeto acadêmico, com o aviso de documento sem valor jurídico | o domínio não é financeiro; nada de empresa ou dado inventado |
+| Privacidade | o mesmo, com `lgpd@doafacil.com.br`, cookies e geolocalização | textos novos e a tabela com os dados reais | o site não coleta geolocalização nem usa analytics |
+| Central de ajuda | `contato@doafacil.com.br` | “Fale com a gente” → `/contato` (pendência) | o e-mail não existe |
+| Central de ajuda | “Esta resposta ajudou? Sim / Não” | removido | sem onde guardar o voto |
+| Central de ajuda | só 2 respostas e 2 listas de perguntas | as 27 perguntas e respostas, escritas a partir do site | o conteúdo não existe no Figma |
+| Central de ajuda | “Nenhuma resposta para “boleto”” com o texto sobre boletos | o texto genérico “Tente outra palavra ou escolha uma categoria.” | a frase só vale para essa palavra |
+| Segurança | “Criptografamos todas as informações… transações” | senha com hash, e-mail confirmado por código e fotos sem metadados | não há criptografia de tudo nem transações |
+| Segurança | “email e CPF’s validados”; “validação… item doado está correto” | publicação por conta com e-mail confirmado; o site não confere itens | não há CPF nem validação de itens |
+| Segurança | “SAIBA MAIS SOIBRE NOSSA” | “SAIBA MAIS SOBRE NOSSA” | erro de digitação |
+| Quem somos | “A ideia nasceu em 2019… milhares de doações” | o projeto acadêmico, sem data nem números | não é verdade |
+| Segurança, Quem somos | fotos de banco de imagens | placeholder em degradê | direitos de imagem |
+| todas | “Voltar ao inicio” | “Voltar ao início” | acento |
+| todas | sem rodapé (só Termos e Privacidade têm) | o rodapé da home em todas | navegação consistente |
+
 ## Telas ainda sem desenho
 
-Login e cadastro, detalhe da doação, formulário de cadastro da doação, Como funciona.
+Login e cadastro, detalhe da doação, formulário de cadastro da doação. “Como funciona” não tem tela: o menu leva à seção institucional da home.
 
 ## Referência de estrutura (Vakinha)
 
@@ -176,6 +219,12 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 ![Gaveta de categorias na home](18-categorias-01.png)
 
 ![Lista de uma categoria](18-categorias-02.png)
+
+![Central de ajuda](19-duvidas-01.png)
+
+![Segurança e transparência](20-seguranca.png)
+
+![Quem somos](23-quem-somos.png)
 
 ## Novas telas
 
