@@ -42,7 +42,12 @@ SEARCH_PLACEHOLDER_COLOR = "#6B6B6B"
 # Cabeçalho da tabela da Privacidade.
 TABLE_HEADER_BACKGROUND = "#F3F1EC"
 ACADEMIC_NOTICE ="Documento de projeto acadêmico, sem valor jurídico."
+# Reserva: só aparece se o CONTACT_EMAIL (rodape.py) ficar vazio.
 CONTACT_PENDING_TEXT = "O canal de contato do projeto ainda vai ser publicado."
+# Nos parágrafos dos Termos e da Privacidade, “{email}” vira o link mailto:
+# do CONTACT_EMAIL; sem e-mail, o parágrafo inteiro vira o texto pendente.
+EMAIL_MARK = "{email}"
+CONTACT_DATA_TEXT = "Pelo mesmo e-mail você pode pedir para saber, corrigir ou apagar os seus dados."
 
 
 # ---------------------------------------------------------------------------
@@ -553,13 +558,32 @@ def faq_accordion(questions: rx.Var | list[dict[str, str]]) -> rx.Component:
     )
 
 
+def _email_link(**props: Any) -> rx.Component:
+    """O e-mail de contato, escrito e com link mailto:."""
+    email = CONTACT_EMAIL.strip()
+    return _link(email, f"mailto:{email}", **props)
+
+
+def _with_email(text: str, **props: Any) -> rx.Component:
+    """Um parágrafo com o marcador {email}: o e-mail entra como link. Sem
+    e-mail definido, o parágrafo vira o texto pendente (reserva)."""
+    if not CONTACT_EMAIL.strip():
+        return rx.text(CONTACT_PENDING_TEXT, **props)
+    before, _, after = text.partition(EMAIL_MARK)
+    return rx.text(before, _email_link(), after, **props)
+
+
+def _paragraph(text: str) -> rx.Component:
+    props = {"color": TEXT_BODY, "line_height": "1.6", "margin_top": "10px"}
+    return _with_email(text, **props) if EMAIL_MARK in text else rx.text(text, **props)
+
+
 def contact_box() -> rx.Component:
-    """“Não encontrou o que procurava?” (Figma), sem e-mail inventado."""
-    support = f"Escreva para {CONTACT_EMAIL.strip()}" if CONTACT_EMAIL.strip() else CONTACT_PENDING_TEXT
+    """“Não encontrou o que procurava?” (Figma), com o e-mail do projeto."""
     return rx.flex(
         rx.box(
             rx.text("Não encontrou o que procurava?", color=DARK_GREEN, font_weight="700", font_size="1.15rem"),
-            rx.text(support, color=TEXT_MUTED, font_size="0.85rem"),
+            _with_email(f"Escreva para {EMAIL_MARK}", color=TEXT_MUTED, font_size="0.85rem", class_name="help-contact-text"),
         ),
         rx.link(
             "Fale com a gente",
@@ -930,23 +954,26 @@ def about_page() -> rx.Component:
 # ---------------------------------------------------------------------------
 
 def contact_page() -> rx.Component:
-    email = CONTACT_EMAIL.strip()
-    body = (
-        rx.text(
-            "Escreva para ",
-            _link(email, f"mailto:{email}", class_name="contact-mailto"),
-            ".",
-            color=TEXT_DARK,
-            font_size="1.1rem",
+    if CONTACT_EMAIL.strip():
+        body = rx.fragment(
+            rx.text(
+                "Escreva para ",
+                _email_link(class_name="contact-mailto"),
+                ".",
+                color=TEXT_DARK,
+                font_size="1.1rem",
+            ),
+            rx.text(CONTACT_DATA_TEXT, color=TEXT_DARK, line_height="1.6", class_name="contact-data"),
         )
-        if email
-        else rx.text(CONTACT_PENDING_TEXT, color=TEXT_DARK, font_size="1.1rem", class_name="contact-pending")
-    )
+        more = "Muitas respostas também estão na "
+    else:
+        body = rx.text(CONTACT_PENDING_TEXT, color=TEXT_DARK, font_size="1.1rem", class_name="contact-pending")
+        more = "Enquanto isso, muitas respostas estão na "
     return institutional_shell(
         _h1("Fale com a gente"),
         body,
         rx.text(
-            "Enquanto isso, muitas respostas estão na ",
+            more,
             _link("Central de ajuda", HELP_ROUTE),
             ". Para saber como tratamos seus dados, veja a ",
             _link("Política de privacidade", INSTITUTIONAL_ROUTES["privacidade"]),
@@ -1022,7 +1049,7 @@ TERMS_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "7. Alterações e contato",
         (
             "Estes Termos podem mudar. A versão em vigor é sempre a publicada nesta página.",
-            "O canal de contato do projeto ainda vai ser publicado.",
+            f"Dúvidas sobre estes Termos: escreva para {EMAIL_MARK}.",
         ),
     ),
 )
@@ -1093,7 +1120,7 @@ PRIVACY_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "Pela Lei Geral de Proteção de Dados (LGPD), você pode pedir para saber quais dados temos, "
             "corrigi-los ou apagá-los. Nome, foto, texto Sobre, cidade e estado podem ser corrigidos "
             "em Editar perfil.",
-            "O canal de contato do projeto para os outros pedidos ainda vai ser publicado.",
+            f"Para os outros pedidos, como saber quais dados temos ou apagar a sua conta, escreva para {EMAIL_MARK}.",
         ),
     ),
     (
@@ -1113,7 +1140,7 @@ PRIVACY_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
 def _section(title: str, paragraphs: tuple[str, ...]) -> rx.Component:
     return rx.box(
         _h2(title, color=TEXT_DARK, font_size="1.3rem"),
-        *[rx.text(paragraph, color=TEXT_BODY, line_height="1.6", margin_top="10px") for paragraph in paragraphs],
+        *[_paragraph(paragraph) for paragraph in paragraphs],
         class_name="legal-section",
     )
 

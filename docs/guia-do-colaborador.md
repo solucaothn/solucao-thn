@@ -90,7 +90,10 @@ python -m unittest discover -s tests -v
 - **Pendência (Xano): apagar os arquivos das fotos ao apagar uma doação.** O `DELETE /catalog/donations` remove as linhas de `donation_photo`, mas não chama `storage.delete_file` (a remoção da foto de perfil chama). Os arquivos de imagem continuam no armazenamento do Xano, e a Política de privacidade (seção 6) avisa isso. Corrigir numa change própria, combinada com o grupo; ao corrigir, atualizar também o texto da Privacidade e a resposta “Posso cancelar uma doação?” da Central de ajuda (`doafacil/institucional.py`).
 - **Pendência (Xano): recusar “Alimentos” no backend.** O domínio não aceita doação de alimentos, mas só o front aplica a regra: o formulário esconde a categoria (`EXCLUDED_CATEGORY_NAMES` em `doafacil/cadastro_doacao.py`). O `POST /catalog/donations/publish` e o `PATCH /catalog/donations` aceitam qualquer categoria que exista, inclusive “Alimentos”, numa chamada direta. Como a validação deve ficar no Xano, corrigir numa change própria (decidir com o grupo se “Móveis”, também escondida no formulário, entra na mesma regra).
 - Interesse, avaliações e administração (sem tabelas ainda).
-- **Pendência: e-mail de contato do projeto.** O grupo ainda não definiu um. Enquanto `CONTACT_EMAIL` (`doafacil/rodape.py`) estiver vazio, “Fale com a gente” e “Clique aqui para falar conosco” levam a `/contato`, que avisa que o canal vai ser publicado. Quando houver um e-mail real, basta preenchê-lo ali. Nunca use um endereço que o projeto não tenha.
+- **Pedidos sobre dados pessoais (responsabilidade do grupo):**
+  - o e-mail de contato do projeto é `solucaothn@gmail.com` (`CONTACT_EMAIL` em `doafacil/rodape.py`, change endpoints-antigos);
+  - a Política de privacidade e a `/contato` oferecem esse e-mail para pedir para saber, corrigir ou apagar os dados;
+  - o site não tem exclusão de conta, então o grupo atende esses pedidos à mão, pelo painel do Xano.
 - Fotos próprias para Segurança e Quem somos (hoje com placeholder em degradê).
 - Fotos próprias para os 4 cartões institucionais (hoje com o degradê de placeholder).
 
@@ -151,7 +154,7 @@ A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprova
   | rodapé “Doações mais recentes” | `/#doacoes-recentes` |
   | menu “Categorias” | abre a gaveta de categorias (change explorar-categorias) |
   | menu “Como funciona” | `/#como-funciona` (a seção “Doar no DoaFácil é simples e seguro”) |
-  | rodapé “Clique aqui para falar conosco” | `/contato` (ou `mailto:`, quando `CONTACT_EMAIL` for definido) |
+  | rodapé “Clique aqui para falar conosco” | `/contato`, que mostra o e-mail do projeto |
   | rodapé “Quem somos”, “Política de privacidade”, “Termos de uso”, “Dúvidas frequentes” e “Segurança e transparência” | as páginas institucionais (`INSTITUTIONAL_ROUTES` em `doafacil/rodape.py`) |
 
 - **Cartões institucionais:** `INSTITUTIONAL_CARDS` com `image: None` usa o degradê. Para trocar por uma foto própria, coloque o arquivo em `assets/landing/` e preencha `image` (por exemplo, `"/landing/historias.jpg"`). Um véu escuro embaixo mantém o texto legível. Não use as fotos do Figma: elas têm marca d'água de banco de imagens.
@@ -200,7 +203,11 @@ As referências visuais são `docs/design/19-duvidas-01.png` a `23-quem-somos.pn
   - a busca (`HelpState`) não diferencia maiúsculas nem acentos, e procura na pergunta e na resposta;
   - as perguntas usam o `rx.accordion` do Radix, em que abrir uma fecha a outra, com teclado e `aria-expanded`.
 - **“Como funciona”:** não tem página. O menu leva à seção institucional da home (`id="como-funciona"`).
-- **Pendência:** o e-mail de contato (veja a seção 7).
+- **Contato (change endpoints-antigos):**
+  - `CONTACT_EMAIL = "solucaothn@gmail.com"`;
+  - “Fale com a gente” e “Clique aqui para falar conosco” levam sempre a `/contato`, onde o e-mail aparece escrito e com `mailto:` (um `mailto:` direto não faz nada visível para quem não tem um programa de e-mail);
+  - a caixa da Central de ajuda e as seções 7 dos Termos e da Privacidade também mostram o e-mail, pelo marcador `{email}` nos textos;
+  - se o `CONTACT_EMAIL` ficar vazio, esses lugares voltam a dizer que o canal ainda vai ser publicado.
 - **Testes:** `tests/test_institucional.py`.
 
 ### Explorar doações e categorias (change explorar-categorias)
@@ -213,7 +220,6 @@ As referências visuais são `docs/design/17-explorar.png`, `18-categorias-01.pn
   - Resposta: `{items, page, per_page, total, page_total}`. Cada item tem só `id`, `created_at`, `title`, `photo` (URL pública) e `condition`.
   - Uma página menor que 1 ou uma UF com mais de 2 letras dão 400.
   - No XanoScript, o `includes` só é aceito como operador (`($db.donation.title|to_lower) includes $search`); a forma `|includes:` não passa no validador.
-  - O `GET /catalog/donations` antigo não mudou: ele devolve doações de qualquer status e não é usado pelo site.
 - **`/explorar`** (`doafacil/explorar.py`):
   - o cabeçalho tem busca por texto, UF e lupa. Ao buscar, mantém a categoria atual (só na própria `/explorar`);
   - o título segue os filtros (“Adicionadas recentemente”, “Categoria “Roupas””, “Resultados para “cadeira””, com “em SP” quando houver UF);
@@ -246,6 +252,34 @@ python scripts/teste_explorar_real.py
 | EX4 | uma página além do total vem vazia, com os mesmos totais |
 | EX5 | UF com mais de 2 letras e `page=0` dão 400 |
 | EX6 | nenhuma chave além das do cartão e da paginação |
+
+### GET e POST antigos de `catalog/donations` (change endpoints-antigos)
+
+O grupo Catalog tinha dois endpoints antigos que o site nunca usou. A change endpoints-antigos os remove pelo painel do Xano, sem push:
+
+| Objeto | Por que saiu |
+|---|---|
+| `GET /catalog/donations` (Catalog) | público; listava todas as doações, de qualquer status (inclusive reservadas e concluídas), sem paginação |
+| `POST /catalog/donations` (Catalog) | criava uma doação `disponível` sem foto, cidade, UF, condição, entrega nem contato, fora das regras do `publish` |
+
+- **Ficam, no mesmo caminho:** o `PATCH /catalog/donations` (editar) e o `DELETE /catalog/donations` (apagar), usados por Minhas doações. No painel, o grupo Catalog mostra os quatro métodos com o mesmo caminho: só o GET e o POST saem.
+- **Doação nova só pelo `POST /catalog/donations/publish`.** Não recrie uma listagem pública fora da busca nem outro endpoint de criação sem uma change aprovada.
+- **Teste:** `tests/test_endpoints_antigos.py` confere que o front só usa esse caminho com PATCH e DELETE.
+
+#### Conferir os endpoints contra o Xano real
+
+O script `scripts/teste_endpoints_antigos_real.py` não pede login, não leva token e não cria, edita nem apaga dados. Cada pedido usa uma entrada que falha mesmo com o endpoint no ar (categoria 0, página 0 ou sem token), então nenhuma doação é listada. Com a variável `XANO_API_URL` definida (seção 4) e o `.venv` ativo, na raiz do projeto:
+
+```
+python scripts/teste_endpoints_antigos_real.py --antes   # antes de apagar no painel
+python scripts/teste_endpoints_antigos_real.py           # depois
+```
+
+| Cenário | O que confere |
+|---|---|
+| EA1 e EA2 | o GET (com `category_id=0`) e o POST (sem token): com `--antes`, ainda existem (diferente de 404 e 405); depois, respondem 404 ou 405 |
+| EA3 e EA4 | o PATCH e o DELETE do mesmo caminho, sem token: continuam existindo nos dois modos |
+| EA5 e EA6 | o `publish` (sem token) e a `search` (com `page=0`): continuam existindo nos dois modos |
 
 ### Endpoints antigos do modelo do Xano (change endpoints-publicos)
 

@@ -147,7 +147,7 @@ Os PNGs não têm marca d'água; as fotos de Segurança e Quem somos são de ban
 - **Segurança:** etiqueta, título e texto à esquerda e a imagem à direita (placeholder); o painel cinza com os 4 benefícios e os 2 cartões brancos.
 - **Termos e Privacidade:** título, a linha “Documento de projeto acadêmico, sem valor jurídico.”, o link para a outra e seções numeradas. A Privacidade tem a tabela dos dados tratados.
 - **Quem somos:** a frase de missão com o traço oval em “doar”, a imagem (placeholder), os blocos verdes decorativos e “COMO FOI” / “O início do DoaFácil”.
-- **Contato (`/contato`, sem tela):** “Fale com a gente”, com o aviso de que o canal ainda vai ser publicado.
+- **Contato (`/contato`, sem tela):** “Fale com a gente”, com o e-mail do projeto (`solucaothn@gmail.com`) escrito e com `mailto:` (change endpoints-antigos).
 
 **Diferenças em relação ao Figma:**
 
@@ -155,7 +155,7 @@ Os PNGs não têm marca d'água; as fotos de Segurança e Quem somos são de ban
 |---|---|---|---|
 | Termos | vaquinha em dinheiro: Pix, cartão, BCB, saques, CPF, telefone, endereço, CNPJ, foro, URLs | textos novos para a doação de objetos, num projeto acadêmico, com o aviso de documento sem valor jurídico | o domínio não é financeiro; nada de empresa ou dado inventado |
 | Privacidade | o mesmo, com `lgpd@doafacil.com.br`, cookies e geolocalização | textos novos e a tabela com os dados reais | o site não coleta geolocalização nem usa analytics |
-| Central de ajuda | `contato@doafacil.com.br` | “Fale com a gente” → `/contato` (pendência) | o e-mail não existe |
+| Central de ajuda | `contato@doafacil.com.br` | “Fale com a gente” → `/contato`, que mostra `solucaothn@gmail.com` (change endpoints-antigos) | o e-mail do Figma não existe; o do projeto foi definido pelo grupo |
 | Central de ajuda | “Esta resposta ajudou? Sim / Não” | removido | sem onde guardar o voto |
 | Central de ajuda | só 2 respostas e 2 listas de perguntas | as 27 perguntas e respostas, escritas a partir do site | o conteúdo não existe no Figma |
 | Central de ajuda | “Nenhuma resposta para “boleto”” com o texto sobre boletos | o texto genérico “Tente outra palavra ou escolha uma categoria.” | a frase só vale para essa palavra |

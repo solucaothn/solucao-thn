@@ -30,7 +30,10 @@ from doafacil.institucional import (
     security_page,
     terms_page,
 )
-from doafacil.rodape import INSTITUTIONAL_ROUTES, contact_href
+from doafacil.rodape import CONTACT_EMAIL, INSTITUTIONAL_ROUTES, contact_href
+
+# E-mail de contato do projeto, definido pelo grupo (change endpoints-antigos).
+PROJECT_EMAIL = "solucaothn@gmail.com"
 
 PAGES = {
     "/duvidas": help_page,
@@ -123,25 +126,50 @@ class TruthfulContentTests(unittest.TestCase):
                     self.assertNotIn(word, plain)
 
     def test_no_invented_email(self) -> None:
+        """O único e-mail das páginas é o do projeto (change endpoints-antigos)."""
+        self.assertEqual(CONTACT_EMAIL, PROJECT_EMAIL)
         for route, page in PAGES.items():
             with self.subTest(route=route):
                 r = str(page())
                 self.assertNotIn("doafacil.com", r)
-                self.assertNotIn("mailto:", r)
+                self.assertEqual(set(re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", r)), {PROJECT_EMAIL} if PROJECT_EMAIL in r else set())
+                self.assertEqual(set(re.findall(r"mailto:[^\"']*", r)), {f"mailto:{PROJECT_EMAIL}"} if "mailto:" in r else set())
 
-    def test_contact_pending_and_defined(self) -> None:
+    def test_contact_email_where_it_was_pending(self) -> None:
+        # Os convites levam à /contato, onde o endereço aparece escrito.
         self.assertEqual(contact_href(), "/contato")
-        r = str(contact_page())
-        self.assertIn('className:"contact-pending"', r)
-        self.assertIn('to:"/duvidas"', r)
-        self.assertIn('"Fale com a gente"', r)
-        help_rendered = str(help_page())
-        self.assertIn('to:"/contato"', help_rendered)
-        with patch("doafacil.rodape.CONTACT_EMAIL", "grupo@exemplo.org"), patch("doafacil.institucional.CONTACT_EMAIL", "grupo@exemplo.org"):
-            self.assertEqual(contact_href(), "mailto:grupo@exemplo.org")
-            # O Link do React Router trata o mailto: como externo (<a href> comum).
-            self.assertIn('to:"mailto:grupo@exemplo.org"', str(contact_page()))
-            self.assertIn("mailto:grupo@exemplo.org", str(help_page()))
+        self.assertIn('to:"/contato"', str(help_page()))
+        mailto = f'to:"mailto:{PROJECT_EMAIL}"'  # o React Router trata o mailto: como externo
+        contact = str(contact_page())
+        self.assertIn(mailto, contact)
+        self.assertIn(f'"{PROJECT_EMAIL}"', contact)  # escrito, além do link
+        self.assertIn('className:"contact-mailto"', contact)
+        self.assertIn(inst.CONTACT_DATA_TEXT.replace("ê", "\\u00ea").replace("ó", "\\u00f3"), contact)
+        self.assertIn('to:"/duvidas"', contact)
+        self.assertIn('to:"/privacidade"', contact)
+        self.assertNotIn("contact-pending", contact)
+        for name, page in (("ajuda", help_page), ("termos", terms_page), ("privacidade", privacy_page)):
+            with self.subTest(page=name):
+                self.assertIn(mailto, str(page()))
+        for route, page in PAGES.items():
+            with self.subTest(route=route):
+                self.assertNotIn("ainda vai ser publicado", str(page()).encode().decode("unicode_escape"))
+
+    def test_sections_7_point_to_the_email(self) -> None:
+        terms = dict(inst.TERMS_SECTIONS)["7. Alterações e contato"]
+        privacy = dict(inst.PRIVACY_SECTIONS)["7. Seus direitos"]
+        self.assertIn("Dúvidas sobre estes Termos: escreva para {email}.", terms)
+        self.assertIn("Para os outros pedidos, como saber quais dados temos ou apagar a sua conta, escreva para {email}.", privacy)
+
+    def test_without_email_falls_back_to_pending_text(self) -> None:
+        with patch("doafacil.institucional.CONTACT_EMAIL", ""):
+            for name, page in (("contato", contact_page), ("ajuda", help_page), ("termos", terms_page), ("privacidade", privacy_page)):
+                with self.subTest(page=name):
+                    r = str(page())
+                    self.assertNotIn("mailto:", r)
+                    self.assertNotIn(PROJECT_EMAIL, r)
+                    self.assertIn("ainda vai ser publicado", r)
+            self.assertIn('className:"contact-pending"', str(contact_page()))
 
 
 class HelpCenterTests(unittest.TestCase):
