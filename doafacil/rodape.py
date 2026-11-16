@@ -22,10 +22,12 @@ INSTITUTIONAL_ROUTES = {
     "seguranca": "/seguranca",
 }
 CONTACT_ROUTE = INSTITUTIONAL_ROUTES["contato"]
-# E-mail de contato do projeto. PENDÊNCIA: o grupo ainda não definiu um.
-# Enquanto vazio, os convites de contato levam a /contato; preenchido, viram
-# mailto:. Nunca usar um endereço que o projeto não tenha.
-CONTACT_EMAIL = ""
+# E-mail de contato do projeto (change endpoints-antigos), mostrado na
+# /contato, na Central de ajuda, nos Termos e na Privacidade. Os convites de
+# contato levam sempre a /contato, onde o endereço aparece escrito. Se ficar
+# vazio, as páginas voltam a dizer que o canal ainda vai ser publicado.
+# Nunca usar um endereço que o projeto não tenha.
+CONTACT_EMAIL = "solucaothn@gmail.com"
 # “Como funciona” é a seção institucional da home (não há página própria).
 HOW_IT_WORKS_ANCHOR = "/#como-funciona"
 
@@ -39,10 +41,10 @@ FOOTER_FOCUS_RING = {"outline": "2px solid #2DBF72", "outlineOffset": "2px"}
 
 
 def contact_href() -> str:
-    """Destino dos convites de contato: o mailto quando há e-mail definido;
-    senão, a página /contato."""
-    email = CONTACT_EMAIL.strip()
-    return f"mailto:{email}" if email else CONTACT_ROUTE
+    """Destino dos convites de contato: sempre a página /contato, que mostra o
+    e-mail escrito (um mailto: direto não faz nada visível para quem não tem
+    um programa de e-mail configurado)."""
+    return CONTACT_ROUTE
 
 
 def _footer_link(label: str, href: str) -> rx.Component:
