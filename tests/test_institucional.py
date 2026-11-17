@@ -256,8 +256,10 @@ class OtherPagesTests(unittest.TestCase):
         self.assertIn("Seguran\\u00e7a e Transpar\\u00eancia", r)
         self.assertEqual(r.count('className:"security-benefit"'), 4)
         self.assertEqual(r.count('className:"security-card"'), 2)
-        self.assertIn("institutional-photo-placeholder", r)
-        self.assertNotIn("src:", r.split("institutional-header")[1].split("Links r")[0].replace('src:"/logo.svg"', ""))
+        # A única imagem do conteúdo é a foto da página (change fotos-site).
+        content = r.split("institutional-header")[1].split("Links r")[0]
+        content = content.replace('src:"/logo.svg"', "").replace('src:"/seguranca/seguranca.jpg"', "", 1)
+        self.assertNotIn("src:", content)
 
     def test_about_mission_highlight_and_story(self) -> None:
         r = str(about_page())
@@ -428,3 +430,88 @@ class LightThemeTests(unittest.TestCase):
         plugins = [p for p in rxconfig.config.plugins if isinstance(p, rx.plugins.RadixThemesPlugin)]
         self.assertEqual(len(plugins), 1)
         self.assertEqual(_resolve_default_color_mode(plugins[0].theme), "light")
+
+
+# ---------------------------------------------------------------------------
+# Fotos do Figma (change fotos-site)
+# ---------------------------------------------------------------------------
+
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from PIL import Image  # noqa: E402
+
+ASSETS = Path(__file__).resolve().parent.parent / "assets"
+
+
+def _photo_markup(rendered: str) -> str:
+    """Trecho do componente compilado, do `figure` até o fim do crédito."""
+    start = rendered.index('className:"institutional-photo"')
+    end = rendered.find('className:"photo-credit"', start)
+    return rendered[start : (end if end != -1 else start + 1000) + 200]
+
+
+# (página, dados da foto, src, proporção do Figma, raio, largura máxima, início do alt)
+PAGE_PHOTOS = (
+    (about_page, inst.ABOUT_PHOTO, "/sobre/quem-somos.jpg", "375 / 421", "8px", "375px",
+     "Grupo de jovens agachados no chão de um escritório"),
+    (security_page, inst.SECURITY_PHOTO, "/seguranca/seguranca.jpg", "507 / 339", "16px", "507px",
+     "Cinco jovens sorrindo, de pé em fila"),
+)
+
+
+class PagePhotoTests(unittest.TestCase):
+    def test_pages_show_photo_with_alt_ratio_and_credit(self) -> None:
+        for page, data, src, ratio, radius, max_width, alt_start in PAGE_PHOTOS:
+            with self.subTest(src=src):
+                r = str(page())
+                photo = _photo_markup(r)
+                self.assertIn('jsx("figure"', r)
+                self.assertIn(f'src:"{src}"', photo)
+                self.assertIn(f"alt:{json.dumps(data['alt'])}", photo)
+                self.assertTrue(data["alt"].startswith(alt_start))
+                self.assertIn(f'["aspectRatio"] : "{ratio}"', photo)
+                self.assertIn('["objectFit"] : "cover"', photo)
+                self.assertIn(f'["borderRadius"] : "{radius}"', photo)
+                self.assertIn(f'["maxWidth"] : "{max_width}"', photo)
+                self.assertIn('jsx("figcaption",{className:"photo-credit"', photo)
+                self.assertIn('"Foto: Freepik"', photo)
+
+    def test_pages_have_no_placeholder(self) -> None:
+        for page in (about_page, security_page):
+            with self.subTest(page=page.__name__):
+                self.assertNotIn("institutional-photo-placeholder", str(page()))
+        self.assertFalse(hasattr(inst, "_placeholder"))
+        self.assertFalse(hasattr(inst, "PLACEHOLDER_GRADIENT"))
+
+    def test_alts_are_descriptive_portuguese(self) -> None:
+        for _, data, *_rest in PAGE_PHOTOS:
+            alt = data["alt"]
+            with self.subTest(alt=alt):
+                self.assertGreaterEqual(len(alt.split()), 8)
+                self.assertNotIn("foto", alt.lower().split()[0])
+                self.assertTrue(alt.endswith("."))
+
+    def test_photo_without_credit_has_no_caption(self) -> None:
+        r = str(inst._photo("/x.jpg", "Descrição.", "", 10, 20, "8px"))
+        self.assertNotIn("figcaption", r)
+
+    def test_credit_passes_aa_on_white(self) -> None:
+        self.assertGreaterEqual(contrast(inst.PHOTO_CREDIT_COLOR, "#FFFFFF"), AA_TEXT)
+
+
+class PhotoFilesTests(unittest.TestCase):
+    def _check_jpeg(self, path: Path, size: tuple[int, int]) -> None:
+        self.assertTrue(path.is_file(), path)
+        with Image.open(path) as image:
+            self.assertEqual(image.format, "JPEG")
+            self.assertEqual(image.size, size)
+            self.assertEqual(len(image.getexif()), 0)
+            self.assertNotIn("icc_profile", image.info)
+
+    def test_jpegs_are_2x_of_figma_without_metadata(self) -> None:
+        # Retângulos do Figma exportados em 2x: 375 x 421 e 507 x 339.
+        for data, size in ((inst.ABOUT_PHOTO, (750, 842)), (inst.SECURITY_PHOTO, (1014, 678))):
+            with self.subTest(src=data["src"]):
+                self._check_jpeg(ASSETS / data["src"].lstrip("/"), size)
+                self.assertEqual((data["width"] * 2, data["height"] * 2), size)
