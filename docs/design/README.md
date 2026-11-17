@@ -136,7 +136,7 @@ Referências do Figma:
 | `22-privacidade.png` | 396:1040 | Política de privacidade (`/privacidade`) |
 | `23-quem-somos.png` | 354:851 | Quem somos (`/quem-somos`) |
 
-Os PNGs não têm marca d'água; as fotos de Segurança e Quem somos são de banco de imagens e ficam só na referência.
+Os PNGs não têm marca d'água. As fotos de Segurança e Quem somos são do Freepik e estão no site com crédito (change fotos-site).
 
 - **Comum:** cabeçalho branco só com o logotipo centralizado, “Voltar ao início”, fundo creme, o rodapé da home e o botão flutuante do chat.
 - **Central de ajuda:**
@@ -144,9 +144,19 @@ Os PNGs não têm marca d'água; as fotos de Segurança e Quem somos são de ban
   - 6 cartões de categoria (nome em `#166B3B` e a quantidade);
   - “Mais perguntadas” num acordeão branco com divisórias, em que o item aberto fica em `#F3F4F6`;
   - a caixa “Não encontrou o que procurava?” com “Fale com a gente”.
-- **Segurança:** etiqueta, título e texto à esquerda e a imagem à direita (placeholder); o painel cinza com os 4 benefícios e os 2 cartões brancos.
+- **Segurança:** etiqueta, título e texto à esquerda e a foto à direita, com o crédito “Foto: Freepik” abaixo; o painel cinza com os 4 benefícios e os 2 cartões brancos.
 - **Termos e Privacidade:** título, a linha “Documento de projeto acadêmico, sem valor jurídico.”, o link para a outra e seções numeradas. A Privacidade tem a tabela dos dados tratados.
-- **Quem somos:** a frase de missão com o traço oval em “doar”, a imagem (placeholder), os blocos verdes decorativos e “COMO FOI” / “O início do DoaFácil”.
+- **Quem somos:** a frase de missão com o traço oval em “doar”, a foto com o crédito “Foto: Freepik” abaixo, os blocos verdes decorativos e “COMO FOI” / “O início do DoaFácil”.
+- **Fotos (change fotos-site):**
+  - **Formato:** cada foto segue o retângulo do Figma:
+    - Quem somos: 375 × 421, cantos de 8 px;
+    - Segurança: 507 × 339, cantos de 16 px.
+  - **Exibição:** `object-fit: cover`, largura máxima igual à do Figma e altura pela proporção, sem altura fixa; o `alt` é descritivo e em português.
+  - **Arquivos:** JPEG 2x (`assets/sobre/quem-somos.jpg` e `assets/seguranca/seguranca.jpg`).
+  - **Foto nova:** exporte do Figma em 2x como PNG e rode `python scripts/converter_fotos.py <arquivo.png>`.
+    - O script grava o `.jpg` ao lado do PNG, com qualidade 82, sem metadados e com os cantos transparentes em branco.
+    - O raio dos cantos vem do CSS: é a metade do raio medido no PNG.
+    - Só o `.jpg` entra no commit.
 - **Contato (`/contato`, sem tela):** “Fale com a gente”, com o e-mail do projeto (`solucaothn@gmail.com`) escrito e com `mailto:` (change endpoints-antigos).
 
 **Diferenças em relação ao Figma:**
@@ -163,7 +173,7 @@ Os PNGs não têm marca d'água; as fotos de Segurança e Quem somos são de ban
 | Segurança | “email e CPF’s validados”; “validação… item doado está correto” | publicação por conta com e-mail confirmado; o site não confere itens | não há CPF nem validação de itens |
 | Segurança | “SAIBA MAIS SOIBRE NOSSA” | “SAIBA MAIS SOBRE NOSSA” | erro de digitação |
 | Quem somos | “A ideia nasceu em 2019… milhares de doações” | o projeto acadêmico, sem data nem números | não é verdade |
-| Segurança, Quem somos | fotos de banco de imagens | placeholder em degradê | direitos de imagem |
+| Segurança, Quem somos | fotos de banco de imagens, sem crédito | as mesmas fotos, em JPEG, com “Foto: Freepik” abaixo (change fotos-site) | a licença grátis do Freepik pede atribuição |
 | todas | “Voltar ao inicio” | “Voltar ao início” | acento |
 | todas | sem rodapé (só Termos e Privacidade têm) | o rodapé da home em todas | navegação consistente |
 

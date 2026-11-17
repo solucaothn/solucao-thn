@@ -33,7 +33,6 @@ TEXT_DARK = "#1F1F1F"
 TEXT_BODY = "#2A2A2A"
 TEXT_MUTED = "#555555"
 BORDER = "#D9D9D9"
-PLACEHOLDER_GRADIENT = "linear-gradient(145deg, #168447 0%, #333333 100%)"
 READING_WIDTH = "860px"
 HELP_ROUTE = INSTITUTIONAL_ROUTES["duvidas"]
 # Lupa e placeholder da busca, sobre o branco: 8,9:1 e 5,3:1.
@@ -466,16 +465,71 @@ def _sr_only(component: rx.Component) -> rx.Component:
     )
 
 
-def _placeholder(height: Any, **props: Any) -> rx.Component:
-    """Placeholder decorativo no lugar das fotos de banco de imagens do
-    Figma, até o grupo ter fotos próprias."""
-    return rx.box(
-        aria_hidden="true",
-        class_name="institutional-photo-placeholder",
-        background=PLACEHOLDER_GRADIENT,
-        border_radius="16px",
+# Fotos do Figma (change fotos-site). Os arquivos são JPEG 2x, gerados com
+# scripts/converter_fotos.py; os cantos arredondados vêm do CSS.
+# O raio de cada foto é o dos cantos transparentes do PNG exportado (metade,
+# porque o arquivo é 2x).
+PHOTO_CREDIT_COLOR = TEXT_MUTED
+ABOUT_PHOTO = {
+    "src": "/sobre/quem-somos.jpg",
+    "alt": (
+        "Grupo de jovens agachados no chão de um escritório, sorrindo e apontando "
+        "para papéis com gráficos."
+    ),
+    "credit": "Foto: Freepik",
+    "width": 375,
+    "height": 421,
+    "radius": "8px",
+}
+SECURITY_PHOTO = {
+    "src": "/seguranca/seguranca.jpg",
+    "alt": (
+        "Cinco jovens sorrindo, de pé em fila num escritório claro, usando fones de "
+        "ouvido com microfone."
+    ),
+    "credit": "Foto: Freepik",
+    "width": 507,
+    "height": 339,
+    "radius": "16px",
+}
+
+
+def _photo(
+    src: str, alt: str, credit: str, width: int, height: int, radius: str, **props: Any
+) -> rx.Component:
+    """Foto com a proporção do retângulo do Figma (width × height), que
+    preenche a área sem distorcer, e o crédito da origem logo abaixo."""
+    children = [
+        rx.image(
+            src=src,
+            alt=alt,
+            width="100%",
+            height="auto",
+            display="block",
+            object_fit="cover",
+            border_radius=radius,
+            overflow="hidden",
+            style={"aspectRatio": f"{width} / {height}"},
+        )
+    ]
+    if credit:
+        children.append(
+            rx.el.figcaption(
+                credit,
+                class_name="photo-credit",
+                color=PHOTO_CREDIT_COLOR,
+                font_size="0.75rem",
+                line_height="1.3",
+                margin_top="6px",
+            )
+        )
+    return rx.el.figure(
+        *children,
+        class_name="institutional-photo",
         width="100%",
-        height=height,
+        max_width=f"{width}px",
+        margin="0",
+        justify_self=rx.breakpoints(initial="center", md="end"),
         **props,
     )
 
@@ -831,7 +885,7 @@ def security_page() -> rx.Component:
                 _h1("Segurança e Transparência", margin_top="16px"),
                 rx.text(SECURITY_INTRO, color=TEXT_DARK, font_size="1.25rem", line_height="1.3", margin_top="12px"),
             ),
-            _placeholder(rx.breakpoints(initial="180px", md="339px")),
+            _photo(**SECURITY_PHOTO),
             gap="32px",
             width="100%",
             style={"gridTemplateColumns": rx.breakpoints(initial="minmax(0, 1fr)", md="minmax(0, 1.1fr) minmax(0, 1fr)")},
@@ -920,7 +974,7 @@ def about_page() -> rx.Component:
     return institutional_shell(
         rx.grid(
             mission,
-            _placeholder(rx.breakpoints(initial="200px", md="421px")),
+            _photo(**ABOUT_PHOTO),
             gap="32px",
             width="100%",
             style={"gridTemplateColumns": rx.breakpoints(initial="minmax(0, 1fr)", md="minmax(0, 1.4fr) minmax(0, 0.9fr)")},
