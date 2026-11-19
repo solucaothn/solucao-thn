@@ -18,8 +18,10 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.rotas import path_segment_after
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
-from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
+from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial
+from doafacil.navegacao import back_link_header
 from doafacil.perfil_publico import (
     about_text,
     avatar,
@@ -260,7 +262,7 @@ class DonorProfileState(rx.State):
 
         try:
             donation_id = _positive_donation_id(
-                self.router.page.params.get("id", "")
+                path_segment_after(self.router, "doacao")
             )
         except DonationNotFoundError:
             # Id inválido: nenhuma requisição, e o voltar leva ao início.

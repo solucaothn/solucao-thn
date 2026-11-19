@@ -17,7 +17,6 @@ from doafacil.cadastro_doacao import (
     _fetch_categories,
     _fetch_profile,
     _parse_categories,
-    _back_link,
     _publish_donation,
     _step_five,
     _step_four,
@@ -63,6 +62,12 @@ def _publish_state(**overrides) -> SimpleNamespace:
 
 
 class DonationCreationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache de categorias do processo (change navegacao-celular).
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+
     def test_category_payload_requires_valid_category_ids_and_names(self) -> None:
         payload = [
             {"id": 3, "name": "Móveis"},
@@ -510,8 +515,9 @@ class DonationCreationTests(unittest.TestCase):
         self.assertFalse(state.data_load_failed)
         self.assertEqual(state.categories, [{"id": 3, "name": "Livros"}])
         self.assertEqual((state.city, state.state), ("Recife", "PE"))
-        self.assertEqual(len(events), 1)
-        self.assertIn(PHOTO_UPLOAD_ID, repr(events[0]))
+        # Sem limpar o upload ao entrar (change navegacao-celular): o
+        # clear_selected_files quebrava no navegador e não havia o que limpar.
+        self.assertEqual(events, [])
 
         DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 1)
@@ -873,23 +879,22 @@ class DonationCreationTests(unittest.TestCase):
         )
         self.assertIn("auth-card-enter", str(page))
 
-    def test_back_link_sits_in_full_width_strip_aligned_left(self) -> None:
-        container = _back_link()
-        style = {key: _literal(value) for key, value in container.style.items()}
+    def test_back_link_in_the_header_line_like_other_pages(self) -> None:
+        # Change navegacao-celular: a seta fica na linha do logotipo, à
+        # esquerda, no mesmo cabeçalho das outras páginas, sem “Quero Doar”.
+        from doafacil.navegacao import back_link_header
 
-        self.assertEqual(style.get("width"), "100%")
-        self.assertEqual(style.get("padding"), "0.75rem 1.25rem 0")
-        self.assertNotIn("maxWidth", style)
-        self.assertNotIn("max_width", style)
-        self.assertNotIn("margin", style)
-
-        link = container.children[0]
-        self.assertEqual(link.custom_attrs["aria-label"], "Voltar ao início")
-        self.assertEqual(_literal(link.children[0].to), "/")
-        self.assertIn(
-            '"aria-label":"Voltar ao in\\u00edcio"',
-            str(donation_creation_page()),
+        page = donation_creation_page()
+        header = page.children[0]
+        self.assertEqual(
+            str(header),
+            str(back_link_header("/", "Voltar ao início", "#166B3B", show_donate=False)),
         )
+        back = header.children[0].children[0]
+        self.assertEqual(back.custom_attrs["aria-label"], "Voltar ao início")
+        self.assertIn('to:"/"', str(back))
+        # Sem a faixa solta abaixo do cabeçalho.
+        self.assertEqual(str(page).count('"aria-label":"Voltar ao in\\u00edcio"'), 1)
 
     def test_email_visibility_notice_is_conditional_on_preference(self) -> None:
         step = _step_five()

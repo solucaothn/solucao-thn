@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import httpx
 
+from doafacil.login import LoginState
 from doafacil.detalhe_doacao import (
     CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE,
     CHAT_START_ERROR_MESSAGE,
@@ -58,6 +59,18 @@ DETAIL_PAYLOAD = {
 
 
 class DonationDetailTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache dos dados públicos (change navegacao-celular): validade zero,
+        # para cada chamada destes testes ir ao cliente falso.
+        from unittest.mock import patch as _patch
+
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = _patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     def test_endpoint_uses_xano_base_and_donation_id(self) -> None:
         self.assertEqual(
             _donation_detail_endpoint(
@@ -613,7 +626,7 @@ class DonationDetailTests(unittest.TestCase):
     def test_page_registers_dynamic_route_and_load_handler(self) -> None:
         page = app._unevaluated_pages["doacao/[id]"]
         self.assertEqual(page.route, "doacao/[id]")
-        self.assertEqual(page.on_load.fn, DonationDetailState.load_donation.fn)
+        self.assertEqual([h.fn for h in page.on_load], [DonationDetailState.load_donation.fn, LoginState.load_account.fn])  # + a conta, uma vez por sessão (change navegacao-celular)
 
     def test_detail_view_contains_approved_content_and_no_excluded_features(self) -> None:
         page = donation_detail_page()
@@ -689,17 +702,18 @@ class DonationDetailTests(unittest.TestCase):
     def test_back_link_is_shared_accessible_and_returns_home_in_all_states(
         self,
     ) -> None:
-        from doafacil.chat import back_home_header
+        from doafacil.navegacao import back_home_header
 
         page = donation_detail_page()
         header, state_content = page.children
         rendered_header = str(header)
 
         # “Voltar ao início” na linha do logotipo, o mesmo cabeçalho do chat.
-        self.assertEqual(type(header).__name__, "Grid")
+        self.assertEqual(type(header).__name__, "Box")  # faixa branca com a grade dentro (change navegacao-celular)
+        self.assertEqual(type(header.children[0]).__name__, "Grid")
         self.assertEqual(rendered_header, str(back_home_header()))
         self.assertEqual(type(state_content).__name__, "Fragment")
-        back_link = header.children[0]
+        back_link = header.children[0].children[0]
         self.assertEqual(back_link.custom_attrs.get("aria-label"), "Voltar ao início")
         self.assertIn('"aria-label":"Voltar ao in\\u00edcio"', rendered_header)
         self.assertIn('to:"/"', rendered_header)
@@ -1078,7 +1092,7 @@ class DonationDetailTests(unittest.TestCase):
 
     def test_load_donation_closes_the_viewer(self) -> None:
         state = SimpleNamespace(
-            router=SimpleNamespace(page=SimpleNamespace(params={"id": "abc"})),
+            router=SimpleNamespace(url=SimpleNamespace(path="/doacao/abc", query_parameters={})),
             viewer_open=True,
             viewer_index=3,
             viewer_zoomed=True,
@@ -1140,7 +1154,7 @@ def _all_component_nodes(component: object) -> list[object]:
 def _state_for_route_id(route_id: str) -> SimpleNamespace:
     return SimpleNamespace(
         router=SimpleNamespace(
-            page=SimpleNamespace(params={"id": route_id})
+            url=SimpleNamespace(path=f"/doacao/{route_id}", query_parameters={})
         ),
         donation_id=0,
         title="",
@@ -1190,3 +1204,23 @@ def _chat_state(*, auth_token: str) -> SimpleNamespace:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DetailRetryTests(unittest.TestCase):
+    """Change navegacao-celular: a falha do detalhe oferece “Tentar novamente”."""
+
+    def test_error_state_has_retry_that_reloads(self) -> None:
+        rendered = str(donation_detail_page())
+        retry = rendered[rendered.index('className:"detail-retry"') :][:1500]
+        self.assertIn('"Tentar novamente"', retry)
+        self.assertIn("load_donation", retry)
+        self.assertIn('["minHeight"] : "44px"', retry)
+        # Logo depois da mensagem de falha, no ramo do estado de erro.
+        import json
+
+        from doafacil.detalhe_doacao import DONATION_DETAIL_ERROR_MESSAGE
+
+        message_at = rendered.index(json.dumps(DONATION_DETAIL_ERROR_MESSAGE))
+        retry_at = rendered.index('className:"detail-retry"')
+        self.assertLess(message_at, retry_at)
+        self.assertLess(retry_at - message_at, 1500)

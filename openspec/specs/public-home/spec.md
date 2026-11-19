@@ -7,7 +7,7 @@ Define a apresentação da página inicial pública do DoaFácil e como seus ele
 ## Requirements
 
 ### Requirement: Apresentação da home pública
-A home SHALL apresentar o cabeçalho, a frase de destaque, as estatísticas “Doações em circulação!” e “Pessoas alcançadas”, a seção “Doações mais recentes” e a ilustração aprovada no rodapé conforme a referência `docs/design/16-landing-nova.png`.
+A home SHALL apresentar o cabeçalho, a frase de destaque, as estatísticas “Doações em circulação!” e “Pessoas alcançadas”, a seção “Doações mais recentes” e a ilustração aprovada no rodapé conforme a referência `docs/design/16-landing-nova.png`. Abaixo de 992 px, os links do menu e “Quero Doar” SHALL ficar no painel do menu do celular (spec `site-navigation`).
 
 #### Scenario: Abrir a home sem autenticação
 - **WHEN** uma pessoa acessa a página inicial sem sessão
@@ -23,6 +23,12 @@ A home SHALL apresentar o cabeçalho, a frase de destaque, as estatísticas “D
 #### Scenario: Cabeçalho em 360 px
 - **WHEN** a home é exibida com 360 px de largura, com ou sem sessão
 - **THEN** o cabeçalho MUST caber sem rolagem horizontal da página, com os controles de pelo menos 44 px de área de toque
+
+#### Scenario: Cabeçalho abaixo de 992 px
+- **WHEN** a home é exibida com menos de 992 px de largura
+- **THEN** a barra do cabeçalho MUST mostrar o logotipo, “Entrar” ou o menu da conta e o botão ☰
+- **AND** os links Explorar Doações, Como funciona e Categorias e o “Quero Doar” MUST estar no painel do menu
+- **AND** a partir de 992 px, o cabeçalho MUST continuar como no cenário “Abrir a home sem autenticação”, sem o botão ☰
 
 ### Requirement: Exibição da contagem em circulação
 A home SHALL apresentar na estatística “Doações em circulação” a quantidade retornada pelo serviço público de contagem de doações disponíveis.
@@ -111,7 +117,7 @@ A home SHALL apresentar, abaixo de “Doações em circulação!”, a estatíst
 - **AND** a estatística “Doações em circulação!” continua sendo exibida quando a sua quantidade for válida
 
 ### Requirement: Menu da conta no cabeçalho
-Com sessão, o cabeçalho da home SHALL apresentar um menu da conta com a foto de perfil (ou, sem foto, a inicial) e o primeiro nome da pessoa, no lugar dos controles “Minhas doações”, “Olá, nome” e “Sair”, mantendo o botão “Quero Doar”.
+Com sessão, o cabeçalho da home SHALL apresentar um menu da conta com a foto de perfil (ou, sem foto, a inicial) e o primeiro nome da pessoa, no lugar dos controles “Minhas doações”, “Olá, nome” e “Sair”, mantendo o botão “Quero Doar”. Abaixo de 992 px, o “Quero Doar” SHALL ficar no painel do menu do celular.
 
 #### Scenario: Abrir o menu
 - **WHEN** uma pessoa com sessão aciona o menu da conta, pelo mouse ou pelo teclado
@@ -126,6 +132,7 @@ Com sessão, o cabeçalho da home SHALL apresentar um menu da conta com a foto d
 #### Scenario: Sem sessão
 - **WHEN** não há sessão
 - **THEN** o cabeçalho MUST mostrar “Entrar” e “Quero Doar”, sem o menu da conta
+- **AND** abaixo de 992 px, o “Quero Doar” MUST estar no painel do menu, e a barra MUST mostrar “Entrar” e o botão ☰
 
 #### Scenario: Foto de perfil no círculo
 - **WHEN** a pessoa com sessão tem foto de perfil

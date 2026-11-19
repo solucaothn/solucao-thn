@@ -257,7 +257,9 @@ class OtherPagesTests(unittest.TestCase):
         self.assertEqual(r.count('className:"security-benefit"'), 4)
         self.assertEqual(r.count('className:"security-card"'), 2)
         # A única imagem do conteúdo é a foto da página (change fotos-site).
-        content = r.split("institutional-header")[1].split("Links r")[0]
+        # Conteúdo depois do cabeçalho (que tem a foto da conta, change
+        # navegacao-celular) e antes do rodapé.
+        content = r.split('className:"institutional-back-link"')[1].split("Links r")[0]
         content = content.replace('src:"/logo.svg"', "").replace('src:"/seguranca/seguranca.jpg"', "", 1)
         self.assertNotIn("src:", content)
 

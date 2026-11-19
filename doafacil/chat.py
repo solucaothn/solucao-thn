@@ -28,6 +28,7 @@ START_PATH = "/catalog/chat/conversations/start"
 CONVERSATIONS_PATH = "/catalog/chat/conversations"
 MESSAGES_PATH = "/catalog/chat/messages"
 UNREAD_TOTAL_PATH = "/catalog/chat/unread_total"
+UNREAD_REFRESH_SECONDS = 60.0
 
 CONVERSATIONS_PAGE_LIMIT = 20
 MESSAGES_PAGE_LIMIT = 50
@@ -714,6 +715,15 @@ async def _load_list(state: Any, client: httpx.AsyncClient) -> None:
     )
     state.conversations_page = 1
     state.conversations_has_more = result["has_more"]
+    # Total do botão e do menu atualizado na hora, sem pedido a mais (change
+    # navegacao-celular): com a lista inteira numa página, é a soma; com mais
+    # páginas, a próxima página do site consulta o total de novo.
+    if result["has_more"]:
+        state._unread_checked_token = ""
+    else:
+        _set_unread_total(state, sum(item["unread_count"] for item in state.chat_conversations))
+        state._unread_checked_token = state.auth_token
+        state._unread_checked_at = time.monotonic()
 
 
 def _apply_page_metadata(state: Any, page: dict[str, Any]) -> None:
@@ -740,6 +750,15 @@ async def _open_conversation(
 ) -> None:
     _reset_conversation(state)
     state.active_conversation_id = conversation_id
+    # O total do botão e do menu desconta as não lidas desta conversa na hora
+    # (change navegacao-celular), sem pedido a mais.
+    opened_unread = sum(
+        item["unread_count"]
+        for item in state.chat_conversations
+        if item["conversation_id"] == conversation_id
+    )
+    if opened_unread:
+        _set_unread_total(state, max(0, state.unread_total - opened_unread))
     # O contador some na hora; a leitura no Xano acontece no GET abaixo.
     state.chat_conversations = _without_unread_for(
         state.chat_conversations, conversation_id
@@ -828,24 +847,42 @@ class ChatState(LoginState):
     unread_total: int = 0
     unread_total_text: str = ""
     unread_link_label: str = "Mensagens"
+    # Última consulta do total (change navegacao-celular): no máximo uma a
+    # cada UNREAD_REFRESH_SECONDS por pessoa; entre elas, fica o último valor.
+    _unread_checked_at: float = 0.0
+    _unread_checked_token: str = ""
 
     @rx.event
     async def load_unread_total(self) -> None:
-        """Uma consulta por carregamento da home; sem token, nenhuma.
+        """No máximo uma consulta a cada UNREAD_REFRESH_SECONDS por pessoa
+        (change navegacao-celular: limite de 10 pedidos a cada 20 s do Xano);
+        entre elas, as páginas mostram o último valor. Sem token, nenhuma.
+        O /chat e abrir uma conversa continuam atualizando o total na hora.
 
         Qualquer erro, inclusive 401 (o load_account já trata o token
-        recusado), deixa o total em 0, sem aviso.
+        recusado), deixa o total em 0, sem aviso, e a próxima página tenta
+        de novo.
         """
         if not self.auth_token:
             _set_unread_total(self, 0)
+            self._unread_checked_token = ""
+            return
+        now = time.monotonic()
+        if (
+            self._unread_checked_token == self.auth_token
+            and now - self._unread_checked_at < UNREAD_REFRESH_SECONDS
+        ):
             return
         try:
             async with _new_client() as client:
                 total = await fetch_unread_total(client, self.auth_token)
         except ChatError:
             _set_unread_total(self, 0)
+            self._unread_checked_token = ""
             return
         _set_unread_total(self, total)
+        self._unread_checked_token = self.auth_token
+        self._unread_checked_at = now
 
     @rx.event
     async def load_chat(self) -> rx.event.EventSpec | None:
@@ -858,7 +895,8 @@ class ChatState(LoginState):
         if not self.auth_token:
             return rx.redirect("/login")
 
-        route_value = self.router.page.params.get("conversa")
+        # Query da URL (router.url; o router.page está obsoleto).
+        route_value = self.router.url.query_parameters.get("conversa")
         self.is_loading_list = True
         try:
             async with _new_client() as client:
@@ -1313,65 +1351,12 @@ def chat_fab() -> rx.Component:
     )
 
 
-def back_link_header(
-    href: str | rx.Var, label: str, color: str = GREEN_TEXT
-) -> rx.Component:
-    """Cabeçalho branco com um link de voltar na linha do logotipo.
-
-    Como nos frames chat-1, detalhes-doacao e perfil-doador do Figma: o link
-    fica à esquerda, na mesma linha do logotipo centralizado, sem faixa
-    própria. A coluna da direita fica vazia para manter o logotipo no centro.
-    Em telas estreitas aparece só a seta, com o rótulo acessível e 44 px de
-    área de toque.
-    """
-    return rx.grid(
-        rx.link(
-            rx.hstack(
-                rx.icon("chevron-left", size=20),
-                rx.text(
-                    label,
-                    display=rx.breakpoints(initial="none", sm="inline"),
-                ),
-                spacing="1",
-                align="center",
-            ),
-            href=href,
-            color=color,
-            font_weight="600",
-            aria_label=label,
-            justify_self="start",
-            # Área de toque confortável mesmo quando só a seta aparece.
-            display="inline-flex",
-            align_items="center",
-            min_height="44px",
-            min_width="44px",
-        ),
-        rx.link(
-            rx.image(
-                src="/logo.svg",
-                alt="DoaFácil",
-                width="140px",
-                height="52px",
-                object_fit="contain",
-            ),
-            href="/",
-        ),
-        rx.box(),
-        grid_template_columns="1fr auto 1fr",
-        align_items="center",
-        width="100%",
-        background="white",
-        padding="0.25rem 1rem",
-        box_shadow="0 2px 8px rgba(39, 39, 39, 0.06)",
-    )
-
-
-def back_home_header() -> rx.Component:
-    """“Voltar ao início” (para /) em #166B3B. Usado no /chat e no detalhe."""
-    return back_link_header("/", "Voltar ao início", GREEN_TEXT)
-
-
 def _header() -> rx.Component:
+    # O cabeçalho mora em navegacao.py, que importa este módulo (ChatState):
+    # o import fica aqui dentro para não criar import circular.
+    from doafacil.navegacao import back_home_header
+
+    # Largura toda, como nas outras páginas com Voltar (change navegacao-celular).
     return back_home_header()
 
 
@@ -1933,12 +1918,20 @@ def chat_page() -> rx.Component:
             ),
             class_name="page-fade-enter",
             width="100%",
-            height="calc(100vh - 64px)",
-            min_height="420px",
+            # Ocupa o que sobra abaixo do cabeçalho, seja qual for a altura
+            # dele (change navegacao-celular). Com o calc(100vh - 64px) e o
+            # cabeçalho mais alto, a página passava da tela e a rolagem até a
+            # última mensagem cortava o topo do logotipo.
+            flex="1",
+            min_height="0",
             border_top=f"1px solid {LIGHT_BORDER}",
             background="white",
         ),
-        min_height="100vh",
+        display="flex",
+        flex_direction="column",
+        height="100dvh",
+        min_height="520px",
+        overflow="hidden",
         background=CREAM,
         font_family="'LINE Seed JP', Arial, sans-serif",
     )

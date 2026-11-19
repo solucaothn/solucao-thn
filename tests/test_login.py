@@ -312,6 +312,7 @@ class LoginClientTests(unittest.TestCase):
         class State:
             auth_token = "private-token"
             account_name = "Old name"
+            _account_token = ""
             password_reset_notice_pending = False
             password_reset_notice_visible = False
 
@@ -715,6 +716,23 @@ class LoginPageTests(unittest.TestCase):
             if getattr(node, "class_name", None) == "category-link":
                 self.assertIn("close_drawer", str(node.event_triggers.get("on_click")))
                 continue
+            # Itens do painel do celular (change navegacao-celular): fecham o
+            # painel ao navegar; o “Sair” também encerra a sessão.
+            if "nav-menu-item" in str(getattr(node, "class_name", "") or ""):
+                self.assertIn("NavMenuState.close", str(node.event_triggers.get("on_click")))
+                continue
+            # Pausa dos vídeos com movimento reduzido (change videos-home).
+            if getattr(node, "id", None) == "como-funciona":
+                self.assertEqual(set(node.event_triggers), {"on_mount"})
+                continue
+            # “Tentar de novo” da gaveta de categorias (change navegacao-celular).
+            if getattr(node, "class_name", None) == "category-retry":
+                self.assertIn("reload_categories", str(node.event_triggers.get("on_click")))
+                continue
+            # O “Entrar” da barra do celular, igual ao do desktop.
+            if type(node).__name__ == "Button" and _component_text(node) == "Entrar":
+                self.assertIn("/login", str(node.event_triggers["on_click"]))
+                continue
             if node is not enter and type(node).__name__ not in allowed:
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
@@ -727,15 +745,25 @@ class LoginPageTests(unittest.TestCase):
             and "auth_token" in str(getattr(node, "cond", ""))
             and "Sair" in str(node.children[0])
         ]
-        self.assertEqual(len(header_conds), 1)
-        authenticated, visitor = (str(child) for child in header_conds[0].children)
-        # A entrada no chat saiu do cabeçalho: virou o botão flutuante.
-        for header in (authenticated, visitor):
-            self.assertNotIn("Mensagens", header)
-            self.assertNotIn("/chat", header)
-            self.assertNotIn("unread_total", header)
-            self.assertNotIn("chat-unread-badge", header)
-        self.assertIn("Sair", authenticated)
+        # Barra do desktop, barra do celular e painel do celular (change
+        # navegacao-celular).
+        panel = [cond for cond in header_conds if "nav-menu-account" in str(cond)]
+        bars = [cond for cond in header_conds if "nav-menu-account" not in str(cond)]
+        self.assertEqual((len(bars), len(panel)), (2, 1))
+        for bar in bars:
+            authenticated, visitor = (str(child) for child in bar.children)
+            # A entrada no chat saiu do cabeçalho: virou o botão flutuante.
+            for header in (authenticated, visitor):
+                self.assertNotIn("Mensagens", header)
+                self.assertNotIn("/chat", header)
+                self.assertNotIn("unread_total", header)
+                self.assertNotIn("chat-unread-badge", header)
+            self.assertIn("Sair", authenticated)
+        # No painel, “Mensagens” só com sessão.
+        authenticated, visitor = (str(child) for child in panel[0].children)
+        self.assertIn("Mensagens", authenticated)
+        self.assertIn('"/chat"', authenticated)
+        self.assertNotIn("Mensagens", visitor)
 
     def test_home_has_floating_messages_button(self) -> None:
         rendered = str(index())

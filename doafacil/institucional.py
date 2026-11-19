@@ -16,8 +16,9 @@ from typing import Any
 
 import reflex as rx
 
-from doafacil.cabecalho import FOCUS_RING, HEADER_MAX_WIDTH, HEADER_PADDING_X, back_link, logo_header
+from doafacil.cabecalho import FOCUS_RING, HEADER_MAX_WIDTH, HEADER_PADDING_X, back_link
 from doafacil.chat import CHAT_FAB_CLEARANCE, chat_fab
+from doafacil.navegacao import logo_header
 from doafacil.rodape import (
     CONTACT_EMAIL,
     INSTITUTIONAL_ROUTES,

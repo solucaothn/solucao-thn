@@ -23,7 +23,8 @@ from doafacil.cadastro_doacao import (
     DonationServiceError,
     _api_endpoint,
 )
-from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
+from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial
+from doafacil.navegacao import back_link_header
 from doafacil.login import LoginState
 from doafacil.minhas_doacoes import (
     MyDonationsState,
@@ -81,6 +82,11 @@ VISIBILITY_TEXT = (
 
 PHOTO_PATH = "/auth/profile/photo"
 PHOTO_UPLOAD_ID = "profile-photo-upload"
+# Sem rx.clear_selected_files (change navegacao-celular): com on_drop, os
+# arquivos vão direto para o evento e o componente não guarda seleção. A
+# limpeza depende do UploadFilesProvider, que o Reflex só monta quando a
+# página usa rx.selected_files; sem ele, o navegador mostrava
+# “refs.__clear_selected_files is not a function”.
 PHOTO_MAX_BYTES = 5 * 1024 * 1024
 PHOTO_FORMATS_TEXT = "JPG, PNG, GIF ou WEBP, até 5 MB"
 PHOTO_PUBLIC_NOTICE = "Sua foto aparece para outras pessoas."
@@ -447,12 +453,10 @@ class EditProfileState(LoginState):
             contents = await file.read()
         except OSError:
             self.photo_error = PHOTO_ERROR_MESSAGE
-            yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
             return
         error = validate_photo_file(file.name or "", file.content_type or "", len(contents))
         if error:
             self.photo_error = error
-            yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
             return
         try:
             source = prepare_source(contents)
@@ -460,7 +464,6 @@ class EditProfileState(LoginState):
         except PhotoImageError:
             # Extensão e tipo aceitos, mas o conteúdo não é uma imagem legível.
             self.photo_error = PHOTO_FORMAT_MESSAGE
-            yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
             return
 
         # O original fica só no servidor (variável de backend); o navegador
@@ -469,7 +472,6 @@ class EditProfileState(LoginState):
         self._crop_preview_size = (width, height)
         self.crop_preview = preview
         self.crop_open = True
-        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
 
     @rx.event
     def set_crop_area(self, area: dict[str, Any]) -> None:

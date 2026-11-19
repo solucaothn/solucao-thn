@@ -190,7 +190,7 @@ As referências visuais são `docs/design/19-duvidas-01.png` a `23-quem-somos.pn
   | `/quem-somos` | Quem somos |
   | `/contato` | Fale com a gente |
 
-  Todas são estáticas, sem Xano. Têm o cabeçalho com o logotipo centralizado (`logo_header` em `cabecalho.py`), “Voltar ao início”, o rodapé da home e o botão flutuante do chat.
+  Todas são estáticas, sem Xano. Têm o cabeçalho com o logotipo centralizado e os controles do site à direita (`logo_header` em `navegacao.py`, change navegacao-celular), “Voltar ao início”, o rodapé da home e o botão flutuante do chat.
 - **Módulos:**
   - `doafacil/institucional.py` tem o conteúdo e as páginas;
   - `doafacil/rodape.py` tem o rodapé (movido de `doafacil.py`), `INSTITUTIONAL_ROUTES`, `CONTACT_EMAIL` e `HOW_IT_WORKS_ANCHOR`. O antigo `FUTURE_ROUTES` acabou.
@@ -233,7 +233,7 @@ As referências visuais são `docs/design/17-explorar.png`, `18-categorias-01.pn
   - a rota `/categorias` mostra a mesma lista, com o cabeçalho da Explorar;
   - cada categoria leva a `/explorar?categoria=<id>`. Os ícones saem do `CATEGORY_ICONS` (pelo nome sem acento; outro nome usa `tag`);
   - as categorias excluídas do cadastro (Alimentos e Móveis) também ficam fora daqui.
-- **Cabeçalho compartilhado:** `doafacil/cabecalho.py` tem o menu da conta e os controles “Entrar”/“Quero Doar”, usados pela home, pela `/explorar` e pela `/categorias`.
+- **Cabeçalho compartilhado:** `doafacil/cabecalho.py` tem o menu da conta e os controles “Entrar”/“Quero Doar” (`header_auth_controls`), usados pela home, pela `/explorar` e pela `/categorias`. Abaixo de 992 px, eles dão lugar à barra do celular (veja “Navegação e menu do celular”).
 - **Testes:** `tests/test_explore.py` e `tests/test_categories.py`.
 
 #### Conferir a busca contra o Xano real
@@ -252,6 +252,65 @@ python scripts/teste_explorar_real.py
 | EX4 | uma página além do total vem vazia, com os mesmos totais |
 | EX5 | UF com mais de 2 letras e `page=0` dão 400 |
 | EX6 | nenhuma chave além das do cartão e da paginação |
+
+### Navegação e menu do celular (change navegacao-celular)
+
+Spec `site-navigation`. O módulo é `doafacil/navegacao.py`.
+
+- **Menu do celular (abaixo de 992 px):**
+  - **Botão:** ☰ (`nav_menu()`), com o rótulo “Abrir menu” e 44 px de área de toque.
+  - **Painel:** é um `rx.dialog` à esquerda, como a gaveta de Categorias. Prende o foco e fecha com X, Esc ou clique fora.
+  - **Itens para todos:** Explorar doações, Como funciona, Categorias (vai para `/categorias`, sem abrir a gaveta) e Quero Doar.
+  - **Com sessão:** a foto ou a inicial e o nome, depois Minhas doações, Mensagens, Editar perfil e Sair.
+    - Mensagens mostra o total de não lidas que já estiver carregado, sem consulta nova.
+  - **Sem sessão:** Entrar.
+  - Cada item fecha o painel (`NavMenuState.close`).
+- **Barra do celular:**
+  - **Home, `/explorar` e `/categorias`:** logotipo, “Entrar” ou o menu da conta, e o ☰ (`responsive_header_controls()`). O desktop (992 px ou mais) fica como antes.
+  - **Páginas com o logotipo centralizado:** só o ☰ à direita, porque a conta não cabe em 360 px.
+- **Cabeçalho centralizado:**
+  - **Funções:**
+    - `site_header(back=None, show_donate=True)`;
+    - `back_link_header(href, label, color)` e `back_home_header()`, que saíram do `chat.py`;
+    - `logo_header()`, que saiu do `cabecalho.py`.
+  - **Layout:** “Voltar” à esquerda, logotipo no centro e, à direita, a conta e “Quero Doar” no desktop ou o ☰ no celular.
+  - **Onde é usado:**
+    - páginas institucionais, detalhe, perfil de quem doa, chat, Minhas doações, Editar doação e Editar perfil;
+    - cadastro de doação, com `show_donate=False`.
+  - **Exceções:** as telas de login, cadastro de conta e recuperação de senha continuam só com o logotipo.
+  - **Página nova com cabeçalho:** use uma dessas funções e ponha o `LoginState.load_account` no `on_load`.
+- **Imports:** o `navegacao.py` importa o `chat.py` (`ChatState`).
+  - Por isso, o `chat.py` e o `cadastro_doacao.py` importam o `navegacao.py` dentro da função que monta o cabeçalho.
+  - Não importe o `rodape.py` no `navegacao.py`: ele importa o `explorar.py`, que importa o `navegacao.py`. A âncora `HOW_IT_WORKS_ANCHOR` tem uma cópia lá, e um teste confere que as duas são iguais.
+- **Conta uma vez por sessão:** o plano grátis do Xano aceita 10 pedidos a cada 20 s.
+  - O `LoginState.load_account` busca o nome (`auth/me`) e a foto (`auth/profile`) só na primeira página de cada sessão (`_account_token` = token já carregado).
+  - As outras páginas reaproveitam, sem pedido.
+  - **Busca de novo depois de:**
+    - um login, porque o token é novo;
+    - um logout ou um token rejeitado, que limpam o marcador;
+    - uma falha passageira, que não grava o marcador.
+  - O Editar perfil atualiza o nome e a foto direto no estado, sem pedido.
+- **Categorias guardadas no servidor:** o `_fetch_categories` de `cadastro_doacao.py` guarda as categorias no processo do Reflex por 1 hora (`CATEGORY_CACHE_SECONDS`).
+  - Ele é usado pela home (busca e gaveta), pela `/categorias`, pela Explorar, pelo cadastro de doação e pela edição de doação. O `fetch_categories` da Explorar só acrescenta os ícones.
+  - Uma falha não fica guardada. A lista de categorias mostra “Tentar de novo”, que busca outra vez.
+  - Nos testes que usam a busca real com cliente falso, chame `clear_category_cache()` no `setUp`.
+- **Cabeçalho centralizado:** ocupa a largura toda da tela, com `CENTERED_HEADER_PADDING` (12 × 16 px abaixo de 992 px e 12 × 32 px a partir daí) e o logotipo de 72 px da home. A home, a `/explorar` e a `/categorias` continuam no contêiner de 1200 px.
+  - O `/chat` é uma coluna de `100dvh` em que a área de mensagens ocupa o que sobra abaixo do cabeçalho. Não use alturas fixas como `calc(100vh - 64px)`.
+- **Limite do Xano (10 pedidos a cada 20 s no plano grátis):**
+  - **Dados públicos guardados no servidor:** `doafacil/cache_publico.py` guarda a contagem, as recentes, a busca e o detalhe por 60 s, iguais para todos.
+    - Publicar, editar, mudar status ou apagar limpa o cache (`invalidate_donations()` nas funções de escrita).
+    - Só guarde ali dados públicos.
+    - Nos testes que usam essas buscas com cliente falso, zere a validade no `setUp` (`patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)`).
+  - **Total de não lidas:** consultado no máximo a cada 60 s por pessoa (`UNREAD_REFRESH_SECONDS`). O `/chat` atualiza o total na hora.
+  - **`doafacil/xano_http.py`:** envolve as chamadas do servidor.
+    - Num 429, espera 2 s e tenta mais uma vez.
+    - Quando a navegação cancela um pedido, isso não vira erro.
+    - É ligado pelo lifespan do app, então só funciona com o servidor rodando, não nos testes.
+  - **Log temporário:** `$env:DOAFACIL_LOG_XANO = "1"; reflex run` mostra no terminal uma linha `[xano]` por chamada, sem token, query nem host.
+- **Upload:** não use `rx.clear_selected_files`. Ele depende do `UploadFilesProvider`, que o Reflex só monta com `rx.selected_files`; sem ele, quebra no navegador. Com `on_drop`, não há seleção guardada para limpar.
+- **Parâmetros da página:** use `router.url` (`doafacil/rotas.py`: `path_segment_after` e `query_parameter`), não o `router.page`, que está obsoleto.
+- **Aviso “no dispatch function” no console:** aparece quando a aba aberta tem um frontend mais antigo que o backend, por exemplo depois de o `reflex run` recarregar por um estado novo. Recarregue a aba.
+- **Testes:** `tests/test_navegacao.py` (painel, cabeçalho, páginas e rotas) e `tests/test_cabecalho.py` (conta uma vez por sessão).
 
 ### GET e POST antigos de `catalog/donations` (change endpoints-antigos)
 
@@ -465,7 +524,7 @@ O código fica em `doafacil/chat.py`: cliente dos endpoints, `ChatState` e a pá
 Como se entra no chat:
 
 - **Quem tem interesse:** clica em “Chat” no detalhe da doação. O botão inicia a conversa (ou reabre a que já existe) e abre `/chat?conversa=<id>`. Se a doação não aceitar conversa, inclusive quando é a própria pessoa que doou, aparece a mensagem neutra “Não é possível conversar sobre esta doação pelo chat.”.
-- **Quem doa:** usa o link “Mensagens” no cabeçalho logado da home (no celular, só o ícone).
+- **Quem doa:** usa o botão flutuante “Mensagens” ou, abaixo de 992 px, o item “Mensagens” do menu do celular (change navegacao-celular).
 - **Sem login:** `/chat` e o botão “Chat” levam ao `/login`. Uma sessão recusada pelo Xano (401) também é limpa e leva ao `/login`.
 
 Atualização automática:

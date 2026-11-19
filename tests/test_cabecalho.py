@@ -82,7 +82,7 @@ class LoadAccountPhotoTests(unittest.TestCase):
     """Uma requisição a mais (auth/profile), só na primeira carga do token."""
 
     def _state(self, **values: object) -> SimpleNamespace:
-        base = {"auth_token": "tok", "account_name": "", "account_photo": "", "_account_photo_token": ""}
+        base = {"auth_token": "tok", "account_name": "", "account_photo": "", "_account_token": ""}
         return SimpleNamespace(**{**base, **values})
 
     def _patches(self, photo: object = "https://x.example/f.jpg"):
@@ -110,7 +110,7 @@ class LoadAccountPhotoTests(unittest.TestCase):
         self.assertEqual(state.account_name, "Ana")
 
     def test_new_token_fetches_again(self) -> None:
-        state = self._state(account_photo="https://x.example/velha.jpg", _account_photo_token="outro")
+        state = self._state(account_photo="https://x.example/velha.jpg", _account_token="outro")
         me, profile, name, photo = self._patches("")
         with me, profile, name, photo as request:
             _load(state)
@@ -124,19 +124,81 @@ class LoadAccountPhotoTests(unittest.TestCase):
         me, profile, name, photo = self._patches(AuthTokenRejectedError())
         with me, profile, name, photo:
             _load(state)
-        self.assertEqual((state.auth_token, state.account_photo, state._account_photo_token), ("", "", ""))
+        self.assertEqual((state.auth_token, state.account_photo, state._account_token), ("", "", ""))
 
     def test_no_token_and_logout_clear_photo(self) -> None:
         from doafacil.login import LoginState
 
-        state = self._state(auth_token="", account_photo="https://x.example/f.jpg", _account_photo_token="tok")
+        state = self._state(auth_token="", account_photo="https://x.example/f.jpg", _account_token="tok")
         _load(state)
-        self.assertEqual((state.account_photo, state._account_photo_token), ("", ""))
-        state = self._state(account_photo="https://x.example/f.jpg", _account_photo_token="tok")
+        self.assertEqual((state.account_photo, state._account_token), ("", ""))
+        state = self._state(account_photo="https://x.example/f.jpg", _account_token="tok")
         state.password_reset_notice_pending = state.password_reset_notice_visible = False
         state.signup_notice_pending = state.signup_notice_visible = False
         LoginState.logout.fn(state)
-        self.assertEqual((state.account_photo, state._account_photo_token), ("", ""))
+        self.assertEqual((state.account_photo, state._account_token), ("", ""))
+
+
+class AccountOncePerSessionTests(LoadAccountPhotoTests):
+    """Change navegacao-celular: nome e foto uma vez por sessão (token), por
+    causa do limite do plano grátis do Xano (10 pedidos a cada 20 s)."""
+
+    def test_many_pages_one_request_each(self) -> None:
+        state = self._state()
+        me, profile, name, photo = self._patches()
+        with me, profile, name as name_request, photo as photo_request:
+            for _ in range(5):  # cinco páginas seguidas
+                _load(state)
+        self.assertEqual(name_request.await_count, 1)
+        self.assertEqual(photo_request.await_count, 1)
+        self.assertEqual(state._account_token, "tok")
+
+    def test_new_login_loads_again(self) -> None:
+        state = self._state(account_name="Ana", _account_token="tok")
+        me, profile, name, photo = self._patches()
+        with me, profile, name as name_request, photo:
+            _load(state)
+            self.assertEqual(name_request.await_count, 0)
+            state.auth_token = "novo"
+            _load(state)
+        self.assertEqual(name_request.await_count, 1)
+        self.assertEqual(state._account_token, "novo")
+
+    def test_transient_failure_does_not_mark_and_retries(self) -> None:
+        from unittest.mock import AsyncMock, patch
+
+        from doafacil.login import ACCOUNT_FALLBACK_NAME, AuthAccountUnavailableError
+
+        state = self._state()
+        me, profile, _name, photo = self._patches()
+        failing = patch(
+            "doafacil.login.request_authenticated_name",
+            new_callable=AsyncMock,
+            side_effect=AuthAccountUnavailableError(),
+        )
+        with me, profile, failing as name_request, photo:
+            _load(state)
+            _load(state)
+        self.assertEqual(name_request.await_count, 2)
+        self.assertEqual(state.account_name, ACCOUNT_FALLBACK_NAME)
+        self.assertEqual(state._account_token, "")
+
+    def test_profile_edit_updates_without_request(self) -> None:
+        import inspect
+
+        from doafacil import editar_perfil
+
+        # O Editar perfil grava o nome e a foto novos direto no estado da conta.
+        source = inspect.getsource(editar_perfil)
+        self.assertIn("self.account_name = first_name_of(", source)
+        self.assertIn("self.account_photo = url", source)
+        state = self._state(account_name="Ana", _account_token="tok")
+        state.account_name = "Bia"  # nome salvo no Editar perfil
+        me, profile, name, photo = self._patches()
+        with me, profile, name as name_request, photo as photo_request:
+            _load(state)
+        self.assertEqual((name_request.await_count, photo_request.await_count), (0, 0))
+        self.assertEqual(state.account_name, "Bia")
 
 
 class RequestAccountPhotoTests(unittest.TestCase):

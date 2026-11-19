@@ -1,0 +1,9 @@
+/* Cartões institucionais da home (change videos-home).
+   Com movimento reduzido, os vídeos não aparecem nem tocam: fica a capa, que
+   é o fundo do cartão. O script na montagem da seção (REDUCED_MOTION_SCRIPT
+   em doafacil/doafacil.py) também tira o autoplay e pausa os vídeos. */
+@media (prefers-reduced-motion: reduce) {
+  .home-institutional-video {
+    display: none !important;
+  }
+}

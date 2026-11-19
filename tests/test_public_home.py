@@ -1,11 +1,15 @@
 import asyncio
+import json
 import os
 import re
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
+
+from doafacil.navegacao import nav_menu_items
 
 from doafacil.doafacil import (
     COMPLETED_ERROR_MESSAGE,
@@ -15,6 +19,8 @@ from doafacil.doafacil import (
     HOW_IT_WORKS_ANCHOR,
     INSTITUTIONAL_ROUTES,
     INSTITUTIONAL_CARDS,
+    INSTITUTIONAL_VEIL,
+    REDUCED_MOTION_SCRIPT,
     HomeState,
     _fetch_donation_counts,
     _fetch_recent_donations,
@@ -25,6 +31,7 @@ from doafacil.doafacil import (
     app,
     donation_count_view,
     index,
+    institutional_card,
     institutional_section,
     public_home_footer,
     recent_donations_view,
@@ -106,7 +113,60 @@ def _link_target(node: object) -> str:
     return match.group(1) if match else ""
 
 
+def _veil_alpha(fraction: float) -> float:
+    """Opacidade do INSTITUTIONAL_VEIL a uma altura (0 no topo, 1 embaixo),
+    interpolando entre as paradas do gradiente."""
+    stops = [
+        (float(alpha), float(position) / 100)
+        for alpha, position in re.findall(r"rgba\(0, 0, 0, ([0-9.]+)\) (\d+)%", INSTITUTIONAL_VEIL)
+    ]
+    if fraction <= stops[0][1]:
+        return stops[0][0]
+    for (a0, p0), (a1, p1) in zip(stops, stops[1:]):
+        if fraction <= p1:
+            return a0 + (a1 - a0) * (fraction - p0) / (p1 - p0)
+    return stops[-1][0]
+
+
+def _poster_text_contrast(poster: str) -> float:
+    """Contraste do branco com o pixel claro (percentil 95) da faixa do texto
+    da capa, com o véu aplicado."""
+    from PIL import Image
+
+    path = Path(__file__).resolve().parent.parent / "assets" / poster.lstrip("/")
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        width, height = rgb.size
+        luminances = []
+        for y in range(int(height * 0.55), height, 2):
+            alpha = _veil_alpha(y / height)
+            for x in range(0, width, 2):
+                r, g, b = (channel * (1 - alpha) for channel in rgb.getpixel((x, y)))
+                linear = [
+                    (c / 255) / 12.92 if c / 255 <= 0.03928 else (((c / 255) + 0.055) / 1.055) ** 2.4
+                    for c in (r, g, b)
+                ]
+                luminances.append(0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2])
+    luminances.sort()
+    bright = luminances[int(len(luminances) * 0.95)]
+    return 1.05 / (bright + 0.05)
+
+
 class PublicHomeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache de categorias do processo (change navegacao-celular).
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+        # Cache dos dados públicos (change navegacao-celular): validade zero,
+        # para cada chamada destes testes ir ao cliente falso.
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     @staticmethod
     def _value(value: object) -> object:
         return getattr(value, "_var_value", value)
@@ -381,6 +441,7 @@ class PublicHomeTests(unittest.TestCase):
         class AccountState:
             auth_token = "temporary-token"
             account_name = ""
+            _account_token = ""
 
         account_state = AccountState()
         with (
@@ -546,8 +607,6 @@ class PublicHomeTests(unittest.TestCase):
 
         self.assertNotIn("Saiba mais", contents)
         nodes = _component_nodes(section)
-        # Placeholder em degradê: nenhuma foto (as do Figma têm marca d'água).
-        self.assertTrue(all(card["image"] is None for card in INSTITUTIONAL_CARDS))
         cards = [
             node
             for node in nodes
@@ -555,15 +614,80 @@ class PublicHomeTests(unittest.TestCase):
         ]
         self.assertEqual(len(cards), 4)
         for card in cards:
-            self.assertTrue(str(card.background).startswith("linear-gradient"))
             self.assertEqual(self._value(card.aspect_ratio), "1")
         rendered = str(section)
-        self.assertNotIn("url(", rendered)
+        self.assertNotIn("linear-gradient(145deg", rendered)  # sem o degradê provisório
         self.assertNotIn("shutterstock", rendered.lower())
+        # Os cartões não navegam; o único evento da seção é a pausa dos vídeos
+        # com movimento reduzido (change videos-home).
         for node in nodes:
             self.assertFalse(getattr(node, "href", None))
-            self.assertFalse(getattr(node, "event_triggers", {}))
-            self.assertFalse(getattr(node, "src", None))
+            triggers = getattr(node, "event_triggers", {})
+            if getattr(node, "id", None) == "como-funciona":
+                self.assertEqual(set(triggers), {"on_mount"})
+                continue
+            self.assertFalse(triggers)
+
+    def test_institutional_cards_show_own_videos_with_poster(self) -> None:
+        """Change videos-home: vídeo decorativo, sem som e em repetição, com a
+        capa de fundo, o véu escuro por cima e o texto acessível no cartão."""
+        names = ("solidariedade", "seguranca", "missao", "passo-a-passo")
+        self.assertEqual(
+            [(card["video"], card["poster"]) for card in INSTITUTIONAL_CARDS],
+            [(f"/landing/{name}.mp4", f"/landing/{name}.jpg") for name in names],
+        )
+        for card, name in zip(INSTITUTIONAL_CARDS, names):
+            with self.subTest(cartao=card["title"]):
+                rendered = str(institutional_card(card))
+                video = rendered[rendered.index('jsx("video"') :]
+                video = video[: video.index("},)") + 3]
+                for expected in (
+                    'autoPlay:true',
+                    'muted:true',
+                    'loop:true',
+                    'playsInline:true',
+                    'preload:"metadata"',
+                    f'src:"/landing/{name}.mp4"',
+                    f'poster:"/landing/{name}.jpg"',
+                    '"aria-hidden":"true"',
+                    'tabIndex:-1',
+                    'className:"home-institutional-video"',
+                    '["objectFit"] : "cover"',
+                    '["position"] : "absolute"',
+                    # Sem controles do navegador (picture-in-picture, “pular”,
+                    # transmissão) nem cliques no vídeo decorativo.
+                    "disablePictureInPicture:true",
+                    "disableRemotePlayback:true",
+                    'controlsList:"nodownload nofullscreen noremoteplayback noplaybackrate"',
+                    '["pointerEvents"] : "none"',
+                ):
+                    self.assertIn(expected, video)
+                # Sem o atributo controls (o controlsList só restringe os do
+                # navegador).
+                self.assertNotRegex(video, r"[{,]controls:")
+                # A capa é o fundo do cartão (antes do vídeo, se ele falhar e
+                # com movimento reduzido).
+                self.assertIn(f"url('/landing/{name}.jpg') center / cover", rendered)
+                self.assertIn('["overflow"] : "hidden"', rendered)
+                # Véu escuro por cima do vídeo e o texto por cima do véu.
+                veil_at = rendered.index('className:"home-institutional-veil"')
+                self.assertLess(rendered.index('jsx("video"'), veil_at)
+                self.assertIn(INSTITUTIONAL_VEIL, rendered)
+                self.assertLess(veil_at, rendered.index(json.dumps(card["title"])))
+                self.assertIn('["zIndex"] : "1"', rendered)
+
+    def test_institutional_videos_respect_reduced_motion(self) -> None:
+        css = (Path(__file__).resolve().parent.parent / "assets" / "home.css").read_text(encoding="utf-8")
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+        self.assertIn(".home-institutional-video", css)
+        self.assertIn("display: none !important", css)
+        self.assertIn("/home.css", app.stylesheets)
+        section = institutional_section()
+        mount = str(section.event_triggers["on_mount"])
+        self.assertIn("prefers-reduced-motion: reduce", REDUCED_MOTION_SCRIPT)
+        self.assertIn("removeAttribute('autoplay')", REDUCED_MOTION_SCRIPT)
+        self.assertIn("pause()", REDUCED_MOTION_SCRIPT)
+        self.assertIn("home-institutional-video", mount)
 
     def test_footer_content_and_links(self) -> None:
         footer = public_home_footer()
@@ -866,11 +990,11 @@ class PublicHomeTests(unittest.TestCase):
         # Números e rótulos (#005723) e título (#2A2A2A) do Figma.
         self.assertGreaterEqual(ratio("#005723", cream), 4.5)
         self.assertGreaterEqual(ratio("#2A2A2A", cream), 4.5)
-        # Branco sobre o degradê de cada cartão institucional (as duas pontas).
+        # Branco sobre o véu escuro em cada capa (change videos-home): na faixa
+        # do texto (45% de baixo), o pixel claro do percentil 95 com o véu.
         for card in INSTITUTIONAL_CARDS:
-            for color in re.findall(r"#[0-9A-Fa-f]{6}", card["placeholder"]):
-                with self.subTest(card=card["title"], color=color):
-                    self.assertGreaterEqual(ratio("#FFFFFF", color), 4.5)
+            with self.subTest(card=card["title"]):
+                self.assertGreaterEqual(_poster_text_contrast(card["poster"]), 4.5)
         # Links do rodapé sobre o fundo escuro.
         self.assertGreaterEqual(ratio("#F5F5F5", "#252525"), 4.5)
 
@@ -1010,6 +1134,7 @@ class PublicHomeTests(unittest.TestCase):
             _component_contents(node)[0]: _link_target(node)
             for node in _all_component_nodes(page.children[0].children[0])
             if type(node).__name__ == "Link"
+            and "nav-menu-item" not in str(getattr(node, "class_name", "") or "")
             and _component_contents(node)
             and _component_contents(node)[0] in {"Explorar Doações", "Como funciona", "Categorias"}
         }
@@ -1026,13 +1151,29 @@ class PublicHomeTests(unittest.TestCase):
         header = str(page.children[0].children[0])
         self.assertIn('className:"home-categories-trigger"', header)
         self.assertIn("categories-drawer", header)
-        self.assertNotIn('to:"/categorias"', header)
+        # No menu do desktop, “Categorias” não é link; só o painel do celular
+        # leva a /categorias (change navegacao-celular).
+        self.assertEqual(header.count('to:"/categorias"'), 1)
+        self.assertIn('to:"/categorias"', str(nav_menu_items()))
 
         # Eventos só no “Entrar”, nos itens do menu da conta, na busca e na
         # gaveta de categorias.
         for node in _component_nodes(page):
             if getattr(node, "class_name", None) == "category-link":
                 continue  # fecha a gaveta ao navegar (test_categories)
+            # Painel do celular e o “Entrar” da barra do celular (change
+            # navegacao-celular; ver tests/test_navegacao.py).
+            if "nav-menu-item" in str(getattr(node, "class_name", "") or ""):
+                continue
+            if getattr(node, "class_name", None) == "category-retry":
+                self.assertIn("reload_categories", str(node.event_triggers.get("on_click")))
+                continue
+            # Pausa dos vídeos com movimento reduzido (change videos-home).
+            if getattr(node, "id", None) == "como-funciona":
+                self.assertEqual(set(node.event_triggers), {"on_mount"})
+                continue
+            if type(node).__name__ == "Button" and _component_contents(node) == ["Entrar"]:
+                continue
             if node is not enter_button and type(node).__name__ not in {"DropdownMenuItem", "Form", "DialogRoot"}:
                 self.assertFalse(getattr(node, "event_triggers", {}))
 
