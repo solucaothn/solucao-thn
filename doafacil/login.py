@@ -497,10 +497,12 @@ class LoginState(rx.State):
     error_message: str = ""
     auth_token: str = ""
     account_name: str = ""
-    # Foto do menu da conta: buscada uma vez por sessão (por token), no
-    # load_account, e atualizada pelo Editar perfil ao trocar a foto.
+    # Nome e foto da conta (menu da conta e menu do celular): buscados uma vez
+    # por sessão (por token), no load_account, e reaproveitados em todas as
+    # páginas (change navegacao-celular; o plano grátis do Xano aceita 10
+    # pedidos a cada 20 s). O Editar perfil atualiza os dois direto aqui.
     account_photo: str = ""
-    _account_photo_token: str = ""
+    _account_token: str = ""
     password_visible: bool = False
     signup_password_visible: bool = False
     signup_confirmation_visible: bool = False
@@ -896,7 +898,11 @@ class LoginState(rx.State):
         if not self.auth_token:
             self.account_name = ""
             self.account_photo = ""
-            self._account_photo_token = ""
+            self._account_token = ""
+            return
+
+        # Conta deste token já carregada: nenhum pedido ao Xano.
+        if self._account_token == self.auth_token and self.account_name:
             return
 
         self.account_name = ACCOUNT_FALLBACK_NAME
@@ -906,18 +912,17 @@ class LoginState(rx.State):
                 self.account_name = await request_authenticated_name(
                     client, endpoint, self.auth_token
                 )
-                # Uma requisição só, e só na primeira carga deste token.
-                if self._account_photo_token != self.auth_token:
-                    self.account_photo = await request_account_photo(
-                        client, auth_profile_endpoint(), self.auth_token
-                    )
-                    self._account_photo_token = self.auth_token
+                self.account_photo = await request_account_photo(
+                    client, auth_profile_endpoint(), self.auth_token
+                )
+            self._account_token = self.auth_token
         except AuthTokenRejectedError:
             self.auth_token = ""
             self.account_name = ""
             self.account_photo = ""
-            self._account_photo_token = ""
+            self._account_token = ""
         except LoginError:
+            # Falha passageira: sem marcador, a próxima página tenta de novo.
             self.account_name = ACCOUNT_FALLBACK_NAME
 
     @rx.event
@@ -925,7 +930,7 @@ class LoginState(rx.State):
         self.auth_token = ""
         self.account_name = ""
         self.account_photo = ""
-        self._account_photo_token = ""
+        self._account_token = ""
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
         self.signup_notice_pending = False

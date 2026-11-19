@@ -22,6 +22,12 @@ CATEGORIES = [{"id": "4", "name": "Livros", "icon": "book-open"}, {"id": "7", "n
 
 
 class FetchCategoriesTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache de categorias do processo (change navegacao-celular).
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+
     def test_adds_icon_and_applies_creation_exclusions(self) -> None:
         def respond(request: httpx.Request) -> httpx.Response:
             return httpx.Response(
@@ -50,6 +56,12 @@ class FetchCategoriesTests(unittest.TestCase):
 
 
 class CategoriesStateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache de categorias do processo (change navegacao-celular).
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+
     def _load(self, result=None, error=None):
         state = SimpleNamespace(categories=[], loading=True, drawer_open=False)
         with patch("doafacil.categorias.fetch_categories", new_callable=AsyncMock, return_value=result, side_effect=error):
@@ -179,3 +191,110 @@ class CategoriesDrawerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CategoryCacheTests(unittest.TestCase):
+    """Change navegacao-celular: categorias buscadas uma vez e reaproveitadas
+    (limite do plano grátis do Xano: 10 pedidos a cada 20 s)."""
+
+    ENV = {"XANO_API_URL": "https://xano.example/api:catalog"}
+    PAYLOAD = [{"id": 1, "name": "Eletrônicos"}, {"id": 4, "name": "Ferramentas"}]
+
+    def setUp(self) -> None:
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+        self.requests = 0
+        self.status = 200
+
+    def _respond(self, request: httpx.Request) -> httpx.Response:
+        self.requests += 1
+        return httpx.Response(self.status, json=self.PAYLOAD if self.status == 200 else {})
+
+    def _run(self, *calls):
+        async def run():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(self._respond)) as client:
+                return [await call(client) for call in calls]
+
+        with patch.dict("os.environ", self.ENV):
+            return asyncio.run(run())
+
+    def test_every_page_reuses_one_request(self) -> None:
+        from doafacil.cadastro_doacao import CATALOG_API_ENV, _api_endpoint, _fetch_categories
+        from doafacil.doafacil import _load_categories_result
+
+        async def creation(client):  # cadastro e edição de doação
+            return await _fetch_categories(client, _api_endpoint(CATALOG_API_ENV, "/catalog/categories"))
+
+        # Home (busca e gaveta), /categorias e Explorar, cadastro de doação.
+        home, page, explore, form = self._run(_load_categories_result, fetch_categories, fetch_categories, creation)
+        self.assertEqual(self.requests, 1)
+        self.assertEqual(home, page)
+        self.assertEqual(page, explore)
+        self.assertEqual([category["name"] for category in form], ["Eletrônicos", "Ferramentas"])
+
+    def test_failure_is_not_cached(self) -> None:
+        from doafacil.cadastro_doacao import DonationServiceError
+
+        self.status = 500
+
+        async def failing(client):
+            try:
+                return await fetch_categories(client)
+            except DonationServiceError:
+                return "falhou"
+
+        self.assertEqual(self._run(failing), ["falhou"])
+        self.status = 200
+        (categories,) = self._run(fetch_categories)
+        self.assertEqual(len(categories), 2)
+        self.assertEqual(self.requests, 2)
+
+    def test_expires_after_an_hour(self) -> None:
+        from doafacil import cadastro_doacao
+
+        with patch("doafacil.cadastro_doacao.time.monotonic", return_value=1000.0):
+            self._run(fetch_categories)
+        with patch("doafacil.cadastro_doacao.time.monotonic", return_value=1000.0 + cadastro_doacao.CATEGORY_CACHE_SECONDS - 1):
+            self._run(fetch_categories)
+        self.assertEqual(self.requests, 1)
+        with patch("doafacil.cadastro_doacao.time.monotonic", return_value=1000.0 + cadastro_doacao.CATEGORY_CACHE_SECONDS + 1):
+            self._run(fetch_categories)
+        self.assertEqual(self.requests, 2)
+
+    def test_callers_get_copies(self) -> None:
+        from doafacil.cadastro_doacao import CATALOG_API_ENV, _api_endpoint, _fetch_categories
+
+        async def creation(client):
+            return await _fetch_categories(client, _api_endpoint(CATALOG_API_ENV, "/catalog/categories"))
+
+        (first,) = self._run(creation)
+        first[0]["name"] = "alterado"
+        first.clear()
+        (second,) = self._run(creation)
+        self.assertEqual(second[0]["name"], "Eletrônicos")
+        self.assertEqual(self.requests, 1)
+
+
+class RetryTests(unittest.TestCase):
+    def test_failure_offers_retry_on_page_and_drawer(self) -> None:
+        page = str(categories_page())
+        self.assertIn('"Tentar de novo"', page)
+        self.assertIn("load_categories", page[page.index('className:"category-retry"') :][:600])
+        from doafacil.doafacil import index
+
+        home = str(index())
+        retry = home[home.index('className:"category-retry"') :][:600]
+        self.assertIn("reload_categories", retry)
+        self.assertIn('["minHeight"] : "44px"', retry)
+
+    def test_without_retry_handler_there_is_no_button(self) -> None:
+        self.assertNotIn("Tentar de novo", str(category_list(CategoriesState.categories)))
+
+    def test_home_reload_categories(self) -> None:
+        from doafacil.doafacil import HomeState
+
+        state = SimpleNamespace(categories=[])
+        with patch("doafacil.doafacil._load_categories_result", new_callable=AsyncMock, return_value=CATEGORIES):
+            asyncio.run(HomeState.reload_categories.fn(state))
+        self.assertEqual(state.categories, CATEGORIES)

@@ -17,19 +17,20 @@ from urllib.parse import urlencode
 import httpx
 import reflex as rx
 
+from doafacil import cache_publico
 from doafacil.cabecalho import (
     back_link,
     FOCUS_RING,
     HEADER_MAX_WIDTH,
     HEADER_PADDING,
     HEADER_PADDING_X,
-    header_auth_controls,
 )
+from doafacil.navegacao import responsive_header_controls
 from doafacil.cadastro_doacao import (
     CATALOG_API_ENV,
     DonationServiceError,
     _api_endpoint,
-    _parse_categories,
+    _fetch_categories,
 )
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
 from doafacil.chat import CHAT_FAB_CLEARANCE, chat_fab
@@ -130,15 +131,15 @@ def category_icon(name: object) -> str:
 async def fetch_categories(client: httpx.AsyncClient) -> list[dict[str, str]]:
     """Categorias do backend como `{id, name, icon}` em texto (os seletores
     usam id e nome; a lista de categorias usa também o ícone)."""
-    response = await client.get(_api_endpoint(CATALOG_API_ENV, CATEGORIES_PATH))
-    response.raise_for_status()
+    # Passa pelo cache de categorias do cadastro (change navegacao-celular).
+    categories = await _fetch_categories(client, _api_endpoint(CATALOG_API_ENV, CATEGORIES_PATH))
     return [
         {
             "id": str(category["id"]),
             "name": category["name"],
             "icon": category_icon(category["name"]),
         }
-        for category in _parse_categories(response.json())
+        for category in categories
     ]
 
 
@@ -158,21 +159,28 @@ async def fetch_search_page(
         params["category_id"] = filters["categoria"]
     if filters.get("uf"):
         params["state"] = filters["uf"]
-    response = await client.get(_api_endpoint(CATALOG_API_ENV, SEARCH_PATH), params=params)
-    response.raise_for_status()
-    payload = response.json()
-    if (
-        not isinstance(payload, dict)
-        or not isinstance(payload.get("items"), list)
-        or not _valid_count(payload.get("total"))
-        or not _valid_count(payload.get("page_total"))
-    ):
-        raise ValueError("A resposta da busca é inválida.")
-    return {
-        "items": _parse_donations(payload["items"]),
-        "total": payload["total"],
-        "page_total": payload["page_total"],
-    }
+    endpoint = _api_endpoint(CATALOG_API_ENV, SEARCH_PATH)
+
+    async def load() -> dict[str, Any]:
+        response = await client.get(endpoint, params=params)
+        response.raise_for_status()
+        payload = response.json()
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("items"), list)
+            or not _valid_count(payload.get("total"))
+            or not _valid_count(payload.get("page_total"))
+        ):
+            raise ValueError("A resposta da busca é inválida.")
+        return {
+            "items": _parse_donations(payload["items"]),
+            "total": payload["total"],
+            "page_total": payload["page_total"],
+        }
+
+    # Guardada por 60 s para todos, por combinação de filtros e página.
+    key = (endpoint, tuple(sorted((name, str(value)) for name, value in params.items())))
+    return await cache_publico.cached(cache_publico.SEARCH, key, load)
 
 
 def explore_title(query: str, category_id: str, category_label: str, state: str) -> str:
@@ -402,7 +410,7 @@ def explore_header() -> rx.Component:
                 order=rx.breakpoints(initial="3", md="2"),
                 style={"width": rx.breakpoints(initial="100%", md="auto")},
             ),
-            rx.box(header_auth_controls(), order="2", margin_left="auto"),
+            rx.box(responsive_header_controls(), order="2", margin_left="auto"),
             align="center",
             wrap="wrap",
             column_gap="24px",

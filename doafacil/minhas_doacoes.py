@@ -14,6 +14,8 @@ from typing import Any
 import httpx
 import reflex as rx
 
+from doafacil import cache_publico
+from doafacil.rotas import path_segment_after
 from doafacil.cadastro_doacao import (
     CATALOG_API_ENV,
     CONDITIONS,
@@ -25,7 +27,9 @@ from doafacil.cadastro_doacao import (
 )
 from doafacil.campos import FIELD_BORDER, FIELD_TEXT, SELECT_PLACEHOLDER, field_label, select_field
 from doafacil.cartoes_doacao import GENERIC_DONATION_IMAGE
-from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial, back_link_header
+from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial
+from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
+from doafacil.navegacao import back_link_header
 from doafacil.detalhe_doacao import (
     DONATION_NOT_FOUND_MESSAGE,
     DonationNotFoundError,
@@ -323,6 +327,8 @@ async def change_status(
         headers=_bearer(auth_token),
     )
     _raise_for_status(response)
+    # A doação mudou: os dados públicos guardados podem estar velhos.
+    cache_publico.invalidate_donations()
     payload = _json(response)
     if not isinstance(payload, dict) or payload.get("status") != status:
         raise MyDonationsServiceError
@@ -338,6 +344,8 @@ async def update_donation(
         headers=_bearer(auth_token),
     )
     _raise_for_status(response)
+    # A doação mudou: os dados públicos guardados podem estar velhos.
+    cache_publico.invalidate_donations()
     payload = _json(response)
     if not isinstance(payload, dict) or payload.get("id") != donation_id:
         raise MyDonationsServiceError
@@ -352,6 +360,8 @@ async def delete_donation(
         headers=_bearer(auth_token),
     )
     _raise_for_status(response)
+    # A doação mudou: os dados públicos guardados podem estar velhos.
+    cache_publico.invalidate_donations()
     payload = _json(response)
     if not isinstance(payload, dict) or payload.get("deleted") is not True:
         raise MyDonationsServiceError
@@ -705,7 +715,7 @@ class EditDonationState(LoginState):
             yield rx.redirect("/login")
             return
         try:
-            donation_id = _positive_donation_id(self.router.page.params.get("id", ""))
+            donation_id = _positive_donation_id(path_segment_after(self.router, "minhas-doacoes"))
         except DonationNotFoundError:
             self.view_state = "not_found"
             return
@@ -853,7 +863,10 @@ TEXT_ERROR = "#9B2C2C"
 AVATAR_BACKGROUND = "#F2F2F2"
 DANGER_RED = "#B42318"
 DANGER_RED_HOVER = "#912018"
-CONTENT_MAX_WIDTH = "1396px"
+# O mesmo contêiner do cabeçalho (change navegacao-celular): até 1200 px,
+# com as margens laterais do cabeçalho dentro dele, para o conteúdo começar
+# na mesma linha do “Voltar” e terminar na do “Quero Doar”.
+CONTENT_MAX_WIDTH = HEADER_MAX_WIDTH
 # Selo de status: fundo opaco, para o contraste não depender da foto.
 STATUS_BADGE_COLORS = {
     STATUS_AVAILABLE: ("#E3F5EA", "#166B3B"),
@@ -1403,10 +1416,13 @@ def _my_donations_content() -> rx.Component:
             width="100%",
             max_width=CONTENT_MAX_WIDTH,
             margin="0 auto",
+            padding_x=HEADER_PADDING_X,
+            box_sizing="border-box",
         ),
         width="100%",
         min_height="calc(100vh - 88px)",
-        padding=rx.breakpoints(initial="24px 16px 48px", md="32px 24px 56px"),
+        padding_top=rx.breakpoints(initial="24px", md="32px"),
+        padding_bottom=rx.breakpoints(initial="48px", md="56px"),
         background=CREAM,
     )
 

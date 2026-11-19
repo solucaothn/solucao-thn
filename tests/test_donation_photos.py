@@ -193,8 +193,7 @@ def _add(state, files) -> list:
     async def run() -> list:
         return [event async for event in DonationCreateState.add_photos.fn(state, files)]
 
-    with patch("doafacil.cadastro_doacao.rx.clear_selected_files", return_value="clear"):
-        return asyncio.run(run())
+    return asyncio.run(run())
 
 
 class PhotoStateTests(unittest.TestCase):
@@ -202,7 +201,9 @@ class PhotoStateTests(unittest.TestCase):
         state = _state()
         events = _add(state, [_FakeUpload("a.png", "image/png", _png()), _FakeUpload("b.jpg", "image/jpeg", encode(solid((1, 2, 3)), "JPEG"))])
         self.assertEqual(len(state.photos), 2)
-        self.assertEqual(events[-1], "clear")
+        # Sem limpar o upload (change navegacao-celular): o on_drop não guarda
+        # seleção, e o clear_selected_files quebrava no navegador.
+        self.assertNotIn("clear", [str(event) for event in events])
         _add(state, [_FakeUpload("c.webp", "image/webp", encode(solid((5, 5, 5)), "WEBP"))])
         self.assertEqual(len(state.photos), 3)
         self.assertEqual(set(state._photo_files), {photo["id"] for photo in state.photos})
@@ -414,11 +415,23 @@ def _all_nodes(component) -> list:
 
 
 class PublishedNoticeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache dos dados públicos (change navegacao-celular): validade zero,
+        # para cada chamada destes testes ir ao cliente falso.
+        from unittest.mock import patch as _patch
+
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = _patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     def _load(self, route_id: str, notice_id: int) -> SimpleNamespace:
         from doafacil.detalhe_doacao import DonationDetailState
 
         state = SimpleNamespace(
-            router=SimpleNamespace(page=SimpleNamespace(params={"id": route_id})),
+            router=SimpleNamespace(url=SimpleNamespace(path=f"/doacao/{route_id}", query_parameters={})),
             published_notice_id=notice_id,
             show_published_notice=False,
         )
@@ -437,7 +450,7 @@ class PublishedNoticeTests(unittest.TestCase):
         self.assertTrue(arrived.show_published_notice)
         self.assertEqual(arrived.published_notice_id, 0)  # consumido
         # Recarregar a página (o id já foi consumido): sem aviso.
-        arrived.router.page.params = {"id": "12"}
+        arrived.router = SimpleNamespace(url=SimpleNamespace(path="/doacao/12", query_parameters={}))
         reloaded = self._load("12", arrived.published_notice_id)
         self.assertFalse(reloaded.show_published_notice)
         # Outra doação: sem aviso.

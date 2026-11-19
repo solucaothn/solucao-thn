@@ -1,4 +1,6 @@
+import copy
 import os
+import time
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any
@@ -7,6 +9,7 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil import cache_publico
 from doafacil.campos import select_field
 from doafacil.fotos_doacao import (
     EMPTY_MESSAGE,
@@ -29,6 +32,11 @@ from doafacil.login import LoginState
 CATALOG_API_ENV = "XANO_API_URL"
 AUTH_API_ENV = "XANO_AUTH_API_URL"
 PHOTO_UPLOAD_ID = "donation-photo-upload"
+# Sem rx.clear_selected_files (change navegacao-celular): com on_drop, os
+# arquivos vão direto para o evento e o componente não guarda seleção. A
+# limpeza depende do UploadFilesProvider, que o Reflex só monta quando a
+# página usa rx.selected_files; sem ele, o navegador mostrava
+# “refs.__clear_selected_files is not a function”.
 PHOTOS_PREPARING_MESSAGE = "Preparando fotos..."
 PHOTO_STEP_TEXT = "Adicione de 1 a 5 fotos. A primeira foto é a capa da doação."
 IMAGE_ACCEPT = {
@@ -125,15 +133,35 @@ def _parse_categories(payload: object) -> list[dict[str, Any]]:
     return categories
 
 
+# Categorias guardadas no processo do Reflex, por endereço do Xano (change
+# navegacao-celular): são iguais para todos e eram buscadas a cada página
+# (home, gaveta, /categorias, Explorar, cadastro e edição de doação), o que
+# estourava o limite do plano grátis do Xano (10 pedidos a cada 20 s). Uma
+# falha não fica guardada; a validade deixa uma categoria nova aparecer sem
+# reiniciar o servidor.
+CATEGORY_CACHE_SECONDS = 3600
+_category_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def clear_category_cache() -> None:
+    """Esvazia o cache (usado pelos testes)."""
+    _category_cache.clear()
+
+
 async def _fetch_categories(
     client: httpx.AsyncClient, endpoint: str
 ) -> list[dict[str, Any]]:
+    cached = _category_cache.get(endpoint)
+    if cached is not None and time.monotonic() - cached[0] < CATEGORY_CACHE_SECONDS:
+        return copy.deepcopy(cached[1])
     try:
         response = await client.get(endpoint)
         response.raise_for_status()
-        return _parse_categories(response.json())
+        categories = _parse_categories(response.json())
     except (httpx.HTTPError, ValueError):
         raise DonationServiceError from None
+    _category_cache[endpoint] = (time.monotonic(), categories)
+    return copy.deepcopy(categories)
 
 
 async def _fetch_profile(
@@ -274,6 +302,8 @@ async def _publish_donation(
             raise DonationMissingPhotosError
         raise DonationServiceError
 
+    # Doação publicada: a contagem, as recentes e a busca guardadas mudaram.
+    cache_publico.invalidate_donations()
     try:
         result = response.json()
     except ValueError:
@@ -361,7 +391,6 @@ class DonationCreateState(LoginState):
             yield rx.redirect("/login")
             return
 
-        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
         self.is_loading_data = True
         self.data_load_failed = False
         self.donation_error_message = ""
@@ -498,7 +527,6 @@ class DonationCreateState(LoginState):
             self.photo_notice = (
                 "Foto adicionada." if accepted == 1 else f"{accepted} fotos adicionadas."
             )
-        yield rx.clear_selected_files(PHOTO_UPLOAD_ID)
 
     @rx.event
     def photos_rejected(self, rejections: list[dict[str, Any]]) -> None:
@@ -1340,43 +1368,16 @@ def _wizard_content() -> rx.Component:
     )
 
 
-def _back_link() -> rx.Component:
-    # Faixa de largura total: a seta fica no canto esquerdo, logo abaixo do
-    # cabeçalho, e não acompanha a coluna centralizada do wizard.
-    return rx.box(
-        rx.link(
-            rx.icon("chevron-left", size=24),
-            href="/",
-            color="#166B3B",
-            font_weight="600",
-            aria_label="Voltar ao início",
-        ),
-        width="100%",
-        padding="0.75rem 1.25rem 0",
-    )
-
-
 def donation_creation_page() -> rx.Component:
+    # navegacao.py importa chat.py, que importa este módulo: o import fica
+    # aqui dentro para não criar import circular.
+    from doafacil.navegacao import back_link_header
+
     return rx.box(
-        rx.box(
-            rx.link(
-                rx.image(
-                    src="/logo.svg",
-                    alt="DoaFácil",
-                    width="140px",
-                    height="52px",
-                    object_fit="contain",
-                ),
-                href="/",
-            ),
-            width="100%",
-            background="white",
-            padding="0.25rem 1rem",
-            box_shadow="0 2px 8px rgba(39, 39, 39, 0.06)",
-            display="flex",
-            justify_content="center",
-        ),
-        _back_link(),
+        # O mesmo cabeçalho das outras páginas (change navegacao-celular):
+        # a seta “Voltar ao início” na linha do logotipo, à esquerda, e a
+        # conta à direita, sem “Quero Doar”, que é a própria página.
+        back_link_header("/", "Voltar ao início", "#166B3B", show_donate=False),
         rx.vstack(
             rx.cond(
                 DonationCreateState.is_loading_data,

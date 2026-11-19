@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil import cache_publico
 from doafacil.cadastro import signup_page
 from doafacil.cartoes_doacao import (  # noqa: F401 (reexportados para a home e os testes)
     AVAILABLE_CONDITIONS,
@@ -45,8 +46,10 @@ from doafacil.cabecalho import (
     HEADER_PADDING,
     HEADER_PADDING_X,
     account_menu,  # noqa: F401 (reexportado para os testes)
-    header_auth_controls,
+    header_auth_controls,  # noqa: F401 (reexportado para os testes)
 )
+from doafacil.navegacao import responsive_header_controls
+from doafacil import xano_http
 from doafacil.login import LoginState, login_page
 from doafacil.institucional import (
     HelpCategoryState,
@@ -100,6 +103,7 @@ STAT_COLOR = "#005723"
 COUNT_ERROR_MESSAGE = "Não foi possível carregar a contagem de doações."
 COMPLETED_ERROR_MESSAGE = "Não foi possível carregar este número."
 
+
 # “Categorias” não é link: abre a gaveta de categorias (categorias.py).
 NAV_LINKS = (
     ("Explorar Doações", EXPLORE_ROUTE),
@@ -123,9 +127,14 @@ def _xano_endpoints() -> tuple[str, str]:
 async def _fetch_recent_donations(
     client: httpx.AsyncClient, url: str
 ) -> list[dict[str, str | int | bool]]:
-    response = await client.get(url)
-    response.raise_for_status()
-    return _parse_donations(response.json())
+    """Recentes da home, guardadas por 60 s para todos (cache_publico)."""
+
+    async def load() -> list[dict[str, str | int | bool]]:
+        response = await client.get(url)
+        response.raise_for_status()
+        return _parse_donations(response.json())
+
+    return await cache_publico.cached(cache_publico.RECENT, url, load)
 
 
 def _valid_count(value: object) -> bool:
@@ -137,15 +146,20 @@ async def _fetch_donation_counts(
 ) -> tuple[int, int | None]:
     """Doações disponíveis e concluídas. Um `count` inválido invalida a
     resposta; um `completed` ausente ou inválido vira None (só a estatística
-    “Pessoas alcançadas” fica com erro)."""
-    response = await client.get(url)
-    response.raise_for_status()
-    payload = response.json()
+    “Pessoas alcançadas” fica com erro). Guardadas por 60 s para todos
+    (cache_publico)."""
 
-    if not isinstance(payload, dict) or not _valid_count(payload.get("count")):
-        raise ValueError("A resposta da contagem de doações é inválida.")
-    completed = payload.get("completed")
-    return payload["count"], completed if _valid_count(completed) else None
+    async def load() -> tuple[int, int | None]:
+        response = await client.get(url)
+        response.raise_for_status()
+        payload = response.json()
+
+        if not isinstance(payload, dict) or not _valid_count(payload.get("count")):
+            raise ValueError("A resposta da contagem de doações é inválida.")
+        completed = payload.get("completed")
+        return payload["count"], completed if _valid_count(completed) else None
+
+    return await cache_publico.cached(cache_publico.COUNT, url, load)
 
 
 async def _load_count_result(
@@ -196,6 +210,13 @@ class HomeState(rx.State):
                 form_data.get("uf"),
             )
         )
+
+    @rx.event
+    async def reload_categories(self) -> None:
+        """“Tentar de novo” da gaveta: busca só as categorias (change
+        navegacao-celular; uma busca que deu certo fica no cache)."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            self.categories = await _load_categories_result(client)
 
     @rx.event
     async def load_home_data(self) -> None:
@@ -681,49 +702,91 @@ def start_here_section() -> rx.Component:
 # o degradê (placeholder). Para usar uma foto própria, coloque o arquivo em
 # assets/landing/ e preencha `image` com o caminho (por exemplo,
 # "/landing/historias.jpg"); um véu escuro embaixo mantém o texto legível.
+# Cartões institucionais (change videos-home): vídeos próprios do grupo, sem
+# som e sem marca d'água, em assets/landing/ (490 x 490, o 2x do cartão de
+# 245 px do Figma), cada um com a sua capa.
 INSTITUTIONAL_CARDS = (
     {
         "category": "Solidariedade",
         "title": "Histórias que continuam",
         "icon": "hand-heart",
-        "image": None,
-        "placeholder": "linear-gradient(145deg, #168447 0%, #333333 100%)",
+        "video": "/landing/solidariedade.mp4",
+        "poster": "/landing/solidariedade.jpg",
     },
     {
         "category": "Segurança",
         "title": "Você no controle",
         "icon": "shield-check",
-        "image": None,
-        "placeholder": "linear-gradient(145deg, #333333 0%, #168447 100%)",
+        "video": "/landing/seguranca.mp4",
+        "poster": "/landing/seguranca.jpg",
     },
     {
         "category": "Nossa missão",
         "title": "Nada se perde",
         "icon": "heart",
-        "image": None,
-        "placeholder": "linear-gradient(145deg, #656B70 0%, #333333 100%)",
+        "video": "/landing/missao.mp4",
+        "poster": "/landing/missao.jpg",
     },
     {
         "category": "Passo a passo",
         "title": "Doar leva minutos",
         "icon": "check",
-        "image": None,
-        "placeholder": "linear-gradient(145deg, #168447 0%, #5B6262 100%)",
+        "video": "/landing/passo-a-passo.mp4",
+        "poster": "/landing/passo-a-passo.jpg",
     },
 )
-INSTITUTIONAL_VEIL = "linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.72) 100%)"
+# Véu escuro embaixo, sobre o vídeo, para o texto branco ficar legível em
+# qualquer quadro: transparente no alto e escuro só na faixa do texto. É o
+# mais leve com contraste AA (4,5:1) do branco sobre as quatro capas, que o
+# tests/test_public_home.py confere (a capa de “Nada se perde” é clara
+# embaixo; o véu de duas paradas anterior dava só 2,2:1).
+INSTITUTIONAL_VEIL = (
+    "linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.5) 55%, rgba(0, 0, 0, 0.8) 100%)"
+)
+INSTITUTIONAL_VIDEO_CLASS = "home-institutional-video"
+# Com movimento reduzido, os vídeos não tocam: o assets/home.css os esconde
+# (fica a capa, que é o fundo do cartão) e este script tira o autoplay e
+# pausa, para o navegador não decodificar vídeo escondido.
+REDUCED_MOTION_SCRIPT = (
+    "if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {"
+    f" document.querySelectorAll('video.{INSTITUTIONAL_VIDEO_CLASS}').forEach((video) => {{"
+    " video.removeAttribute('autoplay'); video.autoplay = false; video.pause(); }); }"
+)
 
-
-def _institutional_background(card: dict[str, Any]) -> str:
-    image = card["image"]
-    if image:
-        return f"{INSTITUTIONAL_VEIL}, url('{image}') center / cover no-repeat"
-    return card["placeholder"]
+_COVER_LAYER = {"position": "absolute", "inset": "0", "width": "100%", "height": "100%"}
 
 
 def institutional_card(card: dict[str, Any]) -> rx.Component:
-    """Cartão quadrado: ícone em círculo verde, categoria e título embaixo."""
+    """Cartão quadrado: a capa de fundo, o vídeo decorativo por cima, o véu
+    escuro e, embaixo, o ícone em círculo verde, a categoria e o título (o
+    texto acessível do cartão)."""
     return rx.box(
+        rx.el.video(
+            src=card["video"],
+            poster=card["poster"],
+            auto_play=True,
+            muted=True,
+            loop=True,
+            plays_inline=True,
+            preload="metadata",
+            tab_index=-1,
+            aria_hidden="true",
+            class_name=INSTITUTIONAL_VIDEO_CLASS,
+            # Decorativo: sem os controles que o navegador mostra ao passar o
+            # mouse (no Edge, picture-in-picture e “pular” tiravam o vídeo da
+            # página e ele travava), sem transmissão e sem receber cliques.
+            custom_attrs={
+                "disablePictureInPicture": True,
+                "disableRemotePlayback": True,
+                "controlsList": "nodownload nofullscreen noremoteplayback noplaybackrate",
+            },
+            style={**_COVER_LAYER, "objectFit": "cover", "pointerEvents": "none"},
+        ),
+        rx.box(
+            aria_hidden="true",
+            class_name="home-institutional-veil",
+            style={**_COVER_LAYER, "background": INSTITUTIONAL_VEIL},
+        ),
         rx.vstack(
             rx.box(
                 rx.icon(card["icon"], size=16, color="white", aria_hidden="true"),
@@ -751,6 +814,8 @@ def institutional_card(card: dict[str, Any]) -> rx.Component:
             align="start",
             spacing="1",
             width="100%",
+            position="relative",
+            z_index="1",
         ),
         class_name="home-institutional-card",
         display="flex",
@@ -765,13 +830,18 @@ def institutional_card(card: dict[str, Any]) -> rx.Component:
         },
         max_width=rx.breakpoints(initial="320px", lg="none"),
         padding="16px",
-        background=_institutional_background(card),
+        position="relative",
+        overflow="hidden",
+        # A capa aparece antes do vídeo, no lugar dele se falhar e com
+        # movimento reduzido.
+        background=f"#333333 url('{card['poster']}') center / cover no-repeat",
         border_radius="16px",
         box_shadow="0 4px 14px rgba(20, 35, 28, 0.12)",
     )
 
 
 def institutional_section() -> rx.Component:
+    # Movimento reduzido: pausa os vídeos dos cartões (change videos-home).
     return rx.box(
         rx.vstack(
             rx.heading(
@@ -815,6 +885,7 @@ def institutional_section() -> rx.Component:
         class_name="page-fade-enter",
         # Destino de “Como funciona” no menu (change paginas-institucionais).
         id="como-funciona",
+        on_mount=rx.call_script(REDUCED_MOTION_SCRIPT),
     )
 
 
@@ -883,14 +954,20 @@ def index() -> rx.Component:
                             # “Categorias” abre a gaveta (change
                             # explorar-categorias), com as categorias que a
                             # home já carrega para a busca.
-                            categories_drawer(HomeState.categories, _categories_trigger()),
+                            categories_drawer(
+                                HomeState.categories,
+                                _categories_trigger(),
+                                on_retry=HomeState.reload_categories,
+                            ),
                             # 12 px entre 992 e 1279 px (menos espaço) e
                             # 32 px a partir de 1280 px.
                             spacing=rx.breakpoints(initial="3", lg="6"),
                         )
                     ),
                     rx.spacer(),
-                    header_auth_controls(),
+                    # Desktop como sempre; abaixo de 992 px, a conta e o ☰
+                    # (change navegacao-celular).
+                    responsive_header_controls(),
                     align="center",
                     width="100%",
                     max_width=HEADER_MAX_WIDTH,
@@ -1087,9 +1164,13 @@ app = rx.App(
     stylesheets=[
         "/auth-card.css",
         "/chat.css",
+        "/home.css",
         "https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap"
     ]
 )
+# Chamadas ao Xano: nova tentativa no 429, cancelamento sem erro e o log
+# temporário (DOAFACIL_LOG_XANO=1). Só quando o servidor sobe.
+app.register_lifespan_task(xano_http.lifespan)
 app.add_page(
     index,
     on_load=[
@@ -1115,40 +1196,43 @@ app.add_page(
     route="/nova-senha",
     on_load=LoginState.require_reset_token,
 )
+# Páginas com o cabeçalho comum (change navegacao-celular): a conta é
+# carregada uma vez por sessão (LoginState.load_account), sem consulta de
+# não lidas a mais.
 app.add_page(
     donation_creation_page,
     route="/cadastro-doacao",
-    on_load=DonationCreateState.load_initial_data,
+    on_load=[DonationCreateState.load_initial_data, LoginState.load_account],
 )
 app.add_page(
     donation_detail_page,
     route="/doacao/[id]",
-    on_load=DonationDetailState.load_donation,
+    on_load=[DonationDetailState.load_donation, LoginState.load_account],
 )
 app.add_page(
     donor_profile_page,
     route="/doacao/[id]/quem-doa",
-    on_load=DonorProfileState.load_profile,
+    on_load=[DonorProfileState.load_profile, LoginState.load_account],
 )
 app.add_page(
     my_donations_page,
     route="/minhas-doacoes",
-    on_load=MyDonationsState.load_page,
+    on_load=[MyDonationsState.load_page, LoginState.load_account],
 )
 app.add_page(
     edit_donation_page,
     route="/minhas-doacoes/[id]/editar",
-    on_load=EditDonationState.load_edit,
+    on_load=[EditDonationState.load_edit, LoginState.load_account],
 )
 app.add_page(
     edit_profile_page,
     route="/perfil/editar",
-    on_load=EditProfileState.load_profile,
+    on_load=[EditProfileState.load_profile, LoginState.load_account],
 )
 app.add_page(
     chat_page,
     route="/chat",
-    on_load=ChatState.load_chat,
+    on_load=[ChatState.load_chat, LoginState.load_account],
 )
 # Explorar doações e categorias (change explorar-categorias): as duas com o
 # cabeçalho de conta e o botão flutuante do chat, como a home.

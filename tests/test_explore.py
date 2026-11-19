@@ -132,6 +132,18 @@ class FilterTests(unittest.TestCase):
 
 
 class FetchSearchPageTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache dos dados públicos (change navegacao-celular): validade zero,
+        # para cada chamada destes testes ir ao cliente falso.
+        from unittest.mock import patch as _patch
+
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = _patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     def _fetch(self, payload, filters=None, status=200):
         seen = {}
 
@@ -162,6 +174,18 @@ class FetchSearchPageTests(unittest.TestCase):
 
 
 class LoadFiltersTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache de categorias do processo (change navegacao-celular).
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     def test_no_filters_loads_first_page(self) -> None:
         state, fetch_categories, fetch_page = _load({}, _page([3, 2, 1], 3, 1))
         self.assertEqual([item["id"] for item in state.items], [3, 2, 1])
@@ -200,6 +224,18 @@ class LoadFiltersTests(unittest.TestCase):
 
 
 class LoadMoreTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache dos dados públicos (change navegacao-celular): validade zero,
+        # para cada chamada destes testes ir ao cliente falso.
+        from unittest.mock import patch as _patch
+
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = _patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     def _more(self, state, page=None, error=None):
         with patch("doafacil.explorar.fetch_search_page", new_callable=AsyncMock, return_value=page, side_effect=error) as fetch:
             _run(ExploreState.load_more.fn(state))

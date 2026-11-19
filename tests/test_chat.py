@@ -152,7 +152,9 @@ def _state(**overrides: Any) -> SimpleNamespace:
     values: dict[str, Any] = {
         "auth_token": "token-teste",
         "account_name": "Bia",
-        "router": SimpleNamespace(page=SimpleNamespace(params={})),
+        "_unread_checked_at": 0.0,
+        "_unread_checked_token": "",
+        "router": SimpleNamespace(url=SimpleNamespace(path="/chat", query_parameters={})),
         "chat_conversations": [],
         "conversations_page": 1,
         "conversations_has_more": False,
@@ -933,7 +935,7 @@ class ChatUnreadStateTests(unittest.TestCase):
                 return httpx.Response(200, json=_list_page(items), request=request)
             return httpx.Response(200, json=_messages_page([_message(1)]), request=request)
 
-        state = _state(router=SimpleNamespace(page=SimpleNamespace(params={"conversa": "7"})))
+        state = _state(router=SimpleNamespace(url=SimpleNamespace(path="/chat", query_parameters={"conversa": "7"})))
         with self._patch_client(_Recorder(respond)):
             _run(ChatState.load_chat.fn(state))
         counts = {c["conversation_id"]: c["unread_count"] for c in state.chat_conversations}
@@ -1172,7 +1174,7 @@ class ChatStateTests(unittest.TestCase):
             )
 
         recorder = _Recorder(respond)
-        state = _state(router=SimpleNamespace(page=SimpleNamespace(params={"conversa": "7"})))
+        state = _state(router=SimpleNamespace(url=SimpleNamespace(path="/chat", query_parameters={"conversa": "7"})))
         with self._patch_client(recorder):
             result = _run(ChatState.load_chat.fn(state))
 
@@ -1192,7 +1194,7 @@ class ChatStateTests(unittest.TestCase):
 
     def test_load_chat_with_invalid_route_keeps_list(self) -> None:
         recorder = _Recorder(_json(200, _list_page([_conversation(1)])))
-        state = _state(router=SimpleNamespace(page=SimpleNamespace(params={"conversa": "abc"})))
+        state = _state(router=SimpleNamespace(url=SimpleNamespace(path="/chat", query_parameters={"conversa": "abc"})))
         with self._patch_client(recorder):
             _run(ChatState.load_chat.fn(state))
         self.assertEqual(state.conversation_error, CONVERSATION_NOT_FOUND_MESSAGE)
@@ -1205,7 +1207,7 @@ class ChatStateTests(unittest.TestCase):
                 return httpx.Response(200, json=_list_page([]), request=request)
             return httpx.Response(404, json=GENERIC_404, request=request)
 
-        state = _state(router=SimpleNamespace(page=SimpleNamespace(params={"conversa": "99"})))
+        state = _state(router=SimpleNamespace(url=SimpleNamespace(path="/chat", query_parameters={"conversa": "99"})))
         with self._patch_client(_Recorder(respond)):
             _run(ChatState.load_chat.fn(state))
         self.assertEqual(state.conversation_error, CONVERSATION_NOT_FOUND_MESSAGE)
@@ -1834,3 +1836,83 @@ class ChatFabTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnreadTotalThrottleTests(unittest.TestCase):
+    """Change navegacao-celular: o total de não lidas é consultado no máximo
+    uma vez a cada 60 s por pessoa (limite do plano grátis do Xano)."""
+
+    def _load(self, state, recorder, now: float) -> None:
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.chat._new_client", side_effect=lambda: recorder.client()),
+            # Só o relógio do módulo chat (o do asyncio continua o real).
+            patch("doafacil.chat.time", SimpleNamespace(monotonic=lambda: now)),
+        ):
+            _run(ChatState.load_unread_total.fn(state))
+
+    def test_one_request_per_60_seconds_keeping_last_value(self) -> None:
+        from doafacil.chat import UNREAD_REFRESH_SECONDS
+
+        self.assertEqual(UNREAD_REFRESH_SECONDS, 60.0)
+        state = _state()
+        recorder = _Recorder(_json(200, {"unread_total": 3}))
+        self._load(state, recorder, 1000.0)
+        self._load(state, recorder, 1030.0)  # outra página, 30 s depois
+        self.assertEqual(len(recorder.requests), 1)
+        self.assertEqual(state.unread_total_text, "3")
+        self._load(state, recorder, 1061.0)
+        self.assertEqual(len(recorder.requests), 2)
+
+    def test_new_session_queries_again(self) -> None:
+        state = _state()
+        recorder = _Recorder(_json(200, {"unread_total": 1}))
+        self._load(state, recorder, 1000.0)
+        state.auth_token = "outro-token"
+        self._load(state, recorder, 1001.0)
+        self.assertEqual(len(recorder.requests), 2)
+
+    def test_failure_is_retried_on_next_page(self) -> None:
+        state = _state()
+        self._load(state, _Recorder(_json(500, {"message": "x"})), 1000.0)
+        recorder = _Recorder(_json(200, {"unread_total": 2}))
+        self._load(state, recorder, 1001.0)
+        self.assertEqual(len(recorder.requests), 1)
+        self.assertEqual(state.unread_total, 2)
+
+
+class UnreadTotalInChatTests(unittest.TestCase):
+    """Change navegacao-celular: abrir o /chat ou uma conversa atualiza o total
+    do botão e do menu na hora, sem pedido a mais."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _client(self, recorder):
+        return patch("doafacil.chat._new_client", side_effect=lambda: recorder.client())
+
+    def test_opening_conversation_discounts_its_unread(self) -> None:
+        state = _state(chat_conversations=[_listed(7, 3), _listed(8, 2)], unread_total=5, unread_total_text="5")
+        recorder = _Recorder(_json(200, _messages_page([_message(1)])))
+        with self._client(recorder):
+            _run(ChatState.select_conversation.fn(state, 7))
+        self.assertEqual((state.unread_total, state.unread_total_text), (2, "2"))
+        self.assertFalse(any("unread_total" in str(r.url) for r in recorder.requests))
+
+    def test_list_in_one_page_sets_the_total(self) -> None:
+        recorder = _Recorder(_json(200, _list_page([_conversation(7, unread_count=4), _conversation(8, unread_count=1)])))
+        state = _state(unread_total=9)
+        with self._client(recorder):
+            _run(ChatState.load_chat.fn(state))
+        self.assertEqual(state.unread_total, 5)
+        self.assertEqual(state._unread_checked_token, "token-teste")
+
+    def test_list_with_more_pages_asks_again_on_next_page(self) -> None:
+        recorder = _Recorder(_json(200, _list_page([_conversation(7, unread_count=4)], has_more=True)))
+        state = _state(unread_total=9, _unread_checked_token="token-teste")
+        with self._client(recorder):
+            _run(ChatState.load_chat.fn(state))
+        self.assertEqual(state.unread_total, 9)
+        self.assertEqual(state._unread_checked_token, "")

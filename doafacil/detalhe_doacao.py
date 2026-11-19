@@ -7,17 +7,19 @@ from urllib.parse import quote, urlsplit
 import httpx
 import reflex as rx
 
+from doafacil import cache_publico
+from doafacil.rotas import path_segment_after
 from doafacil.chat import (
     ChatError,
     ChatNotFoundError,
     ChatRateLimitError,
     ChatUnauthorizedError,
     avatar_initial,
-    back_home_header,
     rate_limit_message,
     start_conversation,
 )
 from doafacil.login import LoginState
+from doafacil.navegacao import back_home_header
 from doafacil.perfil_publico import (
     avatar,
     donation_counts,
@@ -169,11 +171,16 @@ async def _fetch_donation_detail(
 ) -> dict[str, Any]:
     donation_id = _positive_donation_id(donation_id_value)
     endpoint = _donation_detail_endpoint(base_url, donation_id)
-    response = await client.get(endpoint)
-    if response.status_code == 404:
-        raise DonationNotFoundError
-    response.raise_for_status()
-    return _parse_donation_detail(response.json(), donation_id)
+
+    async def load() -> dict[str, Any]:
+        response = await client.get(endpoint)
+        if response.status_code == 404:
+            raise DonationNotFoundError
+        response.raise_for_status()
+        return _parse_donation_detail(response.json(), donation_id)
+
+    # Detalhe público, guardado por 60 s para todos (cache_publico).
+    return await cache_publico.cached(cache_publico.DETAIL, endpoint, load)
 
 
 async def _fetch_donor_email(
@@ -312,7 +319,7 @@ class DonationDetailState(LoginState):
         self.viewer_open = False
         self.viewer_index = 0
         self.viewer_zoomed = False
-        donation_id = self.router.page.params.get("id", "")
+        donation_id = path_segment_after(self.router, "doacao")
         # O aviso de publicação vale uma vez, só para a doação recém-publicada.
         notice_id = self.published_notice_id
         self.published_notice_id = 0
@@ -1232,9 +1239,14 @@ def _donation_content() -> rx.Component:
     )
 
 
-def _detail_state_message(message: str, color: str) -> rx.Component:
+def _detail_state_message(message: str, color: str, *actions: rx.Component) -> rx.Component:
     return rx.box(
-        rx.text(message, color=color, text_align="center"),
+        rx.vstack(
+            rx.text(message, color=color, text_align="center"),
+            *actions,
+            align="center",
+            spacing="3",
+        ),
         display="flex",
         align_items="center",
         justify_content="center",
@@ -1264,6 +1276,19 @@ def donation_detail_page() -> rx.Component:
                     _detail_state_message(
                         DONATION_DETAIL_ERROR_MESSAGE,
                         "#9B2C2C",
+                        # Busca a doação de novo (change navegacao-celular).
+                        rx.button(
+                            rx.icon("rotate-cw", size=16, aria_hidden="true"),
+                            "Tentar novamente",
+                            on_click=DonationDetailState.load_donation,
+                            class_name="detail-retry",
+                            variant="outline",
+                            color=PRIMARY_GREEN,
+                            border_color=PRIMARY_GREEN,
+                            min_height="44px",
+                            cursor="pointer",
+                            _focus_visible={"outline": f"2px solid {PRIMARY_GREEN}", "outlineOffset": "2px"},
+                        ),
                     ),
                     _donation_content(),
                 ),

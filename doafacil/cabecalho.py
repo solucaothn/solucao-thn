@@ -160,68 +160,52 @@ def back_link(label: str = "Voltar ao início", href: str = "/", class_name: str
 LOGO_WIDTH = rx.breakpoints(initial="100px", md="190px")
 
 
-def logo_header() -> rx.Component:
-    """Cabeçalho das páginas institucionais (Figma): só o logotipo,
-    centralizado, levando à home. O mesmo tamanho do logotipo da home."""
-    return rx.box(
-        rx.link(
-            rx.image(
-                src="/logo.svg",
-                alt="DoaFácil — início",
-                style={"width": LOGO_WIDTH},
-                height="72px",
-                object_fit="contain",
-            ),
-            href="/",
-            aria_label="DoaFácil — início",
-            display="inline-flex",
-            align_items="center",
-            min_height="44px",
-            _focus_visible=FOCUS_RING,
+def account_control(touch: bool = False) -> rx.Component:
+    """O menu da conta, com sessão, ou “Entrar”, sem sessão. Com `touch`
+    (barra do celular), “Entrar” ganha 44 px de altura; no desktop fica como
+    sempre foi."""
+    touch_props = {"min_height": "44px"} if touch else {}
+    return rx.cond(
+        LoginState.auth_token,
+        account_menu(),
+        rx.button(
+            "Entrar",
+            variant="outline",
+            color=GREEN,
+            border_color=GREEN,
+            size="2",
+            on_click=rx.redirect("/login"),
+            **touch_props,
         ),
-        class_name="institutional-header",
-        display="flex",
-        justify_content="center",
-        align_items="center",
-        width="100%",
-        padding=HEADER_PADDING,
-        box_sizing="border-box",
-        background="white",
     )
 
 
-def header_auth_controls() -> rx.Component:
-    """“Entrar” ou o menu da conta, e “Quero Doar”. A entrada no chat é o
-    botão flutuante (chat_fab), não um item do cabeçalho."""
+def donate_link() -> rx.Component:
+    return rx.link(
+        "Quero Doar",
+        href="/cadastro-doacao",
+        background=GREEN,
+        color="white",
+        padding="8px 16px",
+        border_radius="6px",
+        font_size="14px",
+        font_weight="500",
+        white_space="nowrap",
+        display="inline-flex",
+        align_items="center",
+        min_height="44px",
+        _hover={"background": "#126f3b"},
+        _focus_visible=FOCUS_RING,
+    )
+
+
+def header_auth_controls(show_donate: bool = True) -> rx.Component:
+    """“Entrar” ou o menu da conta, e “Quero Doar” (fora no cadastro de
+    doação, que é a própria página). A entrada no chat é o botão flutuante
+    (chat_fab), não um item do cabeçalho."""
     return rx.hstack(
-        rx.cond(
-            LoginState.auth_token,
-            account_menu(),
-            rx.button(
-                "Entrar",
-                variant="outline",
-                color=GREEN,
-                border_color=GREEN,
-                size="2",
-                on_click=rx.redirect("/login"),
-            ),
-        ),
-        rx.link(
-            "Quero Doar",
-            href="/cadastro-doacao",
-            background=GREEN,
-            color="white",
-            padding="8px 16px",
-            border_radius="6px",
-            font_size="14px",
-            font_weight="500",
-            white_space="nowrap",
-            display="inline-flex",
-            align_items="center",
-            min_height="44px",
-            _hover={"background": "#126f3b"},
-            _focus_visible=FOCUS_RING,
-        ),
+        account_control(),
+        *([donate_link()] if show_donate else []),
         spacing=rx.breakpoints(initial="2", sm="3"),
         align="center",
     )

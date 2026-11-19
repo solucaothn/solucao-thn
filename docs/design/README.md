@@ -77,8 +77,22 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 - **Cartões das recentes:** quadrados entre 220 e 260 px de lado, dividindo a largura do carrossel entre os 4. A linha dos números e do carrossel usa as mesmas bordas do conteúdo do cabeçalho (até 1200 px, com margens de 16 e 24 px), e a coluna dos números tem 11rem. Assim, os 4 cartões cabem em 1512 px; quando não cabem, o carrossel rola dentro dele.
 - **“Doações mais recentes:”** com o link **“Ver mais...”** (`/explorar`) à direita.
 - **“Comece por aqui”:** “Para você mesmo” leva a `/explorar` e “Ajude quem precisa” a `/cadastro-doacao`; “Desapego em grupo” segue **Em breve**. A busca funciona: categorias do Xano, as 27 UFs e “Buscar” abrindo `/explorar?q=…&categoria=…&uf=…`.
-- **Institucional:** fundo creme, título em `#1F1F1F`, texto de apoio em `#166B3B` e quatro cartões quadrados com ícone em círculo verde: Solidariedade — “Histórias que continuam”; Segurança — “Você no controle”; Nossa missão — “Nada se perde”; Passo a passo — “Doar leva minutos”. Sem “Saiba mais”. Enquanto não houver fotos próprias, o fundo é um degradê verde e cinza (`INSTITUTIONAL_CARDS` em `doafacil/doafacil.py`).
+- **Institucional:** fundo creme, título em `#1F1F1F`, texto de apoio em `#166B3B` e quatro cartões quadrados com ícone em círculo verde: Solidariedade — “Histórias que continuam”; Segurança — “Você no controle”; Nossa missão — “Nada se perde”; Passo a passo — “Doar leva minutos”. Sem “Saiba mais”. Desde a change videos-home, o fundo de cada cartão é um vídeo próprio do grupo; o detalhamento está em “Vídeos dos cartões institucionais”, logo abaixo desta lista.
 - **Rodapé:** os links navegam (rotas na tabela do guia, seção 8).
+
+#### Vídeos dos cartões institucionais (change videos-home)
+
+- **Arquivos:** os vídeos ficam em `assets/landing/` (`solidariedade`, `seguranca`, `missao` e `passo-a-passo`).
+  - Cada um é um `.mp4` H.264 de 490 × 490, o 2x do cartão de 245 px, sem som e com até 8 s, mais a capa `.jpg` de mesmo nome.
+  - O `tests/test_videos_home.py` confere isso lendo o cabeçalho do MP4, sem `ffprobe`.
+- **Camadas do cartão:**
+  1. a capa como fundo;
+  2. o `<video autoplay muted loop playsinline preload="metadata" poster>` com `object-fit: cover`;
+  3. o véu escuro;
+  4. o ícone, o rótulo e o título.
+- **Acessibilidade:** o vídeo tem `aria-hidden`, sem controles e fora da ordem do Tab. O texto acessível é o rótulo e o título.
+- **Véu (`INSTITUTIONAL_VEIL`):** transparente até 30%, 0,5 em 55% e 0,8 embaixo. É o mais leve com contraste AA do branco sobre as quatro capas (mínimo de 4,9:1, na de “Nada se perde”). O degradê de duas paradas anterior dava só 2,2:1 nessa capa.
+- **Movimento reduzido:** com `prefers-reduced-motion`, o `assets/home.css` esconde os vídeos (fica a capa) e um script na montagem da seção tira o `autoplay` e os pausa.
 
 **Diferenças aprovadas em relação ao Figma:**
 
@@ -88,7 +102,7 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 | “COMECE POR AQUI” quase invisível (branco sobre creme) | `#166B3B` | contraste AA; o `#168447` dá só 4,4:1 sobre o creme |
 | “Linkes rápidos” | “Links rápidos” | erro de digitação |
 | “Desapego em grupo” com seta | “Em breve”, sem seta | a funcionalidade não existe |
-| fotos com marca d'água “shutterstock” | degradê como placeholder | direitos de imagem |
+| fotos com marca d'água “shutterstock” | vídeos próprios do grupo, sem som, com capa (change videos-home) | direitos de imagem |
 | sem “Projeto acadêmico DoaFácil” | a linha continua | exigida pela spec do rodapé |
 | 6 cartões de recentes no quadro | até 4 | spec atual; “Ver mais...” leva ao resto |
 | cartões de recentes com cerca de 214 px | entre 220 e 260 px, dividindo o carrossel | pedido do grupo: textos legíveis e os 4 cabendo em 1512 px |
@@ -176,6 +190,35 @@ Os PNGs não têm marca d'água. As fotos de Segurança e Quem somos são do Fre
 | Segurança, Quem somos | fotos de banco de imagens, sem crédito | as mesmas fotos, em JPEG, com “Foto: Freepik” abaixo (change fotos-site) | a licença grátis do Freepik pede atribuição |
 | todas | “Voltar ao inicio” | “Voltar ao início” | acento |
 | todas | sem rodapé (só Termos e Privacidade têm) | o rodapé da home em todas | navegação consistente |
+
+### Navegação no celular e cabeçalho comum (change navegacao-celular)
+
+O Figma não desenha o celular. A spec é a `site-navigation`.
+
+- **Abaixo de 992 px:**
+  - **Botão:** ☰ no cabeçalho, com o rótulo “Abrir menu” e 44 px de área de toque.
+  - **Painel:** abre à esquerda, com até 360 px de largura e a altura toda da tela, no mesmo padrão da gaveta de Categorias. Tem o título “Menu”, o X e itens de 48 px com ícone verde `#168447`.
+  - **Itens para todos:** Explorar doações, Como funciona, Categorias e Quero Doar, este com fundo verde-claro `#E8F3EC` e texto `#166B3B`.
+  - **Com sessão:** a foto ou a inicial e o nome, depois Minhas doações, Mensagens (com o selo de não lidas), Editar perfil e Sair.
+  - **Sem sessão:** Entrar.
+- **Barra no celular:**
+  - **Home, Explorar e Categorias:** logotipo, “Entrar” ou o menu da conta, e o ☰.
+  - **Páginas com o logotipo centralizado:** “Voltar” (quando há), logotipo e ☰.
+- **Desktop (992 px ou mais):**
+  - **Home, Explorar e Categorias:** iguais a antes.
+  - **Páginas com o logotipo centralizado:** ganham à direita “Entrar” ou o menu da conta, e “Quero Doar”.
+- **Telas de autenticação:** login, cadastro de conta e recuperação de senha continuam só com o logotipo.
+
+**Diferenças em relação ao Figma:**
+
+| Tela | No Figma | Na implementação | Motivo |
+|---|---|---|---|
+| todas, abaixo de 992 px | não desenhado | botão ☰ e painel lateral com a navegação e a conta | o Figma não tem telas de celular |
+| home, Explorar e Categorias, abaixo de 992 px | “Quero Doar” no cabeçalho (desktop) | “Quero Doar” no painel; a barra fica com o logotipo, a conta e o ☰ | não cabem em 360 px |
+| institucionais | só o logotipo centralizado | logotipo centralizado e, à direita, “Entrar” ou a conta e “Quero Doar” (desktop) ou ☰ | acesso à conta e ao cadastro de doação em qualquer página |
+| detalhe, perfil de quem doa, chat, Minhas doações, Editar doação e Editar perfil | Voltar, logotipo e lado direito vazio | o mesmo, com os controles do site à direita | idem |
+| cadastro de doação | só o logotipo | logotipo e a conta à direita, sem “Quero Doar” | é a própria página do “Quero Doar” |
+| painel | não existe | “Mensagens” no painel, com o total de não lidas | no celular não há outro caminho para o chat nas páginas sem botão flutuante |
 
 ## Telas ainda sem desenho
 

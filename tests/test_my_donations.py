@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from doafacil.chat import back_link_header
+from doafacil.login import LoginState
+from doafacil.navegacao import back_link_header
 from doafacil.detalhe_doacao import DONATION_NOT_FOUND_MESSAGE
 from doafacil.doafacil import app, index
 from doafacil.minhas_doacoes import (
@@ -161,7 +162,7 @@ def _ready_list_state(**fields) -> SimpleNamespace:
 
 def _edit_state(route_id: str = "17", **fields) -> SimpleNamespace:
     base = dict(
-        router=SimpleNamespace(page=SimpleNamespace(params={"id": route_id})),
+        router=SimpleNamespace(url=SimpleNamespace(path=f"/minhas-doacoes/{route_id}/editar", query_parameters={})),
         auth_token=TOKEN,
         account_name="Ana",
         view_state="loading",
@@ -642,9 +643,9 @@ class MyDonationsStateTests(unittest.TestCase):
 class MyDonationsPageTests(unittest.TestCase):
     def test_routes_and_on_load(self) -> None:
         page = app._unevaluated_pages["minhas-doacoes"]
-        self.assertEqual(page.on_load.fn, MyDonationsState.load_page.fn)
+        self.assertEqual([h.fn for h in page.on_load], [MyDonationsState.load_page.fn, LoginState.load_account.fn])  # + a conta, uma vez por sessão (change navegacao-celular)
         edit = app._unevaluated_pages["minhas-doacoes/[id]/editar"]
-        self.assertEqual(edit.on_load.fn, EditDonationState.load_edit.fn)
+        self.assertEqual([h.fn for h in edit.on_load], [EditDonationState.load_edit.fn, LoginState.load_account.fn])
 
     def test_header_and_title(self) -> None:
         page = my_donations_page()
@@ -726,9 +727,12 @@ class MyDonationsPageTests(unittest.TestCase):
         for excluded in ("Sobre", "Compartilhar", "Avaliação", "Verificado", "Credibilidade", "Chat", "Email", "Em breve", "NOVO"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
+        # Fora o cabeçalho, cujo painel do celular tem “Mensagens” (change
+        # navegacao-celular).
+        without_header = rendered.replace(str(page.children[0]), "")
         for excluded in ("owner_id", "LucideMessageCircle"):
             with self.subTest(excluded=excluded):
-                self.assertNotIn(excluded, rendered)
+                self.assertNotIn(excluded, without_header)
 
     def test_card_has_badge_condition_menu_and_view_link_only_when_available(self) -> None:
         rendered = str(my_donation_card(MyDonationsState.items[0]))
@@ -788,7 +792,16 @@ class MyDonationsPageTests(unittest.TestCase):
         rendered = str(my_donations_page())
         self.assertIn("repeat(3, minmax(0, 1fr))", rendered)
         self.assertIn('"minmax(0, 1fr)"', rendered)
-        self.assertIn("24px 16px 48px", rendered)
+        # Margens laterais do cabeçalho, no mesmo contêiner de 1200 px
+        # (change navegacao-celular): 16 px no celular e 24 px a partir de 992 px.
+        self.assertIn('["maxWidth"] : "1200px"', rendered)
+        self.assertIn(
+            '["maxWidth"] : "1200px", ["margin"] : "0 auto", '
+            '["@media screen and (min-width: 0px)"] : ({ ["paddingInlineStart"] : "16px", ["paddingInlineEnd"] : "16px" }), '
+            '["@media screen and (min-width: 62em)"] : ({ ["paddingInlineStart"] : "24px", ["paddingInlineEnd"] : "24px" }), '
+            '["boxSizing"] : "border-box"',
+            rendered,
+        )
 
     def test_empty_state(self) -> None:
         empty = _empty_state()

@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from doafacil.chat import back_home_header, back_link_header
+from doafacil.login import LoginState
+from doafacil.navegacao import back_home_header, back_link_header
 from doafacil.detalhe_doacao import DONATION_NOT_FOUND_MESSAGE
 from doafacil.doafacil import app
 from doafacil.perfil_doador import (
@@ -97,7 +98,7 @@ def _parsed(**changes: object) -> dict:
 
 def _state(route_id: str = "17", **fields: object) -> SimpleNamespace:
     base = dict(
-        router=SimpleNamespace(page=SimpleNamespace(params={"id": route_id})),
+        router=SimpleNamespace(url=SimpleNamespace(path=f"/doacao/{route_id}/quem-doa", query_parameters={})),
         view_state="loading",
         error_message="",
         donation_id=0,
@@ -484,15 +485,15 @@ class DonorProfilePageTests(unittest.TestCase):
     def test_route_and_on_load_are_registered(self) -> None:
         page = app._unevaluated_pages["doacao/[id]/quem-doa"]
         self.assertEqual(page.route, "doacao/[id]/quem-doa")
-        self.assertEqual(page.on_load.fn, DonorProfileState.load_profile.fn)
+        self.assertEqual([h.fn for h in page.on_load], [DonorProfileState.load_profile.fn, LoginState.load_account.fn])  # + a conta, uma vez por sessão (change navegacao-celular)
         # O detalhe continua na sua rota.
         self.assertIn("doacao/[id]", app._unevaluated_pages)
 
     def test_back_link_header_back_to_donation_in_green(self) -> None:
         header = back_link_header("/doacao/17", BACK_TO_DONATION_LABEL, "#007A42")
         rendered = str(header)
-        self.assertEqual(type(header).__name__, "Grid")
-        self.assertEqual(header.children[0].custom_attrs.get("aria-label"), "Voltar à doação")
+        self.assertEqual(type(header).__name__, "Box")  # faixa branca com a grade dentro (change navegacao-celular)
+        self.assertEqual(header.children[0].children[0].custom_attrs.get("aria-label"), "Voltar à doação")
         self.assertIn('to:"/doacao/17"', rendered)
         self.assertIn('"#007A42"', rendered)
         self.assertIn("LucideChevronLeft", rendered)
@@ -510,11 +511,14 @@ class DonorProfilePageTests(unittest.TestCase):
         page = donor_profile_page()
         header, state_content = page.children
         rendered_header = str(header)
-        self.assertEqual(type(header).__name__, "Grid")
+        self.assertEqual(type(header).__name__, "Box")  # faixa branca com a grade dentro (change navegacao-celular)
         self.assertIn("back_href_rx_state_", rendered_header)
         self.assertIn("Voltar \\u00e0 doa\\u00e7\\u00e3o", rendered_header)
         self.assertIn('"#007A42"', rendered_header)
-        self.assertFalse(getattr(header, "class_name", None))
+        # O cabeçalho não anima (sem page-fade-enter); a classe é a do
+        # cabeçalho comum (change navegacao-celular).
+        self.assertEqual(header.class_name, "site-header")
+        self.assertNotIn("page-fade-enter", rendered_header)
 
         contents = _component_contents(state_content)
         for expected in (PROFILE_LOADING_MESSAGE, DONATION_NOT_FOUND_MESSAGE, DONATIONS_TITLE, EMPTY_TITLE):
@@ -618,7 +622,9 @@ class DonorProfilePageTests(unittest.TestCase):
         ):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
-        without_badge = rendered.replace("email_verified", "")
+        # Fora o cabeçalho, cujo painel do celular tem “Mensagens” (change
+        # navegacao-celular).
+        without_badge = rendered.replace(str(page.children[0]), "").replace("email_verified", "")
         for excluded in ("email", "owner_id", "user_id", "last_name", "LucideMessageCircle", "chat-fab"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, without_badge)

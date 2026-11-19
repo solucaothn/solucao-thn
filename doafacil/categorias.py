@@ -85,10 +85,30 @@ def category_list(
     categories: rx.Var[list[dict[str, Any]]],
     loading: rx.Var | bool = False,
     on_choose: Any = None,
+    on_retry: Any = None,
 ) -> rx.Component:
     """A lista de categorias, com carregando e falha (sem categorias
     fictícias). Lista vazia vale como falha: o backend sempre tem
-    categorias."""
+    categorias. Na falha, “Tentar de novo” (`on_retry`) busca outra vez
+    (change navegacao-celular)."""
+    retry = (
+        [
+            rx.button(
+                rx.icon("rotate-cw", size=16, aria_hidden="true"),
+                "Tentar de novo",
+                on_click=on_retry,
+                class_name="category-retry",
+                variant="outline",
+                color=GREEN,
+                border_color=GREEN,
+                min_height="44px",
+                cursor="pointer",
+                _focus_visible=FOCUS_RING,
+            )
+        ]
+        if on_retry is not None
+        else []
+    )
     return rx.cond(
         loading,
         rx.text("Carregando categorias...", color=TEXT_MUTED, role="status"),
@@ -109,6 +129,7 @@ def category_list(
             ),
             rx.vstack(
                 rx.text(CATEGORIES_ERROR_TEXT, color="#9B2C2C", role="status"),
+                *retry,
                 rx.link(
                     "Explorar doações",
                     href=EXPLORE_ROUTE,
@@ -150,7 +171,9 @@ class CategoriesState(rx.State):
         self.drawer_open = False
 
 
-def categories_drawer(categories: rx.Var[list[dict[str, Any]]], trigger: rx.Component) -> rx.Component:
+def categories_drawer(
+    categories: rx.Var[list[dict[str, Any]]], trigger: rx.Component, on_retry: Any = None
+) -> rx.Component:
     """Gaveta à esquerda (Figma 474:1650): título, “Fechar” (X) e a lista.
     Escolher uma categoria fecha a gaveta e abre a Explorar filtrada."""
     return rx.dialog.root(
@@ -193,7 +216,7 @@ def categories_drawer(categories: rx.Var[list[dict[str, Any]]], trigger: rx.Comp
                 },
             ),
             rx.box(
-                category_list(categories, on_choose=CategoriesState.close_drawer),
+                category_list(categories, on_choose=CategoriesState.close_drawer, on_retry=on_retry),
                 padding="12px 8px",
                 overflow_y="auto",
                 flex="1",
@@ -237,7 +260,11 @@ def categories_page() -> rx.Component:
                 class_name="page-fade-enter",
             ),
             rx.box(
-                category_list(CategoriesState.categories, CategoriesState.loading),
+                category_list(
+                    CategoriesState.categories,
+                    CategoriesState.loading,
+                    on_retry=CategoriesState.load_categories,
+                ),
                 width="100%",
                 max_width="560px",
                 background="white",

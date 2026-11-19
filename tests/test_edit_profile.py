@@ -8,7 +8,8 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from PIL import Image
 
-from doafacil.chat import back_link_header
+from doafacil.login import LoginState
+from doafacil.navegacao import back_link_header
 from doafacil.doafacil import app
 from doafacil.editar_perfil import (
     ABOUT_HINT,
@@ -577,12 +578,10 @@ class ProfilePhotoStateTests(unittest.TestCase):
     escolher abre o modal sem requisição; “Usar foto” recorta e envia."""
 
     def _prepare(self, state, files):
-        with (
-            patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock) as upload,
-            patch("doafacil.editar_perfil.rx.clear_selected_files", return_value="clear") as clear,
-        ):
-            events = _events(EditProfileState.prepare_crop.fn(state, files))
-        return events, upload, clear
+        with patch("doafacil.editar_perfil.upload_profile_photo", new_callable=AsyncMock) as upload:
+            # Sem eventos de limpar o upload (change navegacao-celular).
+            result = asyncio.run(EditProfileState.prepare_crop.fn(state, files))
+        return [] if result is None else [result], upload, None
 
     def _confirm(self, state, **patch_kwargs):
         with (
@@ -620,7 +619,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
         self.assertEqual(state._crop_preview_size, (400, 300))
         self.assertEqual(state.crop_area, {})
         self.assertEqual(state.city, "Cidade digitada")
-        clear.assert_called_once_with(PHOTO_UPLOAD_ID)
+        self.assertIsNone(clear)  # sem rx.clear_selected_files (change navegacao-celular)
 
     def test_unreadable_image_shows_format_message_without_modal(self) -> None:
         state = _ready_state(photo=PHOTO_URL)
@@ -792,7 +791,7 @@ class ProfilePhotoStateTests(unittest.TestCase):
 class EditProfilePageTests(unittest.TestCase):
     def test_route_and_on_load(self) -> None:
         page = app._unevaluated_pages["perfil/editar"]
-        self.assertEqual(page.on_load.fn, EditProfileState.load_profile.fn)
+        self.assertEqual([h.fn for h in page.on_load], [EditProfileState.load_profile.fn, LoginState.load_account.fn])  # + a conta, uma vez por sessão (change navegacao-celular)
 
     def test_header_title_and_no_chat_button(self) -> None:
         page = edit_profile_page()
