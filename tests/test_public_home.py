@@ -1118,7 +1118,7 @@ class PublicHomeTests(unittest.TestCase):
         self.assertEqual(type(messages_link).__name__, "Link")
         self.assertIn("chat-fab", str(messages_link.class_name))
         self.assertIn('"/chat"', str(messages_link))
-        self.assertIn('"/login"', str(messages_link))
+        self.assertIn("login_href", str(messages_link))  # /login com o next da página (change acabamento)
 
         detail_links = [
             node

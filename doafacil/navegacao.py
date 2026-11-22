@@ -221,7 +221,7 @@ def nav_menu_items() -> rx.Component:
                 ),
             ),
             _list(
-                _nav_item("Entrar", "/login", "log-in"),
+                _nav_item("Entrar", LoginState.login_href, "log-in"),
                 class_name="nav-menu-visitor",
             ),
         ),

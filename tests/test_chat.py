@@ -1160,7 +1160,8 @@ class ChatStateTests(unittest.TestCase):
         ):
             result = _run(ChatState.load_chat.fn(state))
         self.assertEqual(result, "login-redirect")
-        redirect.assert_called_once_with("/login")
+        # Volta ao /chat depois do login (change acabamento).
+        redirect.assert_called_once_with("/login?next=/chat")
         self.assertEqual(recorder.requests, [])
 
     def test_load_chat_opens_conversation_from_route(self) -> None:
@@ -1720,7 +1721,7 @@ class ChatFabTests(unittest.TestCase):
     def test_destination_and_label_depend_on_login(self) -> None:
         self.assertEqual(type(self.fab).__name__, "Link")
         self.assertIn('"/chat"', self.rendered)
-        self.assertIn('"/login"', self.rendered)
+        self.assertIn("login_href", self.rendered)  # /login com o next da página (change acabamento)
         self.assertIn("auth_token", self.rendered)
         # Com login: "Mensagens" ou "Mensagens, N não lidas"; sem: "Mensagens".
         self.assertIn("unread_link_label", self.rendered)

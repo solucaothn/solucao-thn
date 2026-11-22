@@ -253,6 +253,25 @@ python scripts/teste_explorar_real.py
 | EX5 | UF com mais de 2 letras e `page=0` dão 400 |
 | EX6 | nenhuma chave além das do cartão e da paginação |
 
+### Acabamento (change acabamento)
+
+- **Volta à origem depois do login:**
+  - Para mandar alguém ao login a partir de um handler, use `login_redirect(self)` (ou `state`), de `doafacil/rotas.py`. Não use `rx.redirect("/login")`.
+  - O `login_redirect` leva a página atual em `/login?next=…`, e o login volta para ela.
+  - Em links e botões, use `LoginState.login_href`.
+  - No `/login`, o “Criar conta” leva o mesmo `next` (`signup_url`), que atravessa o cadastro e a confirmação do e-mail até o login.
+  - Um teste falha se aparecer `rx.redirect("/login")` fora do `login.py`.
+- **Proteção contra open redirect:** o `safe_next` só aceita caminho interno.
+  - Recusa: `//`, `\`, esquema, host, espaço, caracteres de controle, mais de 512 caracteres e telas de autenticação.
+  - Qualquer outro valor leva à home.
+- **Página 404:** `doafacil/nao_encontrada.py`, registrada com `route="404"`.
+- **Títulos:** toda página nova precisa de `title="<Título> | DoaFácil"` no `add_page`. Um teste percorre todas as páginas.
+- **Favicon:**
+  - **Arquivos:** `assets/favicon.ico`, `assets/favicon-32.png` e `assets/apple-touch-icon.png` saem do `scripts/gerar_favicon.py` e entram prontos no commit.
+  - **Para gerar de novo:** com o `.venv` ativo, rode `pip install -r requirements-dev.txt` e depois `python scripts/gerar_favicon.py`.
+  - **PyMuPDF:** fica só no `requirements-dev.txt`, porque o site não precisa dele.
+- **Contêiner do conteúdo:** Minhas doações, o perfil de quem doa, o detalhe e o Editar perfil usam `max_width=HEADER_MAX_WIDTH` com `padding_x=HEADER_PADDING_X` dentro, como a Explorar.
+
 ### Navegação e menu do celular (change navegacao-celular)
 
 Spec `site-navigation`. O módulo é `doafacil/navegacao.py`.

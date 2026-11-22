@@ -7,8 +7,9 @@ from urllib.parse import quote, urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
 from doafacil import cache_publico
-from doafacil.rotas import path_segment_after
+from doafacil.rotas import login_redirect, path_segment_after
 from doafacil.chat import (
     ChatError,
     ChatNotFoundError,
@@ -364,7 +365,7 @@ class DonationDetailState(LoginState):
         self.contact_message = ""
         self.contact_message_is_error = False
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
         if self.contact_preference == "Chat do DoaFácil":
             self.contact_message = DONOR_CHAT_PREFERENCE_MESSAGE
             return None
@@ -401,7 +402,7 @@ class DonationDetailState(LoginState):
         self.contact_message = ""
         self.contact_message_is_error = False
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
         if self.is_starting_chat:
             return None
 
@@ -415,7 +416,7 @@ class DonationDetailState(LoginState):
         except ChatUnauthorizedError:
             self.auth_token = ""
             self.account_name = ""
-            return rx.redirect("/login")
+            return login_redirect(self)
         except ChatNotFoundError:
             self.contact_message = CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE
             return None
@@ -1172,9 +1173,10 @@ def _published_notice() -> rx.Component:
         wrap="wrap",
         column_gap="16px",
         width="100%",
-        max_width="1440px",
+        max_width=HEADER_MAX_WIDTH,
         margin="0 auto",
         padding="4px 16px",
+        box_sizing="border-box",
         background=NOTICE_GREEN_BACKGROUND,
         border_radius="8px",
     )
@@ -1229,13 +1231,45 @@ def _donation_content() -> rx.Component:
             column_gap="24px",
             row_gap="32px",
             width="100%",
-            max_width="1440px",
+            # Mesmo contêiner de Minhas doações (change acabamento); a grade
+            # (áreas e colunas) não muda.
+            max_width=HEADER_MAX_WIDTH,
             margin="0 auto",
-            padding=rx.breakpoints(initial="24px 16px 48px", md="28px 24px 56px"),
+            padding_x=HEADER_PADDING_X,
+            padding_top=rx.breakpoints(initial="24px", md="28px"),
+            padding_bottom=rx.breakpoints(initial="48px", md="56px"),
+            box_sizing="border-box",
         ),
         width="100%",
         min_height="calc(100vh - 88px)",
         background=CREAM,
+    )
+
+
+DONATION_UNAVAILABLE_TEXT = "Ela pode ter sido reservada, concluída ou removida por quem doou."
+
+
+def _state_link(label: str, href: str, class_name: str, solid: bool) -> rx.Component:
+    """Link de 44 px para os estados do detalhe: verde cheio ou contorno."""
+    colors = (
+        {"background": PRIMARY_GREEN, "color": "white", "_hover": {"background": "#006B39", "color": "white"}}
+        if solid
+        else {"background": "white", "color": PRIMARY_GREEN, "border": f"1px solid {PRIMARY_GREEN}", "_hover": {"background": "#F2F7F3", "color": PRIMARY_GREEN}}
+    )
+    return rx.link(
+        label,
+        href=href,
+        class_name=class_name,
+        display="inline-flex",
+        align_items="center",
+        justify_content="center",
+        min_height="44px",
+        padding="0 20px",
+        border_radius="8px",
+        font_weight="700",
+        underline="none",
+        _focus_visible={"outline": f"2px solid {PRIMARY_GREEN}", "outlineOffset": "2px"},
+        **colors,
     )
 
 
@@ -1270,6 +1304,16 @@ def donation_detail_page() -> rx.Component:
                 _detail_state_message(
                     DONATION_NOT_FOUND_MESSAGE,
                     "#555555",
+                    # Caminhos a partir de uma doação indisponível (change
+                    # acabamento), sem dizer qual foi o caso.
+                    rx.text(DONATION_UNAVAILABLE_TEXT, color="#555555", text_align="center"),
+                    rx.flex(
+                        _state_link("Ver outras doações", "/explorar", "detail-unavailable-explore", solid=True),
+                        _state_link("Voltar ao início", "/", "detail-unavailable-home", solid=False),
+                        gap="12px",
+                        wrap="wrap",
+                        justify="center",
+                    ),
                 ),
                 rx.cond(
                     DonationDetailState.view_state == "error",

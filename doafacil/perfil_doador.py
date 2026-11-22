@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
 from doafacil.rotas import path_segment_after
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial
@@ -339,7 +340,9 @@ TEXT_STRONG = "#2A2A2A"
 TEXT_MUTED = "#555555"
 TEXT_ERROR = "#9B2C2C"
 AVATAR_BACKGROUND = "#F2F2F2"
-CONTENT_MAX_WIDTH = "1396px"
+# O mesmo contêiner de Minhas doações e da Explorar (change acabamento):
+# até 1200 px, com as margens laterais do cabeçalho da home dentro dele.
+CONTENT_MAX_WIDTH = HEADER_MAX_WIDTH
 CARDS_GRID_COLUMNS = "repeat(auto-fill, minmax(220px, 1fr))"
 
 
@@ -593,10 +596,13 @@ def _profile_content() -> rx.Component:
             width="100%",
             max_width=CONTENT_MAX_WIDTH,
             margin="0 auto",
+            padding_x=HEADER_PADDING_X,
+            box_sizing="border-box",
         ),
         width="100%",
         min_height="calc(100vh - 88px)",
-        padding=rx.breakpoints(initial="24px 16px 48px", md="32px 24px 56px"),
+        padding_top=rx.breakpoints(initial="24px", md="32px"),
+        padding_bottom=rx.breakpoints(initial="48px", md="56px"),
         background=CREAM,
     )
 

@@ -15,6 +15,8 @@ from typing import Any
 import httpx
 import reflex as rx
 
+from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
+from doafacil.rotas import login_redirect
 from doafacil.cadastro import BRAZILIAN_STATES
 from doafacil.cadastro_doacao import (
     AUTH_API_ENV,
@@ -406,14 +408,14 @@ class EditProfileState(LoginState):
         self.view_state = "loading"
         self.load_error = ""
         if not self.auth_token:
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         try:
             async with _new_client() as client:
                 profile = await fetch_profile(client, self.auth_token)
         except ProfileUnauthorizedError:
             _clear_session(self)
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except ProfileRateLimitError:
             self.load_error = RATE_LIMIT_MESSAGE
@@ -522,7 +524,7 @@ class EditProfileState(LoginState):
         except ProfileUnauthorizedError:
             _clear_session(self)
             self.photo_busy = False
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except ProfilePhotoRejectedError as rejected:
             self.photo_error = rejected.message
@@ -558,7 +560,7 @@ class EditProfileState(LoginState):
         except ProfileUnauthorizedError:
             _clear_session(self)
             self.photo_busy = False
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except ProfileRateLimitError:
             self.photo_error = RATE_LIMIT_MESSAGE
@@ -612,7 +614,7 @@ class EditProfileState(LoginState):
         except ProfileUnauthorizedError:
             _clear_session(self)
             self.is_saving = False
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except ProfileRejectedError:
             self.form_error = SAVE_REJECTED_MESSAGE
@@ -1103,12 +1105,16 @@ def _content() -> rx.Component:
             align="stretch",
             spacing="5",
             width="100%",
-            max_width="1236px",
+            # Mesmo contêiner de Minhas doações (change acabamento).
+            max_width=HEADER_MAX_WIDTH,
             margin="0 auto",
+            padding_x=HEADER_PADDING_X,
+            box_sizing="border-box",
         ),
         width="100%",
         min_height="calc(100vh - 88px)",
-        padding=rx.breakpoints(initial="24px 16px 48px", md="32px 24px 56px"),
+        padding_top=rx.breakpoints(initial="24px", md="32px"),
+        padding_bottom=rx.breakpoints(initial="48px", md="56px"),
         background=CREAM,
     )
 

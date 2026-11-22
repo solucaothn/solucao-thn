@@ -990,7 +990,11 @@ class EditProfilePageTests(unittest.TestCase):
         page = edit_profile_page()
         rendered = str(page)
         self.assertIn("minmax(220px, 280px) minmax(0, 1fr)", rendered)
-        self.assertIn("24px 16px 48px", rendered)
+        # Contêiner de Minhas doações (change acabamento): 1200 px com as
+        # margens do cabeçalho (16 px no celular, 24 px a partir de 992 px).
+        self.assertIn('["maxWidth"] : "1200px"', rendered)
+        self.assertIn('(min-width: 0px)"] : ({ ["paddingInlineStart"] : "16px", ["paddingInlineEnd"] : "16px" })', rendered)
+        self.assertIn('(min-width: 62em)"] : ({ ["paddingInlineStart"] : "24px", ["paddingInlineEnd"] : "24px" })', rendered)
         self.assertIn("repeat(2, minmax(0, 1fr))", rendered)
         animated = [n for n in _nodes(page) if getattr(n, "class_name", None) in {"page-fade-enter", "auth-card-enter"}]
         self.assertTrue(animated)

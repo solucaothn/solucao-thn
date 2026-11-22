@@ -808,7 +808,12 @@ class DonationDetailTests(unittest.TestCase):
         self.assertNotIn('""gallery', rendered)
         self.assertIn("minmax(0, 2.6fr) minmax(280px, 1fr)", rendered)
         # Celular: 16 px de margem lateral, sem rolagem horizontal.
-        self.assertIn("24px 16px 48px", rendered)
+        # Contêiner de Minhas doações (change acabamento): 1200 px com as
+        # margens do cabeçalho (16 px no celular, 24 px a partir de 992 px).
+        self.assertIn('["maxWidth"] : "1200px"', rendered)
+        # (no detalhe, o padding sai junto com as áreas da grade de cada faixa)
+        self.assertIn('["paddingInlineStart"] : "16px", ["paddingInlineEnd"] : "16px"', rendered)
+        self.assertIn('["paddingInlineStart"] : "24px", ["paddingInlineEnd"] : "24px"', rendered)
 
     def test_details_grid_has_four_items_with_icon_label_and_value(self) -> None:
         from doafacil.detalhe_doacao import _details_section

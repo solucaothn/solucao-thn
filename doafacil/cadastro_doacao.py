@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.rotas import login_redirect
 from doafacil import cache_publico
 from doafacil.campos import select_field
 from doafacil.fotos_doacao import (
@@ -388,7 +389,7 @@ class DonationCreateState(LoginState):
         _clear_photos(self)
 
         if not self.auth_token:
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
 
         self.is_loading_data = True
@@ -428,7 +429,7 @@ class DonationCreateState(LoginState):
             except DonationSessionExpiredError:
                 self.is_loading_data = False
                 yield LoginState.logout
-                yield rx.redirect("/login")
+                yield login_redirect(self)
                 return
             except DonationServiceError:
                 self.data_load_failed = True
@@ -635,7 +636,7 @@ class DonationCreateState(LoginState):
     @rx.event
     async def publish(self) -> AsyncGenerator[rx.event.EventSpec, None]:
         if not self.auth_token:
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         if self.is_publishing or self.published:
             return
@@ -702,7 +703,7 @@ class DonationCreateState(LoginState):
             self.is_publishing = False
             self.upload_progress = ""
             yield LoginState.logout
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except DonationMissingPhotosError:
             self.donation_error_message = MISSING_PHOTOS_MESSAGE

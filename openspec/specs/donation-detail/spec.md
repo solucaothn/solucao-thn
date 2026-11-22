@@ -317,3 +317,12 @@ Quando o detalhe da doação não puder ser carregado, a página SHALL mostrar a
 - **WHEN** a busca do detalhe falha (por exemplo, pelo limite de pedidos do backend)
 - **THEN** a página MUST mostrar a mensagem de falha e o botão “Tentar novamente”, com 44 px de área de toque e foco visível
 - **AND** acionar o botão MUST buscar a doação de novo e, se der certo, mostrar o detalhe
+
+### Requirement: Caminhos a partir de uma doação indisponível
+Quando a doação não está disponível (reservada, concluída, apagada ou com identificador inválido), a página de detalhe SHALL manter o aviso “Doação não encontrada” e acrescentar uma explicação e dois caminhos, sem revelar qual é o status da doação.
+
+#### Scenario: Doação indisponível
+- **WHEN** a página de detalhe mostra “Doação não encontrada”
+- **THEN** ela MUST explicar que a doação pode ter sido reservada, concluída ou removida por quem doou
+- **AND** MUST oferecer os links “Ver outras doações” (`/explorar`) e “Voltar ao início” (`/`), com foco visível e pelo menos 44 px de área de toque
+- **AND** MUST NOT dizer qual desses casos aconteceu

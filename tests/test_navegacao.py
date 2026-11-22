@@ -120,7 +120,7 @@ class NavMenuPanelTests(unittest.TestCase):
         self.assertIn("account_name", authenticated)  # nome da conta
         self.assertIn("LucideUser", authenticated)  # avatar (foto, inicial ou ícone)
         self.assertNotIn("Entrar", authenticated)
-        self.assertEqual(_links(visitor), ["/login"])
+        self.assertIn("login_href", visitor)  # /login com o next da página (change acabamento)
         self.assertIn('"Entrar"', visitor)
         for label in ("Mensagens", "Sair", "Minhas doa"):
             self.assertNotIn(label, visitor)

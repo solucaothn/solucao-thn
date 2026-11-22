@@ -50,6 +50,7 @@ from doafacil.cabecalho import (
 )
 from doafacil.navegacao import responsive_header_controls
 from doafacil import xano_http
+from doafacil.nao_encontrada import not_found_page
 from doafacil.login import LoginState, login_page
 from doafacil.institucional import (
     HelpCategoryState,
@@ -1081,7 +1082,16 @@ FIELD_PLACEHOLDER_SELECTOR = "input::placeholder, textarea::placeholder"
 FIELD_TEXT_COLOR = "#1F1F1F"
 FIELD_PLACEHOLDER_COLOR = "#6B6B6B"
 
+# Favicon do DoaFácil (change acabamento): o Reflex já usa o
+# assets/favicon.ico; estes completam o PNG de 32 px e o ícone de atalho do
+# celular. Os três saem de scripts/gerar_favicon.py.
+FAVICON_HEAD = [
+    rx.el.link(rel="icon", type="image/png", sizes="32x32", href="/favicon-32.png"),
+    rx.el.link(rel="apple-touch-icon", sizes="180x180", href="/apple-touch-icon.png"),
+]
+
 app = rx.App(
+    head_components=FAVICON_HEAD,
     style={
         FIELD_TEXT_SELECTOR: {
             "color": f"{FIELD_TEXT_COLOR} !important",
@@ -1171,6 +1181,13 @@ app = rx.App(
 # Chamadas ao Xano: nova tentativa no 429, cancelamento sem erro e o log
 # temporário (DOAFACIL_LOG_XANO=1). Só quando o servidor sobe.
 app.register_lifespan_task(xano_http.lifespan)
+# Página não encontrada própria, em português (change acabamento).
+app.add_page(
+    not_found_page,
+    route="404",
+    title="Página não encontrada | DoaFácil",
+    on_load=LoginState.load_account,
+)
 app.add_page(
     index,
     on_load=[
@@ -1178,23 +1195,27 @@ app.add_page(
         LoginState.load_account,
         ChatState.load_unread_total,
     ],
+    title="Início | DoaFácil",
 )
 app.add_page(
     login_page,
     route="/login",
     on_load=LoginState.consume_password_reset_notice,
+    title="Entrar | DoaFácil",
 )
-app.add_page(signup_page, route="/cadastro")
-app.add_page(request_recovery_page, route="/recuperar-senha")
+app.add_page(signup_page, route="/cadastro", title="Criar conta | DoaFácil")
+app.add_page(request_recovery_page, route="/recuperar-senha", title="Recuperar senha | DoaFácil")
 app.add_page(
     verify_recovery_page,
     route="/verificar-email",
     on_load=LoginState.require_verification_email,
+    title="Confirmar e-mail | DoaFácil",
 )
 app.add_page(
     new_password_page,
     route="/nova-senha",
     on_load=LoginState.require_reset_token,
+    title="Nova senha | DoaFácil",
 )
 # Páginas com o cabeçalho comum (change navegacao-celular): a conta é
 # carregada uma vez por sessão (LoginState.load_account), sem consulta de
@@ -1203,36 +1224,43 @@ app.add_page(
     donation_creation_page,
     route="/cadastro-doacao",
     on_load=[DonationCreateState.load_initial_data, LoginState.load_account],
+    title="Quero Doar | DoaFácil",
 )
 app.add_page(
     donation_detail_page,
     route="/doacao/[id]",
     on_load=[DonationDetailState.load_donation, LoginState.load_account],
+    title="Doação | DoaFácil",
 )
 app.add_page(
     donor_profile_page,
     route="/doacao/[id]/quem-doa",
     on_load=[DonorProfileState.load_profile, LoginState.load_account],
+    title="Quem doa | DoaFácil",
 )
 app.add_page(
     my_donations_page,
     route="/minhas-doacoes",
     on_load=[MyDonationsState.load_page, LoginState.load_account],
+    title="Minhas doações | DoaFácil",
 )
 app.add_page(
     edit_donation_page,
     route="/minhas-doacoes/[id]/editar",
     on_load=[EditDonationState.load_edit, LoginState.load_account],
+    title="Editar doação | DoaFácil",
 )
 app.add_page(
     edit_profile_page,
     route="/perfil/editar",
     on_load=[EditProfileState.load_profile, LoginState.load_account],
+    title="Editar perfil | DoaFácil",
 )
 app.add_page(
     chat_page,
     route="/chat",
     on_load=[ChatState.load_chat, LoginState.load_account],
+    title="Mensagens | DoaFácil",
 )
 # Explorar doações e categorias (change explorar-categorias): as duas com o
 # cabeçalho de conta e o botão flutuante do chat, como a home.

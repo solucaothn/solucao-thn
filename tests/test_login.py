@@ -694,7 +694,7 @@ class LoginPageTests(unittest.TestCase):
             and _component_text(node) == "Entrar"
         )
         self.assertIn("on_click", getattr(enter, "event_triggers", {}))
-        self.assertIn("/login", str(enter.event_triggers["on_click"]))
+        self.assertIn("login_href", str(enter.event_triggers["on_click"]))  # /login com o next da página (change acabamento)
 
         # Change landing-nova: o “Sair” fica no menu da conta, junto do nome.
         logout = next(
@@ -731,7 +731,7 @@ class LoginPageTests(unittest.TestCase):
                 continue
             # O “Entrar” da barra do celular, igual ao do desktop.
             if type(node).__name__ == "Button" and _component_text(node) == "Entrar":
-                self.assertIn("/login", str(node.event_triggers["on_click"]))
+                self.assertIn("login_href", str(node.event_triggers["on_click"]))  # change acabamento
                 continue
             if node is not enter and type(node).__name__ not in allowed:
                 self.assertFalse(getattr(node, "event_triggers", {}))
