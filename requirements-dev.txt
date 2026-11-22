@@ -1,0 +1,5 @@
+# Ferramentas de desenvolvimento: NÃO são necessárias para rodar o site.
+# Instale com: pip install -r requirements-dev.txt (com o .venv ativo).
+
+# Só para scripts/gerar_favicon.py (renderiza o assets/logo.svg).
+pymupdf>=1.24,<2

@@ -650,8 +650,11 @@ class DonorProfilePageTests(unittest.TestCase):
 
     def test_mobile_layout_has_16px_gutter(self) -> None:
         rendered = str(donor_profile_page())
-        self.assertIn("24px 16px 48px", rendered)
-        self.assertIn('"1396px"', rendered)
+        # Contêiner de Minhas doações (change acabamento): 1200 px com as
+        # margens do cabeçalho (16 px no celular, 24 px a partir de 992 px).
+        self.assertIn('["maxWidth"] : "1200px"', rendered)
+        self.assertIn('(min-width: 0px)"] : ({ ["paddingInlineStart"] : "16px", ["paddingInlineEnd"] : "16px" })', rendered)
+        self.assertIn('(min-width: 62em)"] : ({ ["paddingInlineStart"] : "24px", ["paddingInlineEnd"] : "24px" })', rendered)
 
 
 class DonorProfileAboutTests(unittest.TestCase):

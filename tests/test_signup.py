@@ -956,9 +956,8 @@ class SignupPageTests(unittest.TestCase):
             if _component_text(node) == "← Voltar"
         )
         route_link = back_link.children[0]
-        self.assertEqual(
-            getattr(route_link.to, "_var_value", route_link.to), "/login"
-        )
+        # Volta ao login levando o `next` do cadastro (change acabamento).
+        self.assertIn("login_from_signup_href", str(route_link.to))
 
     def test_login_and_signup_fields_have_scoped_autofill_styles(self) -> None:
         autofill_rules = [

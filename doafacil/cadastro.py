@@ -138,7 +138,7 @@ def signup_page() -> rx.Component:
             rx.vstack(
                 rx.link(
                     "← Voltar",
-                    href="/login",
+                    href=LoginState.login_from_signup_href,
                     color="#168447",
                     align_self="start",
                     cursor="pointer",

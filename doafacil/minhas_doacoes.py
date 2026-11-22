@@ -15,7 +15,7 @@ import httpx
 import reflex as rx
 
 from doafacil import cache_publico
-from doafacil.rotas import path_segment_after
+from doafacil.rotas import login_redirect, path_segment_after
 from doafacil.cadastro_doacao import (
     CATALOG_API_ENV,
     CONDITIONS,
@@ -444,7 +444,7 @@ async def _perform_action(state: Any, kind: str, donation_id: int):
     except MyDonationsUnauthorizedError:
         _clear_session(state)
         state.action_busy = False
-        yield rx.redirect("/login")
+        yield login_redirect(state)
         return
     except MyDonationNotFoundError:
         state.notice = ACTION_NOT_FOUND_MESSAGE
@@ -548,14 +548,14 @@ class MyDonationsState(LoginState):
         self.flash = ""
 
         if not self.auth_token:
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         try:
             async with _new_client() as client:
                 data = await fetch_my_donations(client, self.auth_token, 1)
         except MyDonationsUnauthorizedError:
             _clear_session(self)
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except MyDonationsRateLimitError:
             self.load_error = RATE_LIMIT_MESSAGE
@@ -587,7 +587,7 @@ class MyDonationsState(LoginState):
         except MyDonationsUnauthorizedError:
             _clear_session(self)
             self.page_loading = False
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except MyDonationsRateLimitError:
             self.page_error = RATE_LIMIT_MESSAGE
@@ -712,7 +712,7 @@ class EditDonationState(LoginState):
         self.load_error = ""
 
         if not self.auth_token:
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         try:
             donation_id = _positive_donation_id(path_segment_after(self.router, "minhas-doacoes"))
@@ -726,7 +726,7 @@ class EditDonationState(LoginState):
                 donation = await fetch_my_donation(client, self.auth_token, donation_id)
         except MyDonationsUnauthorizedError:
             _clear_session(self)
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except MyDonationNotFoundError:
             self.view_state = "not_found"
@@ -831,7 +831,7 @@ class EditDonationState(LoginState):
         except MyDonationsUnauthorizedError:
             _clear_session(self)
             self.is_saving = False
-            yield rx.redirect("/login")
+            yield login_redirect(self)
             return
         except MyDonationNotFoundError:
             self.form_error = SAVE_NOT_FOUND_MESSAGE

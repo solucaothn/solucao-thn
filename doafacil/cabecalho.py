@@ -174,7 +174,7 @@ def account_control(touch: bool = False) -> rx.Component:
             color=GREEN,
             border_color=GREEN,
             size="2",
-            on_click=rx.redirect("/login"),
+            on_click=rx.redirect(LoginState.login_href),
             **touch_props,
         ),
     )

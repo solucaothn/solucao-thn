@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
+from doafacil.rotas import current_path, login_url, safe_next, signup_url
 from doafacil.perfil_publico import parse_photo_url
 
 
@@ -492,6 +493,13 @@ def validate_recovery_password(
     return ""
 
 
+def _next_from_query(state: object) -> str:
+    """O `next` seguro da query da página atual, ou "" (change acabamento)."""
+    url = getattr(getattr(state, "router", None), "url", None)
+    parameters = getattr(url, "query_parameters", None) or {}
+    return safe_next(parameters.get("next", ""))
+
+
 class LoginState(rx.State):
     is_loading: bool = False
     error_message: str = ""
@@ -503,6 +511,8 @@ class LoginState(rx.State):
     # pedidos a cada 20 s). O Editar perfil atualiza os dois direto aqui.
     account_photo: str = ""
     _account_token: str = ""
+    # Caminho de origem levado pelo cadastro até o login (change acabamento).
+    _auth_next: str = ""
     password_visible: bool = False
     signup_password_visible: bool = False
     signup_confirmation_visible: bool = False
@@ -577,13 +587,31 @@ class LoginState(rx.State):
         self.signup_notice_pending = False
         self.signup_notice_visible = False
 
+    # Volta à origem depois do login (change acabamento) ------------------
+
+    @rx.var(cache=False)
+    def login_href(self) -> str:
+        """`/login?next=<página atual>` para os “Entrar” e o botão de
+        mensagens; numa tela de autenticação, o /login puro."""
+        return login_url(current_path(getattr(self, "router", None)))
+
+    @rx.var(cache=False)
+    def signup_href(self) -> str:
+        """“Criar conta” no /login: leva o mesmo `next` ao cadastro."""
+        return signup_url(_next_from_query(self))
+
+    @rx.var(cache=False)
+    def login_from_signup_href(self) -> str:
+        """“Entrar” no /cadastro: devolve o `next` ao login."""
+        return login_url(_next_from_query(self))
+
     @rx.event
     def navigate_to_signup_from_login(self) -> rx.event.EventSpec:
         self.password_reset_notice_pending = False
         self.password_reset_notice_visible = False
         self.signup_notice_pending = False
         self.signup_notice_visible = False
-        return rx.redirect("/cadastro")
+        return rx.redirect(signup_url(_next_from_query(self)))
 
     @rx.event
     def set_recovery_email(self, value: str) -> None:
@@ -815,7 +843,9 @@ class LoginState(rx.State):
                 self.auth_token = ""
                 self.account_name = ""
                 self.recovery_is_loading = False
-                yield rx.redirect("/login")
+                next_path = getattr(self, "_auth_next", "")
+                self._auth_next = ""
+                yield rx.redirect(login_url(next_path))
                 return
             self.recovery_is_loading = False
             return
@@ -984,7 +1014,8 @@ class LoginState(rx.State):
         else:
             self.auth_token = result.auth_token
             self.is_loading = False
-            yield rx.redirect("/")
+            # Volta à página de origem (`next` seguro) ou à home.
+            yield rx.redirect(_next_from_query(self) or "/")
             return
 
         self.is_loading = False
@@ -1032,6 +1063,8 @@ class LoginState(rx.State):
             self.signup_email = str(form_data["email"]).strip()
             self._signup_password = str(form_data["password"])
             self.verification_flow = "signup"
+            # O `next` do /cadastro segue até o login (change acabamento).
+            self._auth_next = _next_from_query(self)
             self.recovery_resend_seconds = 30
             self.is_loading = False
             yield rx.redirect("/verificar-email")

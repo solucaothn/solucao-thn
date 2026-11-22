@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 import reflex as rx
 
+from doafacil.rotas import login_redirect
 from doafacil.cadastro_doacao import (
     CATALOG_API_ENV,
     DonationServiceError,
@@ -604,7 +605,7 @@ async def _save_edit(state: Any, text: str) -> rx.event.EventSpec | None:
             message = await edit_message(client, state.auth_token, message_id, text)
     except ChatUnauthorizedError:
         _clear_session(state)
-        return rx.redirect("/login")
+        return login_redirect(state)
     except ChatInvalidMessageError:
         # O tamanho já foi validado antes: o 400 é o prazo encerrado.
         # O texto fica no campo, agora como rascunho de mensagem nova.
@@ -893,7 +894,7 @@ class ChatState(LoginState):
         self.mobile_view = "list"
         _reset_conversation(self)
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
 
         # Query da URL (router.url; o router.page está obsoleto).
         route_value = self.router.url.query_parameters.get("conversa")
@@ -909,7 +910,7 @@ class ChatState(LoginState):
                         await _open_conversation(self, client, conversation_id)
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         finally:
             self.is_loading_list = False
         return None
@@ -917,14 +918,14 @@ class ChatState(LoginState):
     @rx.event
     async def refresh_conversations(self) -> rx.event.EventSpec | None:
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
         self.is_loading_list = True
         try:
             async with _new_client() as client:
                 await _load_list(self, client)
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         finally:
             self.is_loading_list = False
         return None
@@ -934,14 +935,14 @@ class ChatState(LoginState):
         self, conversation_id: int
     ) -> rx.event.EventSpec | None:
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
         was_editing = bool(self.editing_message_id)
         try:
             async with _new_client() as client:
                 await _open_conversation(self, client, int(conversation_id))
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         # A edição em andamento termina ao trocar de conversa.
         if was_editing:
             return rx.set_value(MESSAGE_INPUT_ID, "")
@@ -970,7 +971,7 @@ class ChatState(LoginState):
                 )
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         except ChatRateLimitError as error:
             self.conversation_error = rate_limit_message(error.kind)
             return None
@@ -990,7 +991,7 @@ class ChatState(LoginState):
     @rx.event
     async def load_more_conversations(self) -> rx.event.EventSpec | None:
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
         if not self.conversations_has_more or self.is_loading_list:
             return None
         next_page = self.conversations_page + 1
@@ -1003,7 +1004,7 @@ class ChatState(LoginState):
                 )
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         except ChatRateLimitError as error:
             self.list_error = rate_limit_message(error.kind)
             return None
@@ -1037,7 +1038,7 @@ class ChatState(LoginState):
         ):
             return None
         if not self.auth_token:
-            return rx.redirect("/login")
+            return login_redirect(self)
         self.send_error = ""
         if len(text) > MAX_MESSAGE_LENGTH:
             self.send_error = SEND_INVALID_MESSAGE
@@ -1053,7 +1054,7 @@ class ChatState(LoginState):
                 )
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         except ChatInvalidMessageError:
             self.send_error = SEND_INVALID_MESSAGE
             return None
@@ -1162,7 +1163,7 @@ class ChatState(LoginState):
                     )
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         except ChatRateLimitError:
             # Pausa silenciosa: sem aviso bloqueante.
             self.poll_paused_until = _now() + POLL_PAUSE_SECONDS
@@ -1216,7 +1217,7 @@ class ChatState(LoginState):
                 result = await list_conversations(client, self.auth_token, page=1)
         except ChatUnauthorizedError:
             _clear_session(self)
-            return rx.redirect("/login")
+            return login_redirect(self)
         except ChatRateLimitError:
             # Mesma pausa silenciosa das mensagens.
             self.poll_paused_until = _now() + POLL_PAUSE_SECONDS
@@ -1332,7 +1333,7 @@ def chat_fab() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        href=rx.cond(logged_in, "/chat", "/login"),
+        href=rx.cond(logged_in, "/chat", LoginState.login_href),
         aria_label=rx.cond(logged_in, ChatState.unread_link_label, "Mensagens"),
         title="Mensagens",
         class_name="chat-fab",
@@ -1460,10 +1461,26 @@ def _conversation_list() -> rx.Component:
                 (ChatState.chat_conversations.length() == 0)
                 & ~ChatState.is_loading_list
                 & (ChatState.list_error == ""),
-                rx.text(
-                    EMPTY_LIST_MESSAGE,
-                    color=TEXT_MUTED,
-                    font_size="0.9rem",
+                rx.box(
+                    rx.text(
+                        EMPTY_LIST_MESSAGE,
+                        color=TEXT_MUTED,
+                        font_size="0.9rem",
+                    ),
+                    # Saída da lista vazia (change acabamento).
+                    rx.link(
+                        "Explorar doações",
+                        href="/explorar",
+                        class_name="chat-empty-explore",
+                        color=GREEN_TEXT,
+                        font_weight="700",
+                        font_size="0.9rem",
+                        display="inline-flex",
+                        align_items="center",
+                        min_height="44px",
+                        underline="always",
+                        _focus_visible={"outline": f"2px solid {GREEN_BUTTON}", "outlineOffset": "2px"},
+                    ),
                     padding="16px",
                 ),
                 rx.fragment(),

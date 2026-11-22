@@ -191,6 +191,18 @@ Os PNGs não têm marca d'água. As fotos de Segurança e Quem somos são do Fre
 | todas | “Voltar ao inicio” | “Voltar ao início” | acento |
 | todas | sem rodapé (só Termos e Privacidade têm) | o rodapé da home em todas | navegação consistente |
 
+### Acabamento (change acabamento)
+
+- **Página não encontrada (404):**
+  - cabeçalho comum e fundo creme;
+  - “Página não encontrada” e a frase “O endereço pode ter mudado ou não existe mais.”;
+  - os links de 44 px “Voltar ao início”, verde cheio, e “Explorar doações”, com contorno.
+- **Títulos das abas:** “<Título> | DoaFácil” em todas as páginas, por exemplo “Início”, “Entrar”, “Quero Doar”, “Doação” e “Mensagens”.
+- **Favicon:** o símbolo do logotipo, sem o texto. Fica transparente no `.ico` (16, 32 e 48 px) e no PNG de 32 px, e com fundo branco no ícone de atalho de 180 px.
+- **Doação indisponível:** “Doação não encontrada”, a frase “Ela pode ter sido reservada, concluída ou removida por quem doou.” e os links “Ver outras doações”, verde cheio, e “Voltar ao início”, com contorno. A página não diz qual foi o caso.
+- **Chat sem conversas:** depois de “Você ainda não tem conversas.”, o link “Explorar doações”.
+- **Contêiner:** o perfil de quem doa, o detalhe e o Editar perfil passam para os 1200 px de Minhas doações e da Explorar, antes 1396, 1440 e 1236 px. A grade do detalhe não muda.
+
 ### Navegação no celular e cabeçalho comum (change navegacao-celular)
 
 O Figma não desenha o celular. A spec é a `site-navigation`.
