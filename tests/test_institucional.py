@@ -192,6 +192,14 @@ class HelpCenterTests(unittest.TestCase):
         self.assertTrue(answers["O DoaFácil cobra alguma taxa?"].startswith("Não. O DoaFácil não cobra nada"))
         self.assertTrue(answers["Como publico uma doação?"].startswith("Clique em Quero Doar, preencha as cinco etapas"))
 
+    def test_edit_answer_matches_the_edit_page(self) -> None:
+        # Change correcoes-finais: a edição só oferece “A combinar” na entrega.
+        answers = {q["id"]: q["answer"] for q in ALL_QUESTIONS}
+        answer = answers["editar"]
+        self.assertIn("A entrega é sempre “A combinar”", answer)
+        self.assertNotIn("condição, entrega e", answer)
+        self.assertIn("título, descrição, categoria, condição e forma de contato", answer)
+
     def test_search_ignores_case_and_accents(self) -> None:
         for term in ("TAXA", "taxa", "Táxa"):
             with self.subTest(term=term):

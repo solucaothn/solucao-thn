@@ -115,8 +115,8 @@ HELP_CATEGORIES: list[dict[str, Any]] = [
                 "editar",
                 "Posso editar uma doação já publicada?",
                 "Sim. Em Minhas doações, escolha a doação e use Editar para mudar título, "
-                "descrição, categoria, condição, entrega e forma de contato. Doações concluídas não "
-                "podem mais ser editadas.",
+                "descrição, categoria, condição e forma de contato. A entrega é sempre “A combinar”. "
+                "Doações concluídas não podem mais ser editadas.",
             ),
             _q(
                 "marcar-entregue",

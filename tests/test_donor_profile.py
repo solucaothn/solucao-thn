@@ -180,6 +180,16 @@ def _all_nodes(component: object) -> list[object]:
 
 
 class DonorProfileClientTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache dos dados públicos (change correcoes-finais): validade zero,
+        # para cada chamada destes testes ir ao cliente falso.
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        no_cache = patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)
+        no_cache.start()
+        self.addCleanup(no_cache.stop)
+
     def test_endpoint_uses_xano_base_donation_id_and_page(self) -> None:
         self.assertEqual(
             _donor_profile_endpoint(f"{BASE_URL}/", 17, 2),
@@ -297,6 +307,75 @@ class DonorProfileClientTests(unittest.TestCase):
         )
         self.assertNotIn("private@example.com", repr(profile))
         self.assertNotIn("Silva", repr(profile))
+
+
+class DonorProfileCacheTests(unittest.TestCase):
+    """Change correcoes-finais: o perfil de quem doa no cache público."""
+
+    def setUp(self) -> None:
+        from doafacil import cache_publico
+
+        self.cache = cache_publico
+        cache_publico.clear()
+        self.addCleanup(cache_publico.clear)
+
+    def _counting(self, status: int = 200):
+        calls: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(status, json=_profile() if status == 200 else {})
+
+        return calls, handler
+
+    def test_same_page_within_60_seconds_makes_one_request(self) -> None:
+        calls, handler = self._counting()
+        with patch("doafacil.cache_publico.time.monotonic", return_value=100.0):
+            first = _fetch(handler)
+        with patch("doafacil.cache_publico.time.monotonic", return_value=159.0):
+            second = _fetch(handler)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(first, second)
+        # Outra página ou outra doação é outra chave.
+        with patch("doafacil.cache_publico.time.monotonic", return_value=159.0):
+            _fetch(handler, page=2)
+            _fetch(handler, donation_id=18)
+        self.assertEqual(len(calls), 3)
+        # Depois de 60 s, pede de novo.
+        with patch("doafacil.cache_publico.time.monotonic", return_value=161.0):
+            _fetch(handler)
+        self.assertEqual(len(calls), 4)
+
+    def test_failures_are_not_stored(self) -> None:
+        for status, error in (
+            (404, DonorProfileNotFoundError),
+            (429, DonorProfileRateLimitError),
+            (500, DonorProfileServiceError),
+        ):
+            with self.subTest(status=status):
+                calls, handler = self._counting(status)
+                for _ in range(2):
+                    with self.assertRaises(error):
+                        _fetch(handler)
+                self.assertEqual(len(calls), 2)
+        self.assertEqual(self.cache._entries, {})
+
+    def test_stored_profile_has_no_email(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            donor = {**PROFILE_PAYLOAD["donor"], "email": "private@example.com"}
+            return httpx.Response(200, json=_profile(donor=donor, owner_id=99))
+
+        _fetch(handler)
+        self.assertNotIn("private@example.com", repr(self.cache._entries))
+        self.assertNotIn("owner_id", repr(self.cache._entries))
+
+    def test_invalidate_donations_drops_donor_profiles(self) -> None:
+        self.assertIn(self.cache.DONOR, self.cache.DONATION_NAMESPACES)
+        calls, handler = self._counting()
+        _fetch(handler)
+        self.cache.invalidate_donations()
+        _fetch(handler)
+        self.assertEqual(len(calls), 2)
 
 
 class DonorProfileLabelTests(unittest.TestCase):
@@ -590,6 +669,24 @@ class DonorProfilePageTests(unittest.TestCase):
         self.assertIn("page_error_rx_state_", rendered)
         self.assertIn('role:"alert"', rendered)
 
+    def test_error_state_has_retry_button_and_not_found_does_not(self) -> None:
+        # Change correcoes-finais: “Tentar de novo” só no erro.
+        page = donor_profile_page()
+        _, state_content = page.children
+        rendered = str(state_content)
+        self.assertEqual(rendered.count("donor-profile-retry"), 1)
+        self.assertIn("Tentar de novo", rendered)
+        self.assertIn('["minHeight"] : "44px"', rendered)
+        self.assertIn("retry_profile", rendered)
+        error_at = rendered.index("error_message_rx_state_")
+        self.assertGreater(rendered.index("donor-profile-retry"), error_at)
+
+    def test_retry_shows_loading_and_reloads(self) -> None:
+        state = SimpleNamespace(view_state="error", error_message="falhou")
+        result = DonorProfileState.retry_profile.fn(state)
+        self.assertEqual((state.view_state, state.error_message), ("loading", ""))
+        self.assertIs(result, DonorProfileState.load_profile)
+
     def test_empty_state_has_message_first_name_and_explore_link(self) -> None:
         empty = _empty_state()
         rendered = str(empty)
@@ -599,7 +696,9 @@ class DonorProfilePageTests(unittest.TestCase):
         self.assertIn(" publicar uma nova doação, ela aparece aqui.", contents)
         self.assertIn(EXPLORE_LINK_LABEL, contents)
         self.assertIn("first_name_rx_state_", rendered)
-        self.assertIn('to:"/"', rendered)
+        # Change correcoes-finais: o link leva à Explorar, não mais à home.
+        self.assertIn('to:"/explorar"', rendered)
+        self.assertNotIn('to:"/"', rendered)
         self.assertIn('"#007A42"', rendered)
         # Sem contador nem paginação no estado vazio.
         self.assertNotIn("count_label_rx_state_", rendered)

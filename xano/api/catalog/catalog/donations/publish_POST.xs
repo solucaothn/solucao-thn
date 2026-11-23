@@ -4,18 +4,18 @@ query "catalog/donations/publish" verb=POST {
 
   input {
     int category_id
-    text title filters=trim|min:1
-    text description? filters=trim
+    text title filters=trim|min:1|max:100
+    text description? filters=trim|max:2000
     enum condition {
       values = ["Ótimo", "Bom", "Regular"]
     }
-  
+
     enum delivery_method {
-      values = ["Retirada", "Entrega", "A combinar"]
+      values = ["A combinar"]
     }
-  
+
     enum contact_preference {
-      values = ["WhatsApp", "E-mail", "Chat do DoaFácil"]
+      values = ["E-mail", "Chat do DoaFácil"]
     }
   
     file[]? photos?
@@ -26,7 +26,7 @@ query "catalog/donations/publish" verb=POST {
       error_type = "inputerror"
       error = "Adicione pelo menos uma foto para continuar."
     }
-
+  
     precondition ($input.photos == null || ($input.photos|count) <= 5) {
       error_type = "inputerror"
       error = "Selecione no máximo cinco fotos."

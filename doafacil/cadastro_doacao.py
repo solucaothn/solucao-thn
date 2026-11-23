@@ -51,7 +51,6 @@ IMAGE_ACCEPT = {
 CONDITIONS = ("Ótimo", "Bom", "Regular")
 DELIVERY_METHODS = ("A combinar",)
 CONTACT_PREFERENCES = ("E-mail", "Chat do DoaFácil")
-EXCLUDED_CATEGORY_NAMES = frozenset({"alimentos", "móveis"})
 MISSING_PHOTOS_MESSAGE = "Adicione pelo menos uma foto para continuar."
 
 
@@ -106,11 +105,14 @@ def _api_endpoint(environment_key: str, path: str) -> str:
 
 
 def _parse_categories(payload: object) -> list[dict[str, Any]]:
+    """Todas as categorias válidas do Xano, sem exclusão por nome (change
+    correcoes-finais: “Móveis” liberada, “Alimentos” apagada do Xano). Itens
+    sem id inteiro ou sem nome são ignorados; uma resposta só com itens
+    inválidos é falha."""
     if not isinstance(payload, list):
         raise DonationServiceError
 
     categories: list[dict[str, Any]] = []
-    has_valid_category = False
     for item in payload:
         if not isinstance(item, dict):
             continue
@@ -123,13 +125,9 @@ def _parse_categories(payload: object) -> list[dict[str, Any]]:
             or not name.strip()
         ):
             continue
-        has_valid_category = True
-        normalized_name = name.strip()
-        if normalized_name.casefold() in EXCLUDED_CATEGORY_NAMES:
-            continue
-        categories.append({"id": category_id, "name": normalized_name})
+        categories.append({"id": category_id, "name": name.strip()})
 
-    if payload and not has_valid_category:
+    if payload and not categories:
         raise DonationServiceError
     return categories
 

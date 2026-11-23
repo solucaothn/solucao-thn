@@ -8,6 +8,8 @@ importar doafacil.py, o que criaria um import circular.
 
 from __future__ import annotations
 
+from typing import Any
+
 import reflex as rx
 
 from doafacil.login import LoginState
@@ -196,6 +198,32 @@ def donate_link() -> rx.Component:
         min_height="44px",
         _hover={"background": "#126f3b"},
         _focus_visible=FOCUS_RING,
+    )
+
+
+# Verde do “Tentar de novo”: 6,1:1 sobre o creme e sobre o branco (AA); o
+# #168447 dá só 4,4:1 sobre o creme.
+RETRY_GREEN = "#166B3B"
+RETRY_LABEL = "Tentar de novo"
+
+
+def retry_button(on_click: Any, class_name: str) -> rx.Component:
+    """“Tentar de novo” das falhas de carregamento (change correcoes-finais):
+    contorno verde, ícone, 44 px de área de toque e foco visível, como os
+    botões que já existiam na Explorar e em Categorias."""
+    return rx.button(
+        rx.icon("rotate-cw", size=16, aria_hidden="true"),
+        RETRY_LABEL,
+        on_click=on_click,
+        class_name=class_name,
+        type="button",
+        variant="outline",
+        color=RETRY_GREEN,
+        border_color=RETRY_GREEN,
+        background="white",
+        min_height="44px",
+        cursor="pointer",
+        _focus_visible={"outline": f"2px solid {RETRY_GREEN}", "outlineOffset": "2px"},
     )
 
 

@@ -8,6 +8,33 @@ from types import SimpleNamespace
 from doafacil.cabecalho import HeaderState, account_menu
 
 
+class RetryButtonTests(unittest.TestCase):
+    def test_retry_button_text_touch_area_and_contrast(self) -> None:
+        # Change correcoes-finais: o “Tentar de novo” compartilhado.
+        from doafacil.cabecalho import RETRY_GREEN, retry_button
+
+        import reflex as rx
+
+        rendered = str(retry_button(rx.redirect("/"), "teste-retry"))
+        self.assertIn("Tentar de novo", rendered)
+        self.assertIn('className:"teste-retry"', rendered)
+        self.assertIn('["minHeight"] : "44px"', rendered)
+        self.assertIn('type:"button"', rendered)
+        self.assertIn("LucideRotateCw", rendered)
+        self.assertEqual(RETRY_GREEN, "#166B3B")
+        self.assertIn('"#166B3B"', rendered)
+
+        def luminance(color: str) -> float:
+            channels = [int(color.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+            linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+            return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+        for background in ("#FFFFFF", "#FFF6E8"):
+            high, low = sorted((luminance(background), luminance(RETRY_GREEN)), reverse=True)
+            with self.subTest(background=background):
+                self.assertGreaterEqual((high + 0.05) / (low + 0.05), 4.5)
+
+
 class AccountInitialTests(unittest.TestCase):
     def _initial(self, name: object) -> str:
         return HeaderState.computed_vars["account_initial"].fget(SimpleNamespace(account_name=name))

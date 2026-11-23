@@ -112,7 +112,8 @@ class FilterTests(unittest.TestCase):
             ("ROUPAS", "shirt"),
             (" Livros ", "book-open"),
             ("Brinquedos", "bike"),
-            ("Móveis", "house"),
+            ("Móveis", "sofa"),
+            ("moveis", "sofa"),
             ("Ferramentas", "tag"),
             (None, "tag"),
         ):
@@ -338,6 +339,27 @@ class ExplorePageTests(unittest.TestCase):
         self.assertIn('to:"/explorar"', r)
         self.assertIn("Tentar de novo", r)
         self.assertGreaterEqual(r.count('role:"status"'), 3)
+
+    def test_empty_without_filters_invites_to_donate(self) -> None:
+        # Change correcoes-finais: sem filtros e sem resultados, o convite e o
+        # “Quero Doar”; com filtros, o “Limpar filtros” no lugar dele.
+        from doafacil.explorar import DONATE_LABEL, EMPTY_INVITE_TEXT, _donate_invite, _results
+
+        invite = str(_donate_invite())
+        self.assertEqual(DONATE_LABEL, "Quero Doar")
+        self.assertIn("Que tal ser a primeira pessoa a doar?", EMPTY_INVITE_TEXT)
+        self.assertIn('className:"explore-donate"', invite)
+        # Com sessão, o cadastro; sem sessão, o login com next de volta a ele.
+        self.assertIn("login_state.auth_token", invite)
+        self.assertIn('"/cadastro-doacao"', invite)
+        self.assertIn('"/login?next=/cadastro-doacao"', invite)
+        self.assertIn('["minHeight"] : "44px"', invite)
+        self.assertIn('"#166B3B"', invite)
+
+        results = str(_results())
+        cond_start = results.index("explore_state.has_filters")
+        after = results[cond_start:]
+        self.assertLess(after.index("explore-clear-filters"), after.index("explore-donate"))
 
     def test_animation_chat_and_layout(self) -> None:
         r = self.rendered

@@ -88,7 +88,7 @@ python -m unittest discover -s tests -v
 - Detalhe da doação.
 - Perfil: editar as fotos das doações, compartilhar o perfil e avaliações ficam para outras changes. Trocar e-mail ou senha pela tela de perfil também.
 - **Pendência (Xano): apagar os arquivos das fotos ao apagar uma doação.** O `DELETE /catalog/donations` remove as linhas de `donation_photo`, mas não chama `storage.delete_file` (a remoção da foto de perfil chama). Os arquivos de imagem continuam no armazenamento do Xano, e a Política de privacidade (seção 6) avisa isso. Corrigir numa change própria, combinada com o grupo; ao corrigir, atualizar também o texto da Privacidade e a resposta “Posso cancelar uma doação?” da Central de ajuda (`doafacil/institucional.py`).
-- **Pendência (Xano): recusar “Alimentos” no backend.** O domínio não aceita doação de alimentos, mas só o front aplica a regra: o formulário esconde a categoria (`EXCLUDED_CATEGORY_NAMES` em `doafacil/cadastro_doacao.py`). O `POST /catalog/donations/publish` e o `PATCH /catalog/donations` aceitam qualquer categoria que exista, inclusive “Alimentos”, numa chamada direta. Como a validação deve ficar no Xano, corrigir numa change própria (decidir com o grupo se “Móveis”, também escondida no formulário, entra na mesma regra).
+- **Categorias (change correcoes-finais).** A categoria “Alimentos” foi apagada do Xano, e o site não exclui mais categorias por nome: mostra todas as que o `GET /catalog/categories` devolve, inclusive “Móveis”. O backend aceita qualquer categoria que exista; para tirar uma categoria do site, apague-a no Xano (sem doações ligadas a ela), não crie uma exclusão no front. Como as categorias ficam guardadas por 1 h no servidor do Reflex, a mudança aparece em até 1 h ou ao reiniciar o servidor.
 - Interesse, avaliações e administração (sem tabelas ainda).
 - **Pedidos sobre dados pessoais (responsabilidade do grupo):**
   - o e-mail de contato do projeto é `solucaothn@gmail.com` (`CONTACT_EMAIL` em `doafacil/rodape.py`, change endpoints-antigos);
@@ -226,13 +226,13 @@ As referências visuais são `docs/design/17-explorar.png`, `18-categorias-01.pn
   - a categoria aplicada vira um chip removível;
   - a grade usa o `donation_grid_card` (`minmax(min(100%, 220px), 1fr)`; uma coluna em 360 px);
   - “Carregar mais” traz mais 12 sem repetir cartões;
-  - sem resultados, mostra “Nenhuma doação encontrada”, com “Limpar filtros”. Numa falha, mostra a mensagem e “Tentar de novo”;
+  - sem resultados, mostra “Nenhuma doação encontrada”. Com filtros, vem com “Limpar filtros”; sem filtros (o site ainda sem doações), com o convite para doar e o botão “Quero Doar”, que leva a `/cadastro-doacao` ou, sem sessão, a `/login?next=/cadastro-doacao` (change correcoes-finais). Numa falha, mostra a mensagem e “Tentar de novo”;
   - tem o botão flutuante do chat e o link “Ver categorias”.
 - **Categorias** (`doafacil/categorias.py`):
   - o item “Categorias” do menu da home abre uma gaveta à esquerda. É um `rx.dialog`: prende o foco, fecha com X, Esc ou clique fora;
   - a rota `/categorias` mostra a mesma lista, com o cabeçalho da Explorar;
-  - cada categoria leva a `/explorar?categoria=<id>`. Os ícones saem do `CATEGORY_ICONS` (pelo nome sem acento; outro nome usa `tag`);
-  - as categorias excluídas do cadastro (Alimentos e Móveis) também ficam fora daqui.
+  - cada categoria leva a `/explorar?categoria=<id>`. Os ícones saem do `CATEGORY_ICONS` (pelo nome sem acento; “Móveis” usa `sofa`; outro nome usa `tag`);
+  - a lista mostra todas as categorias do Xano, sem exclusão por nome (change correcoes-finais).
 - **Cabeçalho compartilhado:** `doafacil/cabecalho.py` tem o menu da conta e os controles “Entrar”/“Quero Doar” (`header_auth_controls`), usados pela home, pela `/explorar` e pela `/categorias`. Abaixo de 992 px, eles dão lugar à barra do celular (veja “Navegação e menu do celular”).
 - **Testes:** `tests/test_explore.py` e `tests/test_categories.py`.
 
@@ -313,11 +313,14 @@ Spec `site-navigation`. O módulo é `doafacil/navegacao.py`.
   - Ele é usado pela home (busca e gaveta), pela `/categorias`, pela Explorar, pelo cadastro de doação e pela edição de doação. O `fetch_categories` da Explorar só acrescenta os ícones.
   - Uma falha não fica guardada. A lista de categorias mostra “Tentar de novo”, que busca outra vez.
   - Nos testes que usam a busca real com cliente falso, chame `clear_category_cache()` no `setUp`.
+- **“Tentar de novo” (change correcoes-finais):** o `retry_button` de `cabecalho.py` (contorno `#166B3B`, 44 px) aparece nas falhas da home (contagem e recentes), de Minhas doações e do perfil de quem doa.
+  - Cada página tem um evento `retry_*` que mostra o carregando na hora e encadeia o carregamento original (`HomeState.retry_home_data`, `MyDonationsState.retry_load`, `DonorProfileState.retry_profile`).
+  - Os botões antigos da Explorar, das Categorias, do detalhe e do chat continuam como estavam.
 - **Cabeçalho centralizado:** ocupa a largura toda da tela, com `CENTERED_HEADER_PADDING` (12 × 16 px abaixo de 992 px e 12 × 32 px a partir daí) e o logotipo de 72 px da home. A home, a `/explorar` e a `/categorias` continuam no contêiner de 1200 px.
   - O `/chat` é uma coluna de `100dvh` em que a área de mensagens ocupa o que sobra abaixo do cabeçalho. Não use alturas fixas como `calc(100vh - 64px)`.
 - **Limite do Xano (10 pedidos a cada 20 s no plano grátis):**
-  - **Dados públicos guardados no servidor:** `doafacil/cache_publico.py` guarda a contagem, as recentes, a busca e o detalhe por 60 s, iguais para todos.
-    - Publicar, editar, mudar status ou apagar limpa o cache (`invalidate_donations()` nas funções de escrita).
+  - **Dados públicos guardados no servidor:** `doafacil/cache_publico.py` guarda a contagem, as recentes, a busca, o detalhe e o perfil de quem doa (por doação e página; change correcoes-finais) por 60 s, iguais para todos.
+    - Publicar, editar, mudar status ou apagar uma doação limpa o cache (`invalidate_donations()` nas funções de escrita). Salvar o perfil, trocar ou remover a foto de perfil também limpa (`editar_perfil.py`), porque nome, Sobre e foto aparecem no detalhe e no perfil de quem doa.
     - Só guarde ali dados públicos.
     - Nos testes que usam essas buscas com cliente falso, zere a validade no `setUp` (`patch("doafacil.cache_publico.PUBLIC_CACHE_SECONDS", 0.0)`).
   - **Total de não lidas:** consultado no máximo a cada 60 s por pessoa (`UNREAD_REFRESH_SECONDS`). O `/chat` atualiza o total na hora.
@@ -404,6 +407,11 @@ O corpo do erro contém os campos `code` (`ERROR_CODE_INPUT_ERROR`), `message` e
 O campo `donation_photo.photo` é obrigatório. A auditoria confirmou que não havia linhas dessa tabela sem foto antes da alteração. Na change esquema-xano (2026-11-14), o painel mostrou o campo com **Required** marcado e 0 linhas com a foto vazia. A exportação do CLI mostra `image? photo` mesmo assim (veja a seção 10.1). Doações antigas com `donation.photo` vazio não foram alteradas.
 
 O endpoint `publish` foi criado por outro integrante e pode ter outros consumidores. Antes do push real de mudanças nele, avise o grupo, obtenha o OK explícito do grupo e a confirmação necessária para publicar. Revise o dry-run e interrompa a publicação se ele mostrar alterações fora do escopo aprovado.
+
+**Limites do `publish` (change correcoes-finais):** os mesmos da edição (`donations_PATCH`). O título vai até 100 caracteres e a descrição, que continua opcional ali, até 2000. A entrega só aceita “A combinar”, e a preferência de contato, “E-mail” ou “Chat do DoaFácil”. Qualquer outro valor dá HTTP 400, sem criar doação.
+
+- **Dry-run, só desse arquivo:** `xano workspace push -d ./xano -i "api/catalog/catalog/donations/publish_POST.xs" --dry-run`. Deve aparecer 1 item, o UPDATE da query `catalog/donations/publish` (POST, grupo Catalog).
+- **Conferir depois do push:** `python scripts/teste_publicar_limites_real.py`, com `XANO_API_URL` e `XANO_AUTH_API_URL` definidas. O script pede o login de uma conta com cidade e estado no perfil. Ele envia, **sem fotos**, um título de 101 caracteres (P1, que deve dar 400 pelo título) e um de 100 (P2, que deve passar do título e parar na regra das fotos). Sem fotos, nenhuma das duas requisições cria doação, nem se o push ainda não tiver sido feito. Nesse caso, o P1 falha e avisa.
 
 ### Fotos no cadastro de doação (change fotos-formulario-doacao)
 
@@ -548,11 +556,13 @@ Como se entra no chat:
 
 Atualização automática:
 
-- **Mensagens:** só com uma conversa aberta e a aba visível, a cada 15 segundos. Pede só as mensagens novas (`after_message_id`).
-- **Lista de conversas:** com a aba visível, a cada 30 segundos, com ou sem conversa aberta. Pede a página 1, que traz contadores, ordem e conversas novas. Os itens dela entram no topo, e as conversas já carregadas com “Carregar mais conversas” continuam abaixo, sem repetir. O botão “Atualizar conversas” continua funcionando.
-- **Quando não roda:** com a aba oculta ou fora de `/chat` não há consultas automáticas. A das mensagens também para sem conversa aberta.
-- **Depois de um 429:** qualquer 429 numa consulta automática, das mensagens ou da lista, pausa **as duas** por 60 segundos, sem mostrar erro.
-- **Carga no Xano:** com uma conversa aberta, cerca de 6 requisições por minuto por aba (4 das mensagens e 2 da lista); sem conversa aberta, cerca de 2. Não diminua esses intervalos, por causa do limite da plataforma acima.
+- **Mensagens:** só com uma conversa à mostra e a aba visível, a cada 25 segundos (`POLL_INTERVAL_MS`; eram 15 até a change correcoes-finais). Pede só as mensagens novas (`after_message_id`).
+- **Lista de conversas:** com a aba visível e **sem** conversa à mostra, a cada 30 segundos. Pede a página 1, que traz contadores, ordem e conversas novas. Os itens dela entram no topo, e as conversas já carregadas com “Carregar mais conversas” continuam abaixo, sem repetir.
+  - Com uma conversa à mostra, a lista não se atualiza sozinha. Ela se atualiza pelo botão “Atualizar conversas” ou, no celular, ao voltar à lista (`back_to_list` consulta a página 1 uma vez).
+  - “Conversa à mostra” (`_conversation_on_screen`) é `active_conversation_id > 0` com `mobile_view == "conversation"`. No celular, com a lista à mostra, a conversa conta como fechada: as mensagens param e a lista volta a atualizar.
+- **Quando não roda:** com a aba oculta ou fora de `/chat` não há consultas automáticas.
+- **Depois de um 429:** qualquer 429 numa consulta automática, das mensagens ou da lista, pausa **as duas** por 60 segundos, sem mostrar erro. O 429 do “voltar à lista” também pausa, sem erro.
+- **Carga no Xano:** só uma das duas atualizações roda por vez. Com uma conversa à mostra, cerca de 2,4 requisições por minuto por aba (uma a cada 25 s); com a lista à mostra, 2 (uma a cada 30 s). Antes eram 6 com uma conversa aberta. Não diminua esses intervalos, por causa do limite da plataforma acima.
 
 Contador de não lidas:
 
@@ -577,7 +587,7 @@ Em todos os casos o texto digitado continua no campo. Numa doação concluída, 
 
 - **Onde fica:** na linha do horário, embaixo da bolha, nas mensagens de quem está logado. ✓ cinza `#6b6b6b` quando a outra pessoa ainda não leu (“Enviada”) e ✓✓ verde `#007A42` quando ela já leu (“Lida”). Nas mensagens da outra pessoa não aparece nada.
 - **De onde vem:** do `other_last_read_message_id` de cada resposta do `GET messages`. Uma mensagem própria com `id` menor ou igual a ele foi lida. O valor guardado em `other_last_read_id` só aumenta, para não piscar com duas abas, e volta a zero ao trocar de conversa.
-- **Atualização:** junto com a atualização automática da conversa (15 s). Não há requisição a mais.
+- **Atualização:** junto com a atualização automática da conversa (25 s). Não há requisição a mais.
 
 Edição de mensagem:
 

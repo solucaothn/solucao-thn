@@ -69,38 +69,37 @@ class DonationCreationTests(unittest.TestCase):
         clear_category_cache()
 
     def test_category_payload_requires_valid_category_ids_and_names(self) -> None:
+        # Change correcoes-finais: sem exclusão por nome; “Móveis” é uma
+        # categoria como as outras.
         payload = [
             {"id": 3, "name": "Móveis"},
-            {"id": 4, "name": "Livros"},
-            {"id": 5, "name": "Alimentos"},
-            {"id": 6, "name": "Brinquedos"},
+            {"id": 4, "name": " Livros "},
+            {"id": "5", "name": "Ferramentas"},
+            {"id": 6, "name": ""},
+            {"id": True, "name": "Roupas"},
+            {"name": "Sem id"},
+            "lixo",
+            {"id": 7, "name": "Brinquedos"},
         ]
-        original_payload = [item.copy() for item in payload]
+        original_payload = [item.copy() if isinstance(item, dict) else item for item in payload]
         self.assertEqual(
             _parse_categories(payload),
             [
+                {"id": 3, "name": "Móveis"},
                 {"id": 4, "name": "Livros"},
-                {"id": 6, "name": "Brinquedos"},
+                {"id": 7, "name": "Brinquedos"},
             ],
         )
         self.assertEqual(payload, original_payload)
         self.assertEqual(_parse_categories([]), [])
-        self.assertEqual(
-            _parse_categories(
-                [
-                    {"id": 7, "name": "Alimentos"},
-                    {"id": 8, "name": "Móveis"},
-                ]
-            ),
-            [],
-        )
         with self.assertRaises(DonationServiceError):
             _parse_categories([{"id": "3", "name": "Móveis"}])
+        with self.assertRaises(DonationServiceError):
+            _parse_categories({"id": 3, "name": "Móveis"})
 
-    def test_hidden_categories_are_not_valid_options(self) -> None:
+    def test_furniture_is_a_valid_option(self) -> None:
         categories = _parse_categories(
             [
-                {"id": 3, "name": "Alimentos"},
                 {"id": 4, "name": "Móveis"},
                 {"id": 5, "name": "Livros"},
             ]
@@ -112,6 +111,20 @@ class DonationCreationTests(unittest.TestCase):
         )
 
         DonationCreateState.set_category.fn(state, "Móveis")
+        self.assertEqual(state.category_id, "4")
+        self.assertEqual(state.category_name, "Móveis")
+
+    def test_missing_category_is_not_a_valid_option(self) -> None:
+        # Uma categoria apagada do Xano (como “Alimentos”) não vem na lista e
+        # não pode ser escolhida.
+        categories = _parse_categories([{"id": 5, "name": "Livros"}])
+        state = SimpleNamespace(
+            categories=categories,
+            category_id="",
+            category_name="",
+        )
+
+        DonationCreateState.set_category.fn(state, "Alimentos")
         self.assertEqual(state.category_id, "")
         self.assertEqual(state.category_name, "")
         self.assertEqual(
@@ -346,9 +359,14 @@ class DonationCreationTests(unittest.TestCase):
                     "https://xano.example/api:catalog/catalog/categories",
                 )
 
+        # Sem exclusão por nome: o que o Xano devolver aparece.
         self.assertEqual(
             asyncio.run(fetch()),
-            [{"id": 3, "name": "Livros"}],
+            [
+                {"id": 1, "name": "Alimentos"},
+                {"id": 2, "name": "Móveis"},
+                {"id": 3, "name": "Livros"},
+            ],
         )
         self.assertEqual(
             payload,

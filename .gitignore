@@ -8,3 +8,7 @@ __pycache__/
 .venv/
 reflex.lock/
 .aider-desk/
+
+# Segredos e configurações locais (change correcoes-finais)
+.env
+.claude/settings.local.json

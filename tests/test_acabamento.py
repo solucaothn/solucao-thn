@@ -130,7 +130,7 @@ class LoginNextFlowTests(unittest.TestCase):
         )
 
     def test_login_ignores_unsafe_next(self) -> None:
-        for bad in ("https://evil.example", "//evil.example", "/\evil.example", "/login"):
+        for bad in ("https://evil.example", "//evil.example", "/\\evil.example", "/login"):
             with self.subTest(next=bad):
                 self.assertEqual(self._login(_query_router("/login", next=bad)), ["redirect:/"])
         self.assertEqual(self._login(_query_router("/login")), ["redirect:/"])
@@ -236,7 +236,8 @@ class FaviconTests(unittest.TestCase):
         with Image.open(ASSETS / "favicon-32.png") as png:
             self.assertEqual((png.format, png.size), ("PNG", (32, 32)))
             alpha = png.convert("RGBA").getchannel("A")
-            transparent = sum(1 for value in alpha.getdata() if value < 16)
+            # tobytes(): um byte por pixel no canal "L" (o getdata sai no Pillow 14).
+            transparent = sum(1 for value in alpha.tobytes() if value < 16)
             self.assertLess(transparent / (32 * 32), 0.6)  # o símbolo ocupa o ícone
         with Image.open(ASSETS / "apple-touch-icon.png") as touch:
             self.assertEqual((touch.format, touch.size), ("PNG", (180, 180)))

@@ -405,6 +405,34 @@ class PublicHomeTests(unittest.TestCase):
         self.assertEqual(state.completed_error, COMPLETED_ERROR_MESSAGE)
         self.assertEqual((state.donation_count, state.completed_count), (0, 0))
 
+    def test_retry_shows_loading_and_reloads(self) -> None:
+        # Change correcoes-finais: “Tentar de novo” da contagem e das recentes.
+        from types import SimpleNamespace
+
+        from doafacil.doafacil import HomeState
+
+        state = SimpleNamespace(count_loading=False, donations_loading=False)
+        result = HomeState.retry_home_data.fn(state)
+        self.assertEqual((state.count_loading, state.donations_loading), (True, True))
+        self.assertIs(result, HomeState.load_home_data)
+
+    def test_count_and_recent_errors_have_retry_buttons(self) -> None:
+        from doafacil.doafacil import donation_count_view, recent_donations_view
+
+        count = str(donation_count_view())
+        recent = str(recent_donations_view())
+        # Um botão só nas estatísticas (as duas vêm do mesmo pedido) e um nas
+        # recentes, cada um depois da sua mensagem de erro.
+        self.assertEqual(count.count("home-count-retry"), 1)
+        self.assertGreater(count.index("home-count-retry"), count.index("count_error_rx_state_"))
+        self.assertEqual(recent.count("home-recent-retry"), 1)
+        self.assertGreater(recent.index("home-recent-retry"), recent.index("donations_error_rx_state_"))
+        for rendered in (count, recent):
+            self.assertIn("retry_home_data", rendered)
+            self.assertIn('["minHeight"] : "44px"', rendered)
+        # A lista vazia fica num ramo próprio, depois do ramo de erro, sem botão.
+        self.assertGreater(recent.index("Ainda n\\u00e3o h\\u00e1 doa\\u00e7\\u00f5es recentes."), recent.index("home-recent-retry"))
+
     def test_endpoint_failures_are_independent(self) -> None:
         async def respond(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/count"):
@@ -1167,6 +1195,10 @@ class PublicHomeTests(unittest.TestCase):
                 continue
             if getattr(node, "class_name", None) == "category-retry":
                 self.assertIn("reload_categories", str(node.event_triggers.get("on_click")))
+                continue
+            # “Tentar de novo” da contagem e das recentes (change correcoes-finais).
+            if getattr(node, "class_name", None) in {"home-count-retry", "home-recent-retry"}:
+                self.assertIn("retry_home_data", str(node.event_triggers.get("on_click")))
                 continue
             # Pausa dos vídeos com movimento reduzido (change videos-home).
             if getattr(node, "id", None) == "como-funciona":

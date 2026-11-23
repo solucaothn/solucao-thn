@@ -18,7 +18,8 @@ from urllib.parse import urlsplit
 import httpx
 import reflex as rx
 
-from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
+from doafacil import cache_publico
+from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X, retry_button
 from doafacil.rotas import path_segment_after
 from doafacil.cartoes_doacao import _parse_donations, donation_grid_card
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial
@@ -44,9 +45,8 @@ DONOR_PROFILE_PATH = "/catalog/donations/donor"
 PROFILE_PER_PAGE = 12
 BACK_TO_DONATION_LABEL = "Voltar à doação"
 PROFILE_LOADING_MESSAGE = "Carregando perfil..."
-PROFILE_ERROR_MESSAGE = (
-    "Não foi possível carregar o perfil de quem doa. Tente novamente mais tarde."
-)
+# A página oferece “Tentar de novo” junto (change correcoes-finais).
+PROFILE_ERROR_MESSAGE = "Não foi possível carregar o perfil de quem doa."
 PROFILE_PAGE_ERROR_MESSAGE = (
     "Não foi possível carregar esta página de doações. Tente novamente."
 )
@@ -54,6 +54,8 @@ PROFILE_RATE_LIMIT_MESSAGE = PLATFORM_RATE_LIMIT_MESSAGE
 DONATIONS_TITLE = "Doações disponíveis"
 EMPTY_TITLE = "Nenhuma doação disponível no momento"
 EXPLORE_LINK_LABEL = "Explorar outras doações"
+# Destino do link do estado vazio (change correcoes-finais: era a home).
+EXPLORE_LINK_HREF = "/explorar"
 MONTHS_PT_BR = (
     "janeiro",
     "fevereiro",
@@ -183,18 +185,25 @@ async def fetch_donor_profile(
     page: int = 1,
 ) -> dict[str, Any]:
     endpoint = _donor_profile_endpoint(base_url, donation_id, page)
-    response = await client.get(endpoint)
-    if response.status_code == 404:
-        raise DonorProfileNotFoundError
-    if response.status_code == 429:
-        raise DonorProfileRateLimitError
-    if response.status_code != 200:
-        raise DonorProfileServiceError
-    try:
-        payload = response.json()
-    except ValueError as error:
-        raise ValueError("A resposta do perfil não é JSON.") from error
-    return _parse_donor_profile(payload)
+
+    async def load() -> dict[str, Any]:
+        response = await client.get(endpoint)
+        if response.status_code == 404:
+            raise DonorProfileNotFoundError
+        if response.status_code == 429:
+            raise DonorProfileRateLimitError
+        if response.status_code != 200:
+            raise DonorProfileServiceError
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise ValueError("A resposta do perfil não é JSON.") from error
+        return _parse_donor_profile(payload)
+
+    # Perfil público (já sem e-mail), guardado por 60 s para todos, por
+    # doação e página (change correcoes-finais). Uma falha é exceção e não
+    # fica guardada.
+    return await cache_publico.cached(cache_publico.DONOR, endpoint, load)
 
 
 class DonorProfileState(rx.State):
@@ -289,6 +298,14 @@ class DonorProfileState(rx.State):
             self.view_state = "ready"
 
     @rx.event
+    def retry_profile(self):
+        """“Tentar de novo” do erro (change correcoes-finais): mostra o
+        carregando na hora e busca o perfil outra vez."""
+        self.view_state = "loading"
+        self.error_message = ""
+        return DonorProfileState.load_profile
+
+    @rx.event
     async def go_to_page(self, page: int):
         """Uma requisição só para a página pedida.
 
@@ -346,10 +363,15 @@ CONTENT_MAX_WIDTH = HEADER_MAX_WIDTH
 CARDS_GRID_COLUMNS = "repeat(auto-fill, minmax(220px, 1fr))"
 
 
-def _state_message(message: rx.Var | str, color: str) -> rx.Component:
+def _state_message(message: rx.Var | str, color: str, *children: rx.Component) -> rx.Component:
+    """Mensagem de estado centralizada; `children` vêm abaixo dela (o
+    “Tentar de novo” do erro)."""
     return rx.box(
         rx.text(message, color=color, text_align="center"),
+        *children,
         display="flex",
+        flex_direction="column",
+        gap="16px",
         align_items="center",
         justify_content="center",
         width="100%",
@@ -561,7 +583,7 @@ def _empty_state() -> rx.Component:
         ),
         rx.link(
             EXPLORE_LINK_LABEL,
-            href="/",
+            href=EXPLORE_LINK_HREF,
             color=LINK_GREEN,
             font_weight="700",
             display="inline-flex",
@@ -619,7 +641,11 @@ def donor_profile_page() -> rx.Component:
                 _state_message(DONATION_NOT_FOUND_MESSAGE, TEXT_MUTED),
                 rx.cond(
                     DonorProfileState.view_state == "error",
-                    _state_message(DonorProfileState.error_message, TEXT_ERROR),
+                    _state_message(
+                        DonorProfileState.error_message,
+                        TEXT_ERROR,
+                        retry_button(DonorProfileState.retry_profile, "donor-profile-retry"),
+                    ),
                     _profile_content(),
                 ),
             ),

@@ -28,14 +28,16 @@ class FetchCategoriesTests(unittest.TestCase):
 
         clear_category_cache()
 
-    def test_adds_icon_and_applies_creation_exclusions(self) -> None:
+    def test_adds_icon_without_name_exclusions(self) -> None:
+        # Change correcoes-finais: “Móveis” aparece, com o ícone de sofá; um
+        # item inválido é ignorado sem quebrar a lista.
         def respond(request: httpx.Request) -> httpx.Response:
             return httpx.Response(
                 200,
                 json=[
                     {"id": 1, "name": "Eletrônicos"},
                     {"id": 2, "name": "Móveis"},
-                    {"id": 3, "name": "Alimentos"},
+                    {"id": None, "name": "Alimentos"},
                     {"id": 4, "name": "Ferramentas"},
                 ],
             )
@@ -50,6 +52,7 @@ class FetchCategoriesTests(unittest.TestCase):
             categories,
             [
                 {"id": "1", "name": "Eletrônicos", "icon": "smartphone"},
+                {"id": "2", "name": "Móveis", "icon": "sofa"},
                 {"id": "4", "name": "Ferramentas", "icon": "tag"},
             ],
         )

@@ -47,6 +47,7 @@ from doafacil.cabecalho import (
     HEADER_PADDING_X,
     account_menu,  # noqa: F401 (reexportado para os testes)
     header_auth_controls,  # noqa: F401 (reexportado para os testes)
+    retry_button,
 )
 from doafacil.navegacao import responsive_header_controls
 from doafacil import xano_http
@@ -220,6 +221,15 @@ class HomeState(rx.State):
             self.categories = await _load_categories_result(client)
 
     @rx.event
+    def retry_home_data(self):
+        """“Tentar de novo” da contagem e das recentes (change
+        correcoes-finais): mostra o carregando na hora e busca outra vez. As
+        categorias vêm do cache; o que deu certo há menos de 60 s também."""
+        self.count_loading = True
+        self.donations_loading = True
+        return HomeState.load_home_data
+
+    @rx.event
     async def load_home_data(self) -> None:
         self.count_loading = True
         self.count_error = ""
@@ -272,24 +282,34 @@ class HomeState(rx.State):
         self.donations_loading = False
 
 
-def _statistic(value: rx.Var, error: rx.Var, label: str) -> rx.Component:
+def _statistic(value: rx.Var, error: rx.Var, label: str, retry: bool = False) -> rx.Component:
     """Número e rótulo de uma estatística; erro ou carregando no lugar do
-    número, nunca um valor fictício."""
+    número, nunca um valor fictício. Com `retry`, o erro vem com “Tentar de
+    novo” (as duas estatísticas vêm do mesmo pedido: um botão basta)."""
+    error_text = rx.text(
+        error,
+        color="#9B2C2C",
+        width="100%",
+        max_width="100%",
+        white_space="normal",
+        overflow_wrap="anywhere",
+        font_size="0.85rem",
+    )
     return rx.vstack(
         rx.cond(
             HomeState.count_loading,
             rx.text("Carregando...", color="#555555"),
             rx.cond(
                 error != "",
-                rx.text(
-                    error,
-                    color="#9B2C2C",
+                rx.vstack(
+                    error_text,
+                    retry_button(HomeState.retry_home_data, "home-count-retry"),
+                    align="start",
+                    spacing="2",
                     width="100%",
-                    max_width="100%",
-                    white_space="normal",
-                    overflow_wrap="anywhere",
-                    font_size="0.85rem",
-                ),
+                )
+                if retry
+                else error_text,
                 # Figma: LINE Seed JP Bold 24 px.
                 rx.text(
                     value,
@@ -316,7 +336,7 @@ def _statistic(value: rx.Var, error: rx.Var, label: str) -> rx.Component:
 
 def donation_count_view() -> rx.Component:
     return rx.vstack(
-        _statistic(HomeState.donation_count, HomeState.count_error, "Doações em circulação!"),
+        _statistic(HomeState.donation_count, HomeState.count_error, "Doações em circulação!", retry=True),
         _statistic(HomeState.completed_count, HomeState.completed_error, "Pessoas alcançadas"),
         align="start",
         spacing="5",
@@ -358,12 +378,18 @@ def recent_donations_view() -> rx.Component:
             rx.text("Carregando doações recentes...", color="#555555"),
             rx.cond(
                 HomeState.donations_error != "",
-                rx.text(
-                    HomeState.donations_error,
-                    color="#9B2C2C",
+                rx.vstack(
+                    rx.text(
+                        HomeState.donations_error,
+                        color="#9B2C2C",
+                        width="100%",
+                        white_space="normal",
+                        overflow_wrap="anywhere",
+                    ),
+                    retry_button(HomeState.retry_home_data, "home-recent-retry"),
+                    align="start",
+                    spacing="2",
                     width="100%",
-                    white_space="normal",
-                    overflow_wrap="anywhere",
                 ),
                 rx.cond(
                     HomeState.donations.length() == 0,

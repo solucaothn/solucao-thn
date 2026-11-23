@@ -66,7 +66,9 @@ EMPTY_LIST_MESSAGE = "Você ainda não tem conversas."
 NO_CONVERSATION_MESSAGE = "Escolha uma conversa para ver as mensagens."
 EMPTY_CONVERSATION_MESSAGE = "Ainda não há mensagens. Escreva a primeira."
 MESSAGE_PLACEHOLDER = "Digite aqui..."
-POLL_INTERVAL_MS = 15000
+# Mensagens da conversa à mostra a cada 25 s (change correcoes-finais: eram
+# 15 s; com poucas abas abertas, o chat estourava o limite do Xano).
+POLL_INTERVAL_MS = 25000
 LIST_POLL_INTERVAL_MS = 30000
 UNREAD_DISPLAY_MAX = 99
 
@@ -785,6 +787,40 @@ async def _open_conversation(
     state.mobile_view = "conversation"
 
 
+def _conversation_on_screen(state: Any) -> bool:
+    """Há conversa aberta e à mostra (change correcoes-finais). No desktop,
+    abrir uma conversa põe `mobile_view = "conversation"` e nada volta a
+    "list" (o “voltar à lista” só aparece em tela estreita); no celular, com
+    a lista à mostra, a conversa conta como fechada."""
+    return bool(state.active_conversation_id) and state.mobile_view == "conversation"
+
+
+async def _refresh_first_page(state: Any) -> rx.event.EventSpec | None:
+    """Página 1 da lista mesclada às já carregadas, sem aviso de erro: usada
+    pela atualização automática e pelo “voltar à lista”. Um 429 pausa as
+    consultas automáticas; um 401 leva ao login."""
+    try:
+        async with _new_client() as client:
+            result = await list_conversations(client, state.auth_token, page=1)
+    except ChatUnauthorizedError:
+        _clear_session(state)
+        return login_redirect(state)
+    except ChatRateLimitError:
+        # Mesma pausa silenciosa das mensagens.
+        state.poll_paused_until = _now() + POLL_PAUSE_SECONDS
+        return None
+    except ChatError:
+        return None
+    state.chat_conversations = _without_unread_for(
+        _merge_first_page(state.chat_conversations, result["conversations"]),
+        state.active_conversation_id,
+    )
+    # Com páginas seguintes já carregadas, has_more continua o da última.
+    if state.conversations_page <= 1:
+        state.conversations_has_more = result["has_more"]
+    return None
+
+
 def _parse_route_conversation_id(value: object) -> int | None:
     if not isinstance(value, str) or not value.isdigit():
         return None
@@ -1022,8 +1058,14 @@ class ChatState(LoginState):
         return None
 
     @rx.event
-    def back_to_list(self) -> None:
+    async def back_to_list(self) -> rx.event.EventSpec | None:
+        """Volta à lista (tela estreita) e a atualiza uma vez (change
+        correcoes-finais): com a conversa à mostra, a lista não se atualiza
+        sozinha. Falha e 429 são silenciosos, como na atualização automática."""
         self.mobile_view = "list"
+        if not self.auth_token or self.is_loading_list:
+            return None
+        return await _refresh_first_page(self)
 
     @rx.event
     async def send_message(
@@ -1124,7 +1166,7 @@ class ChatState(LoginState):
     def poll_tick(self, _value: Any = None) -> rx.event.EventSpec | None:
         if (
             not self.auth_token
-            or not self.active_conversation_id
+            or not _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
             return None
@@ -1140,7 +1182,7 @@ class ChatState(LoginState):
         if (
             visibility != "visible"
             or not self.auth_token
-            or not self.active_conversation_id
+            or not _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
             return None
@@ -1189,9 +1231,12 @@ class ChatState(LoginState):
 
     @rx.event
     def list_poll_tick(self, _value: Any = None) -> rx.event.EventSpec | None:
+        # Com uma conversa à mostra, a lista não se atualiza sozinha (change
+        # correcoes-finais): só pelo botão de atualizar ou ao voltar à lista.
         if (
             not self.auth_token
             or self.is_loading_list
+            or _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
             return None
@@ -1209,29 +1254,11 @@ class ChatState(LoginState):
             visibility != "visible"
             or not self.auth_token
             or self.is_loading_list
+            or _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
             return None
-        try:
-            async with _new_client() as client:
-                result = await list_conversations(client, self.auth_token, page=1)
-        except ChatUnauthorizedError:
-            _clear_session(self)
-            return login_redirect(self)
-        except ChatRateLimitError:
-            # Mesma pausa silenciosa das mensagens.
-            self.poll_paused_until = _now() + POLL_PAUSE_SECONDS
-            return None
-        except ChatError:
-            return None
-        self.chat_conversations = _without_unread_for(
-            _merge_first_page(self.chat_conversations, result["conversations"]),
-            self.active_conversation_id,
-        )
-        # Com páginas seguintes já carregadas, has_more continua o da última.
-        if self.conversations_page <= 1:
-            self.conversations_has_more = result["has_more"]
-        return None
+        return await _refresh_first_page(self)
 
 
 # ---------------------------------------------------------------------------
