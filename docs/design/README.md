@@ -410,7 +410,7 @@ As imagens originais indicam oito etapas e mostram a condição no último passo
 - As duas imagens representam uma única página de detalhe, não telas ou etapas diferentes.
 - A imagem 14 mostra a página inteira, incluindo a galeria, os detalhes e a localização após rolar. A imagem 15 mostra o topo da mesma página, antes de rolar.
 - A página usa cabeçalho branco com o logotipo, fundo creme, galeria de fotos e resumo da doação. Abaixo aparecem os detalhes, a localização e o cartão mínimo de quem doa.
-- O conteúdo aprovado inclui título, condição, descrição, categoria, cidade/UF, modalidade de entrega e preferência de contato escrita como texto. O cartão de quem doa mostra somente o primeiro nome e a cidade/UF da doação.
+- O conteúdo aprovado inclui título, condição, descrição, categoria, cidade/UF, modalidade de entrega e preferência de contato escrita como texto. O cartão de quem doa mostra o primeiro nome, a foto, o mês e o ano de cadastro, a cidade/UF da doação, os contadores e o e-mail verificado (veja “Quem doa” abaixo).
 - A página é pública e exibe somente doações disponíveis. Um identificador inválido, uma doação inexistente ou uma doação indisponível apresenta “Doação não encontrada”. Falhas de rede ou respostas inválidas apresentam uma mensagem de erro.
 - O conteúdo estático usa `page-fade-enter`, respeitando `prefers-reduced-motion`; cabeçalho e dados carregados do Xano não são animados.
 
@@ -421,8 +421,13 @@ A referência de layout são esses dois frames do Figma, que só diferem no cart
 O que segue o Figma:
 
 - **Cabeçalho:** branco, com o logotipo centralizado e “Voltar ao início” à esquerda na mesma linha. É o mesmo cabeçalho do chat (`back_home_header()`), com seta verde `#166B3B` e rótulo acessível “Voltar ao início”. Em telas estreitas aparece só a seta, numa área de toque de 44 px.
-- **Galeria:** a capa grande (470 px de altura no computador) e, ao lado, até 4 miniaturas em grade 2×2, com 16 px entre as fotos e cantos de 8 px.
-- **Uma foto só:** a capa ocupa toda a largura da galeria e mostra a imagem inteira (`contain`), centralizada, com fundo neutro `#EEEEEE` nas sobras e a mesma altura. Nada é cortado.
+- **Galeria:** uma grade só, de 470 px de altura no computador, com 16 px entre as fotos, cantos de 8 px e `object-fit: cover` de 2 a 5 fotos. O arranjo depende da quantidade de fotos (change galeria-detalhe; o Figma só mostra o caso de 5):
+  - 1 foto: uma grande, na largura toda, mostrando a imagem inteira (`contain`), centralizada, com fundo neutro `#EEEEEE` nas sobras. Nada é cortado;
+  - 2 fotos: lado a lado, do mesmo tamanho;
+  - 3 fotos: a capa à esquerda com 2/3 da largura e duas empilhadas à direita, somando a altura da capa;
+  - 4 fotos: grade 2×2;
+  - 5 fotos: a capa à esquerda, com metade da largura, e as outras 4 em 2×2 à direita.
+- **Galeria no celular:** a capa em cima (300 px de altura) e as demais numa fileira de até 4 miniaturas quadradas, do mesmo tamanho, com 8 px entre elas e sem rolagem horizontal.
 - **Cartão de resumo, à direita da galeria:**
   - branco, com borda `#D9D9D9`, cantos de 8 px e sombra `0 8px 13px rgba(0,0,0,0.15)`;
   - o título grande (2,4 rem) e “Condição: …”;
@@ -430,8 +435,13 @@ O que segue o Figma:
 - **Título e descrição logo abaixo da galeria:** o título em negrito, em caixa alta e preto; a descrição em texto corrido, mantendo as quebras de linha. O título aparece nos dois lugares, como no Figma.
 - **“Detalhes”:** uma grade em que cada item tem o ícone verde do Figma (`assets/detalhe-atributo.svg`), um rótulo pequeno e o valor logo abaixo. Os itens são Categoria, Condição, Forma de entrega e Preferência de contato. A grade tem 4 colunas em telas largas, 2 em médias e 1 no celular.
 - **“Localização”:** a ilustração de edifícios do Figma (`assets/detalhe-localizacao.svg`, 56 px) e “Cidade, UF”.
-- **“Quem doa”:** à direita, abaixo do resumo, como o cartão do anunciante do Figma: branco, com borda `#D9D9D9`, a foto de perfil de 48 px (ou o círculo `#F2F2F2` com a inicial) ao lado do primeiro nome, e o ícone de local com “Cidade, UF”. A foto entrou com a change foto-perfil. O cartão inteiro é o link para o perfil público (veja “Perfil público de quem doa”).
-  - Abaixo da cidade, numa linha, os contadores “Doações” e “Doações realizadas” e, abaixo deles, o selo “E-mail verificado”, só quando o e-mail de quem doa está verificado. Entraram com a change perfil-credibilidade e usam os componentes compartilhados (veja “Contadores e selo ‘E-mail verificado’”). O e-mail nunca aparece.
+- **“Quem doa”:** à direita, abaixo do resumo, branco, com borda `#D9D9D9` e seções separadas por linhas de 1 px `#D9D9D9` (change quem-doa-completo):
+  - topo: a foto de perfil de 48 px (ou o círculo `#F2F2F2` com a inicial) ao lado do primeiro nome e, abaixo do nome, “No DoaFácil desde <mês de ano>” com ícone de calendário e “Cidade, UF” (da doação) com ícone de local;
+  - o botão contornado “Ver perfil de quem doa”, na largura toda, com borda e texto `#007A42`, 44 px de altura e rótulo acessível “Ver perfil de quem doa, <primeiro nome>”. É o único link do cartão (veja “Perfil público de quem doa”);
+  - seção “Doações”: “Doações” (o contador de ativas, que soma disponíveis e reservadas) e “Doações realizadas”, no singular quando o número é 1, com os mesmos rótulos do perfil público e de Minhas doações; cada número em `#166B3B` com um ícone de pacote;
+  - seção “Informações verificadas”: “E-mail” com o check verde `#166B3B`, só quando o e-mail de quem doa está verificado; sem verificação, a seção e a linha acima dela não aparecem. O e-mail nunca aparece;
+  - o “desde” vem do perfil público (`catalog/donations/donor`, página 1, no cache público de 60 s), carregado depois do detalhe. Se esse pedido falhar, a linha some e o resto do cartão aparece normalmente;
+  - os ícones são decorativos. Não há presença online, estrelas, doações canceladas nem CPF.
 - **No celular:** uma coluna, na ordem galeria → resumo → título e descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
 
 Diferenças aprovadas em relação ao Figma:
@@ -445,7 +455,7 @@ Diferenças aprovadas em relação ao Figma:
 - **“Localização” num cartão branco** com borda, no lugar das divisórias do Figma, e com uma só linha: “Cidade, UF”.
 - **Sem “NOVO” e sem status:** o detalhe não recebe a data de criação e só mostra doações disponíveis (decisão do grupo).
 - **Ícones decorativos:** os dois SVGs do Figma têm `alt=""` e `aria-hidden`.
-- **Cartão “Quem doa” como link (não está no Figma):** leva a `/doacao/<id>/quem-doa`, com o id da doação aberta.
+- **Botão “Ver perfil de quem doa” (não está no Figma):** leva a `/doacao/<id>/quem-doa`, com o id da doação aberta. O cartão em si não é link.
   - O rótulo acessível é “Ver perfil de <primeiro nome>”.
   - Uma linha “Ver perfil”, com o ícone `chevron-right` em `#007A42`, mostra que o cartão é clicável.
   - No hover, a borda fica `#007A42`; o foco tem contorno de 2 px em `#007A42`.
@@ -462,7 +472,7 @@ Diferenças aprovadas em relação ao Figma:
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações e presença online dependem de dados ou funcionalidades que ainda não existem. O único indicador de verificação é o selo “E-mail verificado” do cartão “Quem doa”. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
+Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações e presença online dependem de dados ou funcionalidades que ainda não existem. O único indicador de verificação é o “E-mail” da seção “Informações verificadas” do cartão “Quem doa”. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo botão “Ver perfil de quem doa” do cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
 
 ## Perfil público de quem doa
 
