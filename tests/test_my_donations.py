@@ -676,13 +676,13 @@ class MyDonationsPageTests(unittest.TestCase):
         self.assertIn("verified-badge", rendered)
 
     def test_split_email_keeps_at_with_domain(self) -> None:
-        self.assertEqual(split_email("ana.lima@gmail.com"), ("ana.lima", "@gmail.com"))
+        self.assertEqual(split_email("ana.lima@example.test"), ("ana.lima", "@example.test"))
         self.assertEqual(split_email("a@b@c.com"), ("a@b", "@c.com"))
         self.assertEqual(split_email("sem-arroba"), ("sem-arroba", ""))
         self.assertEqual(split_email(""), ("", ""))
-        state = _list_state(email="ana.lima@gmail.com")
+        state = _list_state(email="ana.lima@example.test")
         self.assertEqual(_computed("email_local", state), "ana.lima")
-        self.assertEqual(_computed("email_domain", state), "@gmail.com")
+        self.assertEqual(_computed("email_domain", state), "@example.test")
 
     def test_owner_email_breaks_only_before_the_at(self) -> None:
         """Duas partes que não quebram por dentro quando cabem, com o ponto de

@@ -369,7 +369,7 @@ async def delete_donation(
 
 
 def split_email(email: str) -> tuple[str, str]:
-    """'ana.lima@gmail.com' → ('ana.lima', '@gmail.com'). O cartão quebra a
+    """'ana.lima@example.test' → ('ana.lima', '@example.test'). O cartão quebra a
     linha só entre as duas partes. Sem '@', tudo fica na primeira parte."""
     local, at, domain = email.rpartition("@")
     if not at:
@@ -1115,7 +1115,7 @@ def _email_part(value: rx.Var) -> rx.Component:
 def _owner_email() -> rx.Component:
     """O e-mail da própria conta, como no bloco “Email” do frame Group 6:
     rótulo em negrito e o endereço abaixo, inteiro. Quando não cabe numa
-    linha, quebra só antes do “@” (“ana.lima” / “@gmail.com”)."""
+    linha, quebra só antes do “@” (“ana.lima” / “@example.test”)."""
     return rx.vstack(
         rx.text("E-mail", color=TEXT_STRONG, font_size="0.8rem", font_weight="700"),
         rx.text(
