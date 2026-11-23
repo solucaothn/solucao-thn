@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 import reflex as rx
 
+from doafacil import cache_publico
 from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
 from doafacil.rotas import login_redirect
 from doafacil.cadastro import BRAZILIAN_STATES
@@ -212,6 +213,9 @@ async def update_profile(
         headers={"Authorization": f"Bearer {auth_token}"},
     )
     _raise_for_status(response)
+    # Nome, Sobre, cidade e UF aparecem no detalhe e no perfil de quem doa
+    # guardados (change correcoes-finais).
+    cache_publico.invalidate_donations()
     return _parse_profile(_json(response))
 
 
@@ -251,6 +255,8 @@ async def upload_profile_photo(
     if response.status_code == 400:
         raise ProfilePhotoRejectedError(_photo_rejection_message(response))
     _raise_for_status(response)
+    # A foto aparece no detalhe e no perfil de quem doa guardados.
+    cache_publico.invalidate_donations()
     payload = _json(response)
     if not isinstance(payload, dict):
         raise ProfileServiceError
@@ -268,6 +274,7 @@ async def remove_profile_photo(client: httpx.AsyncClient, auth_token: str) -> No
         _photo_endpoint(), headers={"Authorization": f"Bearer {auth_token}"}
     )
     _raise_for_status(response)
+    cache_publico.invalidate_donations()
 
 
 def validate_photo_file(filename: str, content_type: str, size: int) -> str:

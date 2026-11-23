@@ -172,7 +172,9 @@ def _state(**overrides: Any) -> SimpleNamespace:
         "send_error": "",
         "is_sending": False,
         "poll_paused_until": 0.0,
-        "mobile_view": "list",
+        # Conversa à mostra quando houver uma aberta, como no desktop (change
+        # correcoes-finais: com "list", a conversa conta como fechada).
+        "mobile_view": "conversation",
         "unread_total": 0,
         "unread_total_text": "",
         "unread_link_label": "Mensagens",
@@ -941,10 +943,19 @@ class ChatUnreadStateTests(unittest.TestCase):
         counts = {c["conversation_id"]: c["unread_count"] for c in state.chat_conversations}
         self.assertEqual(counts, {7: 0, 8: 1})
 
-        # A atualização da lista chega antes da leitura das mensagens novas.
+        # Com a conversa à mostra, a lista não se atualiza sozinha (change
+        # correcoes-finais).
         recorder = _Recorder(_json(200, _list_page([_conversation(7, unread_count=2)])))
         with self._patch_client(recorder):
             _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertEqual(recorder.requests, [])
+
+        # Ao voltar à lista (celular), a lista chega antes da leitura das
+        # mensagens novas, e a conversa selecionada continua com 0.
+        recorder = _Recorder(_json(200, _list_page([_conversation(7, unread_count=2)])))
+        with self._patch_client(recorder):
+            _run(ChatState.back_to_list.fn(state))
+        self.assertEqual(len(recorder.requests), 1)
         self.assertEqual(state.chat_conversations[0]["unread_count"], 0)
 
         # Na lista vinda de "Carregar mais conversas" também.
@@ -966,9 +977,17 @@ class ChatUnreadStateTests(unittest.TestCase):
             self.assertIsNone(ChatState.list_poll_tick.fn(_state(auth_token="")))
             self.assertIsNone(ChatState.list_poll_tick.fn(_state(poll_paused_until=1030.0)))
             self.assertIsNone(ChatState.list_poll_tick.fn(_state(is_loading_list=True)))
+            # Com a conversa à mostra, a lista não se atualiza sozinha (change
+            # correcoes-finais).
+            self.assertIsNone(ChatState.list_poll_tick.fn(_state(active_conversation_id=7)))
             # Sem conversa aberta a lista continua atualizando.
             self.assertEqual(ChatState.list_poll_tick.fn(_state(active_conversation_id=0)), "check-visibility")
-        self.assertEqual(call_script.call_count, 1)
+            # No celular, com a lista à mostra, a conversa conta como fechada.
+            self.assertEqual(
+                ChatState.list_poll_tick.fn(_state(active_conversation_id=7, mobile_view="list")),
+                "check-visibility",
+            )
+        self.assertEqual(call_script.call_count, 2)
         self.assertEqual(call_script.call_args.args[0], "document.visibilityState")
         self.assertIn("list_poll_if_visible", str(call_script.call_args.kwargs["callback"]))
 
@@ -988,7 +1007,14 @@ class ChatUnreadStateTests(unittest.TestCase):
         self.assertEqual(recorder.requests, [])
 
     def test_list_poll_429_pauses_lists_and_messages_silently(self) -> None:
-        state = _state(active_conversation_id=7, chat_messages=_decorated(5), chat_conversations=[_listed(7)])
+        # Lista à mostra (celular) com uma conversa selecionada: a lista
+        # atualiza; a conversa não.
+        state = _state(
+            active_conversation_id=7,
+            mobile_view="list",
+            chat_messages=_decorated(5),
+            chat_conversations=[_listed(7)],
+        )
         with (
             self._patch_client(_Recorder(_json(429, PLATFORM_429))),
             patch("doafacil.chat._now", return_value=1000.0),
@@ -999,24 +1025,93 @@ class ChatUnreadStateTests(unittest.TestCase):
         self.assertEqual(state.list_error, "")
         self.assertEqual(len(state.chat_conversations), 1)
 
-        # A pausa vale também para as mensagens.
+        # A pausa vale também para as mensagens, já com a conversa à mostra.
+        state.mobile_view = "conversation"
         recorder = _Recorder(_json(200, _messages_page([_message(6)])))
         with self._patch_client(recorder), patch("doafacil.chat._now", return_value=1030.0):
             _run(ChatState.poll_if_visible.fn(state, "visible"))
-            self.assertIsNone(ChatState.list_poll_tick.fn(state))
+            self.assertIsNone(ChatState.poll_tick.fn(state))
         self.assertEqual(recorder.requests, [])
 
-        # E um 429 nas mensagens pausa a lista.
+        # E um 429 nas mensagens pausa a lista (depois de voltar a ela).
         state = _state(active_conversation_id=7, chat_messages=_decorated(5))
         with (
             self._patch_client(_Recorder(_json(429, CHAT_429))),
             patch("doafacil.chat._now", return_value=2000.0),
         ):
             _run(ChatState.poll_if_visible.fn(state, "visible"))
+        state.mobile_view = "list"
         recorder = _Recorder(_json(200, _list_page([])))
         with self._patch_client(recorder), patch("doafacil.chat._now", return_value=2030.0):
             _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+            self.assertIsNone(ChatState.list_poll_tick.fn(state))
         self.assertEqual(recorder.requests, [])
+
+    def test_open_conversation_stops_list_poll_and_button_still_refreshes(self) -> None:
+        # Change correcoes-finais: com a conversa à mostra, a lista não se
+        # atualiza sozinha, mas o botão “Atualizar conversas” consulta.
+        state = _state(active_conversation_id=7, chat_conversations=[_listed(7), _listed(8)])
+        recorder = _Recorder(_json(200, _list_page([_conversation(8, unread_count=3)])))
+        with self._patch_client(recorder):
+            _run(ChatState.list_poll_if_visible.fn(state, "visible"))
+        self.assertEqual(recorder.requests, [])
+
+        recorder = _Recorder(_json(200, _list_page([_conversation(7), _conversation(8, unread_count=3)])))
+        with self._patch_client(recorder):
+            _run(ChatState.refresh_conversations.fn(state))
+        self.assertEqual(len(recorder.requests), 1)
+        self.assertEqual(state.active_conversation_id, 7)
+        self.assertEqual({c["conversation_id"]: c["unread_count"] for c in state.chat_conversations}, {7: 0, 8: 3})
+
+    def test_back_to_list_refreshes_once_and_pauses_messages(self) -> None:
+        state = _state(
+            active_conversation_id=7,
+            chat_messages=_decorated(5),
+            chat_conversations=[_listed(1), _listed(2), _listed(7)],
+            conversations_page=2,
+            conversations_has_more=True,
+        )
+        recorder = _Recorder(_json(200, _list_page([_conversation(9, unread_count=1), _conversation(7, unread_count=2)], has_more=True)))
+        with self._patch_client(recorder):
+            result = _run(ChatState.back_to_list.fn(state))
+        self.assertIsNone(result)
+        self.assertEqual(state.mobile_view, "list")
+        self.assertEqual(len(recorder.requests), 1)
+        self.assertEqual(recorder.requests[0].url.params["page"], "1")
+        # Mescla sem perder as páginas já carregadas nem repetir; a conversa
+        # selecionada continua com 0.
+        self.assertEqual([c["conversation_id"] for c in state.chat_conversations], [9, 7, 1, 2])
+        self.assertEqual(state.chat_conversations[1]["unread_count"], 0)
+        self.assertEqual((state.conversations_page, state.conversations_has_more), (2, True))
+
+        # Com a lista à mostra, as mensagens não são consultadas.
+        with patch("doafacil.chat.rx.call_script", return_value="check-visibility"):
+            self.assertIsNone(ChatState.poll_tick.fn(state))
+        recorder = _Recorder(_json(200, _messages_page([_message(6)])))
+        with self._patch_client(recorder):
+            _run(ChatState.poll_if_visible.fn(state, "visible"))
+        self.assertEqual(recorder.requests, [])
+
+    def test_back_to_list_errors_are_silent(self) -> None:
+        state = _state(active_conversation_id=7, chat_conversations=[_listed(7)])
+        with (
+            self._patch_client(_Recorder(_json(429, PLATFORM_429))),
+            patch("doafacil.chat._now", return_value=1000.0),
+        ):
+            self.assertIsNone(_run(ChatState.back_to_list.fn(state)))
+        self.assertEqual((state.mobile_view, state.list_error), ("list", ""))
+        self.assertEqual(state.poll_paused_until, 1000.0 + POLL_PAUSE_SECONDS)
+
+        state = _state(active_conversation_id=7, chat_conversations=[_listed(7)])
+        with self._patch_client(_Recorder(_json(500, {"message": "x"}))):
+            self.assertIsNone(_run(ChatState.back_to_list.fn(state)))
+        self.assertEqual(len(state.chat_conversations), 1)
+
+        state = _state(auth_token="", active_conversation_id=7)
+        recorder = _Recorder(_json(200, _list_page([])))
+        with self._patch_client(recorder):
+            _run(ChatState.back_to_list.fn(state))
+        self.assertEqual((state.mobile_view, recorder.requests), ("list", []))
 
     def test_list_poll_merges_first_page_on_top_without_losing_or_repeating(self) -> None:
         # Páginas 1 e 2 já carregadas: 1, 2 | 3, 4.
@@ -1294,7 +1389,8 @@ class ChatStateTests(unittest.TestCase):
 
     def test_back_to_list(self) -> None:
         state = _state(mobile_view="conversation")
-        ChatState.back_to_list.fn(state)
+        with self._patch_client(_Recorder(_json(200, _list_page([])))):
+            _run(ChatState.back_to_list.fn(state))
         self.assertEqual(state.mobile_view, "list")
 
     # 4.5 ------------------------------------------------------------------
@@ -1372,6 +1468,8 @@ class ChatStateTests(unittest.TestCase):
         ):
             self.assertIsNone(ChatState.poll_tick.fn(_state(active_conversation_id=0)))
             self.assertIsNone(ChatState.poll_tick.fn(_state(active_conversation_id=7, poll_paused_until=1030.0)))
+            # Lista à mostra no celular: a conversa conta como fechada.
+            self.assertIsNone(ChatState.poll_tick.fn(_state(active_conversation_id=7, mobile_view="list")))
             self.assertEqual(ChatState.poll_tick.fn(_state(active_conversation_id=7)), "check-visibility")
         self.assertEqual(call_script.call_count, 1)
         self.assertEqual(call_script.call_args.args[0], "document.visibilityState")
@@ -1549,9 +1647,11 @@ class ChatPageTests(unittest.TestCase):
 
     def test_poller_only_exists_with_open_conversation(self) -> None:
         moments = [n for n in _nodes(self.page) if type(n).__name__ == "Moment"]
-        # Um das mensagens (15 s, com conversa aberta) e um da lista (30 s).
+        # Um das mensagens (25 s, com conversa aberta; change
+        # correcoes-finais) e um da lista (30 s).
         self.assertEqual(len(moments), 2)
-        self.assertIn("interval:15000", self.rendered)
+        self.assertIn("interval:25000", self.rendered)
+        self.assertNotIn("interval:15000", self.rendered)
         conds_with_moment = [
             n
             for n in _nodes(self.page)

@@ -95,7 +95,7 @@ A página `/doacao/<id>/quem-doa` MUST apresentar a identificação de quem doa 
 
 #### Scenario: Sem doações disponíveis
 - **WHEN** a lista vem vazia
-- **THEN** a página MUST mostrar “Nenhuma doação disponível no momento”, uma frase de apoio com o primeiro nome e o link “Explorar outras doações”, que leva à home
+- **THEN** a página MUST mostrar “Nenhuma doação disponível no momento”, uma frase de apoio com o primeiro nome e o link “Explorar outras doações”, que leva a `/explorar`
 - **AND** MUST NOT mostrar o contador nem a paginação
 
 #### Scenario: Voltar à doação
@@ -129,3 +129,14 @@ A página MUST validar o identificador da rota antes de consultar o Xano e apres
 - **WHEN** a consulta falha, responde HTTP 429 ou devolve dados inválidos
 - **THEN** a página MUST mostrar uma mensagem de erro simples, sem dados parciais de outra pessoa
 - **AND** numa troca de página com falha, MUST manter a página anterior visível e mostrar a mensagem junto da paginação
+
+### Requirement: Tentar de novo no perfil de quem doa
+Quando o perfil de quem doa não puder ser carregado, a página SHALL mostrar, junto da mensagem de erro, o botão “Tentar de novo”, que busca o perfil outra vez sem sair da página.
+
+#### Scenario: Falha ao carregar o perfil
+- **WHEN** a consulta do perfil falha, responde HTTP 429 ou devolve dados inválidos
+- **THEN** a página MUST mostrar a mensagem de erro e o botão “Tentar de novo”, com área de toque de pelo menos 44 px, foco visível e contraste mínimo AA
+
+#### Scenario: Doação não encontrada não oferece nova tentativa
+- **WHEN** o identificador é inválido ou o endpoint responde HTTP 404
+- **THEN** a página MUST mostrar “Doação não encontrada” sem o botão “Tentar de novo”

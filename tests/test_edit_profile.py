@@ -553,6 +553,54 @@ class ProfilePhotoClientTests(unittest.TestCase):
                     _call(lambda r, s=status: httpx.Response(s, json={}), remove_profile_photo)
 
 
+class ProfileEditInvalidatesPublicCacheTests(unittest.TestCase):
+    """Change correcoes-finais: nome, Sobre e foto aparecem no detalhe e no
+    perfil de quem doa guardados; salvar com sucesso descarta o cache, e uma
+    falha não descarta."""
+
+    def setUp(self) -> None:
+        from doafacil import cache_publico
+
+        self.cache = cache_publico
+        cache_publico.clear()
+        self.addCleanup(cache_publico.clear)
+
+    def _store(self) -> None:
+        async def load():
+            return {"first_name": "Ana"}
+
+        asyncio.run(self.cache.cached(self.cache.DONOR, "perfil", load))
+        asyncio.run(self.cache.cached(self.cache.DETAIL, "detalhe", load))
+        self.assertEqual(len(self.cache._entries), 2)
+
+    def test_successful_writes_drop_cache(self) -> None:
+        fields = {"name": "Ana Lima", "city": "Santos", "state": "SP", "about": ""}
+        calls = {
+            "perfil": (lambda r: httpx.Response(200, json=PROFILE_PAYLOAD), update_profile, (fields,)),
+            "foto": (lambda r: httpx.Response(200, json={"photo": PHOTO_URL}), upload_profile_photo, ("foto.png", PNG_BYTES, "image/png")),
+            "remover foto": (lambda r: httpx.Response(200, json={"photo": None}), remove_profile_photo, ()),
+        }
+        for label, (handler, function, args) in calls.items():
+            with self.subTest(case=label):
+                self._store()
+                _call(handler, function, *args)
+                self.assertEqual(self.cache._entries, {})
+
+    def test_failed_writes_keep_cache(self) -> None:
+        fields = {"name": "Ana Lima", "city": "Santos", "state": "SP", "about": ""}
+        calls = {
+            "perfil": (update_profile, (fields,)),
+            "foto": (upload_profile_photo, ("foto.png", PNG_BYTES, "image/png")),
+            "remover foto": (remove_profile_photo, ()),
+        }
+        for label, (function, args) in calls.items():
+            with self.subTest(case=label):
+                self._store()
+                with self.assertRaises(ProfileServiceError):
+                    _call(lambda r: httpx.Response(500, json={}), function, *args)
+                self.assertEqual(len(self.cache._entries), 2)
+
+
 class ProfilePhotoValidationTests(unittest.TestCase):
     def test_validate_photo_file(self) -> None:
         self.assertEqual(validate_photo_file("foto.PNG", "image/png", PHOTO_MAX_BYTES), "")

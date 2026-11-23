@@ -788,6 +788,20 @@ class MyDonationsPageTests(unittest.TestCase):
         self.assertIn('"aria-live":"polite"', rendered)
         self.assertIn("go_to_page", rendered)
 
+    def test_error_state_has_retry_button(self) -> None:
+        # Change correcoes-finais: “Tentar de novo” junto do erro da lista.
+        rendered = str(my_donations_page())
+        self.assertEqual(rendered.count("my-donations-retry"), 1)
+        self.assertIn("Tentar de novo", rendered)
+        self.assertIn("retry_load", rendered)
+        self.assertGreater(rendered.index("my-donations-retry"), rendered.index("load_error_rx_state_"))
+
+    def test_retry_shows_loading_and_reloads(self) -> None:
+        state = SimpleNamespace(view_state="error", load_error="falhou")
+        result = MyDonationsState.retry_load.fn(state)
+        self.assertEqual((state.view_state, state.load_error), ("loading", ""))
+        self.assertIs(result, MyDonationsState.load_page)
+
     def test_grid_three_columns_on_large_one_on_mobile(self) -> None:
         rendered = str(my_donations_page())
         self.assertIn("repeat(3, minmax(0, 1fr))", rendered)
@@ -944,6 +958,18 @@ class EditDonationStateTests(unittest.TestCase):
         self.assertEqual((state.title, state.description), ("Carrinho", "Em bom estado."))
         self.assertEqual((state.category_id, state.category_name), ("3", "Brinquedos"))
         self.assertEqual((state.condition, state.delivery_method, state.contact_preference), ("Bom", "A combinar", "E-mail"))
+
+    def test_furniture_category_is_offered_and_filled(self) -> None:
+        # Change correcoes-finais: a edição usa as categorias do cadastro, sem
+        # exclusão por nome, então uma doação em “Móveis” abre preenchida.
+        from doafacil.cadastro_doacao import _parse_categories
+
+        categories = _parse_categories([{"id": 3, "name": "Brinquedos"}, {"id": 8, "name": "Móveis"}])
+        state = _edit_state()
+        donation = {**_parse_my_donation(ITEM_PAYLOAD, 17), "category_id": 8}
+        self._load(state, categories=categories, donation=donation)
+        self.assertEqual((state.category_id, state.category_name), ("8", "Móveis"))
+        self.assertIn("Móveis", EditDonationState.category_options.fget(state))
 
     def test_values_outside_options_start_empty(self) -> None:
         state = _edit_state()

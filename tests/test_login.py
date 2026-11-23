@@ -729,6 +729,10 @@ class LoginPageTests(unittest.TestCase):
             if getattr(node, "class_name", None) == "category-retry":
                 self.assertIn("reload_categories", str(node.event_triggers.get("on_click")))
                 continue
+            # “Tentar de novo” da contagem e das recentes (change correcoes-finais).
+            if getattr(node, "class_name", None) in {"home-count-retry", "home-recent-retry"}:
+                self.assertIn("retry_home_data", str(node.event_triggers.get("on_click")))
+                continue
             # O “Entrar” da barra do celular, igual ao do desktop.
             if type(node).__name__ == "Button" and _component_text(node) == "Entrar":
                 self.assertIn("login_href", str(node.event_triggers["on_click"]))  # change acabamento

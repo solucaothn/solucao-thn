@@ -28,7 +28,7 @@ from doafacil.cadastro_doacao import (
 from doafacil.campos import FIELD_BORDER, FIELD_TEXT, SELECT_PLACEHOLDER, field_label, select_field
 from doafacil.cartoes_doacao import GENERIC_DONATION_IMAGE
 from doafacil.chat import PLATFORM_RATE_LIMIT_MESSAGE, avatar_initial
-from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X
+from doafacil.cabecalho import HEADER_MAX_WIDTH, HEADER_PADDING_X, retry_button
 from doafacil.navegacao import back_link_header
 from doafacil.detalhe_doacao import (
     DONATION_NOT_FOUND_MESSAGE,
@@ -87,7 +87,8 @@ ACTION_SUCCESS_MESSAGES = {
 
 PAGE_TITLE = "Minhas doações"
 LOADING_MESSAGE = "Carregando suas doações..."
-LIST_ERROR_MESSAGE = "Não foi possível carregar suas doações. Tente novamente mais tarde."
+# A página oferece “Tentar de novo” junto (change correcoes-finais).
+LIST_ERROR_MESSAGE = "Não foi possível carregar suas doações."
 PAGE_ERROR_MESSAGE = "Não foi possível carregar esta página de doações. Tente novamente."
 RATE_LIMIT_MESSAGE = PLATFORM_RATE_LIMIT_MESSAGE
 EMPTY_TITLE = "Você ainda não tem doações"
@@ -568,6 +569,14 @@ class MyDonationsState(LoginState):
             self.view_state = "ready"
 
     @rx.event
+    def retry_load(self):
+        """“Tentar de novo” do erro (change correcoes-finais): mostra o
+        carregando na hora e busca a página outra vez."""
+        self.view_state = "loading"
+        self.load_error = ""
+        return MyDonationsState.load_page
+
+    @rx.event
     async def go_to_page(self, page: int):
         if self.view_state != "ready" or self.page_loading or self.action_busy:
             return
@@ -884,10 +893,15 @@ def _status_color(status: rx.Var, index: int) -> rx.Var:
     )
 
 
-def _state_message(message: rx.Var | str, color: str) -> rx.Component:
+def _state_message(message: rx.Var | str, color: str, *children: rx.Component) -> rx.Component:
+    """Mensagem de estado centralizada; `children` vêm abaixo dela (o
+    “Tentar de novo” do erro)."""
     return rx.box(
         rx.text(message, color=color, text_align="center"),
+        *children,
         display="flex",
+        flex_direction="column",
+        gap="16px",
         align_items="center",
         justify_content="center",
         width="100%",
@@ -1435,7 +1449,11 @@ def my_donations_page() -> rx.Component:
             _state_message(LOADING_MESSAGE, TEXT_MUTED),
             rx.cond(
                 MyDonationsState.view_state == "error",
-                _state_message(MyDonationsState.load_error, TEXT_ERROR),
+                _state_message(
+                    MyDonationsState.load_error,
+                    TEXT_ERROR,
+                    retry_button(MyDonationsState.retry_load, "my-donations-retry"),
+                ),
                 _my_donations_content(),
             ),
         ),

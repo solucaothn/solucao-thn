@@ -25,7 +25,9 @@ from doafacil.cabecalho import (
     HEADER_PADDING,
     HEADER_PADDING_X,
 )
+from doafacil.login import LoginState
 from doafacil.navegacao import responsive_header_controls
+from doafacil.rotas import login_url
 from doafacil.cadastro_doacao import (
     CATALOG_API_ENV,
     DonationServiceError,
@@ -52,12 +54,18 @@ BRAZILIAN_STATES = (
 )
 RECENT_TITLE = "Adicionadas recentemente"
 EMPTY_TEXT = "Nenhuma doação encontrada"
+# Sem filtros e sem resultados: o site ainda não tem doações (change
+# correcoes-finais). O convite leva ao cadastro; sem sessão, ao login com
+# `next` de volta ao cadastro.
+EMPTY_INVITE_TEXT = "Ainda não há doações por aqui. Que tal ser a primeira pessoa a doar?"
+DONATE_LABEL = "Quero Doar"
+DONATE_ROUTE = "/cadastro-doacao"
 LOAD_ERROR_TEXT = "Não foi possível carregar as doações."
 LOAD_MORE_ERROR_TEXT = "Não foi possível carregar mais doações."
 # Ícone de cada categoria, pelo nome em minúsculas e sem acento (os nomes
 # vêm do Xano). Outros nomes usam o ícone genérico.
 CATEGORY_ICONS = {
-    "moveis": "house",
+    "moveis": "sofa",
     "eletronicos": "smartphone",
     "brinquedos": "bike",
     "livros": "book-open",
@@ -327,6 +335,32 @@ def _text_link(label: str, href: str | rx.Var, **props: Any) -> rx.Component:
     )
 
 
+def _donate_invite() -> rx.Component:
+    """Convite da Explorar vazia sem filtros: frase e o botão “Quero Doar”
+    (branco sobre #166B3B, 7,3:1)."""
+    return rx.vstack(
+        rx.text(EMPTY_INVITE_TEXT, color=TEXT_MUTED),
+        rx.link(
+            DONATE_LABEL,
+            href=rx.cond(LoginState.auth_token, DONATE_ROUTE, login_url(DONATE_ROUTE)),
+            class_name="explore-donate",
+            background=GREEN,
+            color="white",
+            padding="8px 20px",
+            border_radius="6px",
+            font_weight="700",
+            display="inline-flex",
+            align_items="center",
+            min_height="44px",
+            underline="none",
+            _hover={"background": "#0F5530", "color": "white"},
+            _focus_visible=FOCUS_RING,
+        ),
+        align="start",
+        spacing="3",
+    )
+
+
 def explore_header() -> rx.Component:
     """Cabeçalho da Explorar e da /categorias (Figma 438:1426): logotipo,
     busca com texto, UF e lupa, e os controles de conta. Em telas estreitas,
@@ -485,7 +519,7 @@ def _results() -> rx.Component:
                     rx.cond(
                         ExploreState.has_filters,
                         _text_link("Limpar filtros", EXPLORE_ROUTE, class_name="explore-clear-filters"),
-                        rx.fragment(),
+                        _donate_invite(),
                     ),
                     align="start",
                     spacing="2",

@@ -130,7 +130,7 @@ Referências: os quadros `438:1426` (Explorar), `474:1650` (home com a gaveta de
 | No Figma | Na implementação | Motivo |
 |---|---|---|
 | “Estado: Ótimo” | “Condição: Ótimo” | termo do domínio (decisão 6) |
-| gaveta com “Móveis” | categorias do Xano, sem Alimentos e Móveis | as mesmas exclusões do cadastro |
+| gaveta com “Móveis” | todas as categorias do Xano, inclusive “Móveis”, com ícone de sofá | “Alimentos” foi apagada do Xano; sem exclusão por nome (change correcoes-finais) |
 | seta de “expandir” em cada categoria | seta de “ir” (`chevron-right`) | não há subcategorias |
 | `/explorar` sem filtro com “Da categoria “Roupas”” | só “Adicionadas recentemente” | decisão do grupo |
 | grade fixa de 5 × 245 px | grade flexível, de 220 px para cima | responsivo; uma coluna em 360 px |
@@ -487,7 +487,8 @@ O que segue o Figma:
 - **Cartões iguais aos da home:** foto (ou a imagem genérica), título, “Condição: …”, NOVO para doações de até 7 dias e “Acessar”, que leva a `/doacao/<id>` do item.
   - Ficam numa grade `repeat(auto-fill, minmax(220px, 1fr))` com 24 px entre os cartões: 5 colunas a 1512 px e 1 a 360 px.
   - Na grade, o cartão ocupa a largura da célula, em vez do tamanho fixo do carrossel da home (260 px desde a change landing-nova).
-- **Estado vazio (`perfil-doador-02`):** cartão branco centralizado com “Nenhuma doação disponível no momento” (`#166B3B`, negrito), a frase “Quando <nome> publicar uma nova doação, ela aparece aqui.” e o link “Explorar outras doações” (`#007A42`), que leva à home até existir uma página de explorar. Sem contador e sem paginação.
+- **Estado vazio (`perfil-doador-02`):** cartão branco centralizado com “Nenhuma doação disponível no momento” (`#166B3B`, negrito), a frase “Quando <nome> publicar uma nova doação, ela aparece aqui.” e o link “Explorar outras doações” (`#007A42`), que leva a `/explorar` (change correcoes-finais). Sem contador e sem paginação.
+- **Erro do perfil:** a mensagem e o botão “Tentar de novo” (contorno `#166B3B`, 44 px), que busca o perfil outra vez. O “Doação não encontrada” não tem o botão (change correcoes-finais).
 
 Diferenças aprovadas em relação ao Figma:
 
@@ -599,7 +600,7 @@ Diferenças aprovadas em relação ao Figma:
 
 - **Cabeçalho:** “Voltar a Minhas doações”, em `#007A42`, na linha do logotipo.
 - **Cartão do formulário:** branco, de até 640 px, centralizado, com a animação `auth-card-enter`, como as telas de formulário. Tem o título “Editar doação” e o aviso “As fotos, a cidade e a UF não mudam por aqui.”.
-- **Campos:** os do cadastro, com os mesmos textos de exemplo, cores e limites. São o nome do item (até 100 caracteres), a descrição (até 2000), a categoria (sem “Alimentos” e “Móveis”), a condição, a forma de entrega (só “A combinar”) e a forma de contato (“E-mail” ou “Chat do DoaFácil”).
+- **Campos:** os do cadastro, com os mesmos textos de exemplo, cores e limites. São o nome do item (até 100 caracteres), a descrição (até 2000), a categoria (todas as do Xano, inclusive “Móveis”), a condição, a forma de entrega (só “A combinar”) e a forma de contato (“E-mail” ou “Chat do DoaFácil”).
   - Os campos de texto usam os mesmos ids do cadastro, então as regras de cor do placeholder e do texto digitado valem aqui também.
   - Os selects (categoria, condição, entrega e contato) têm fundo branco, borda `#C8C8C8`, 40 px de altura e cantos de 8 px, como os campos de texto. O texto é `#1F1F1F`, o placeholder `#333333` e o foco tem contorno de 2 px em `#007A42`. Eles não ficam com o fundo cinza, que parecia de campo desativado.
   - Um valor atual fora das opções deixa o campo vazio.
