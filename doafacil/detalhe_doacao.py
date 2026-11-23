@@ -22,12 +22,13 @@ from doafacil.chat import (
 from doafacil.login import LoginState
 from doafacil.navegacao import back_home_header
 from doafacil.perfil_publico import (
+    ACTIVE_LABELS,
+    COMPLETED_LABELS,
+    COUNT_NUMBER_COLOR,
     avatar,
-    donation_counts,
     parse_counts,
     parse_email_verified,
     parse_photo_url,
-    verified_badge,
 )
 
 
@@ -184,6 +185,39 @@ async def _fetch_donation_detail(
     return await cache_publico.cached(cache_publico.DETAIL, endpoint, load)
 
 
+async def _fetch_donor_member_since(
+    client: httpx.AsyncClient,
+    base_url: str,
+    donation_id: int,
+) -> str:
+    """“outubro de 2020”, a partir do perfil público de quem doa (página 1,
+    a mesma entrada do cache público de 60 s que a página do perfil usa).
+
+    Qualquer falha do perfil devolve "": a linha “desde” some e o resto do
+    cartão aparece. Navegação cancelada (CancelledError) não é capturada.
+    """
+    # Import tardio: perfil_doador importa deste módulo.
+    from doafacil.perfil_doador import (
+        DonorProfileNotFoundError,
+        DonorProfileRateLimitError,
+        DonorProfileServiceError,
+        fetch_donor_profile,
+        member_since_label,
+    )
+
+    try:
+        profile = await fetch_donor_profile(client, base_url, donation_id)
+        return member_since_label(profile["member_since"])
+    except (
+        DonorProfileNotFoundError,
+        DonorProfileRateLimitError,
+        DonorProfileServiceError,
+        httpx.HTTPError,
+        ValueError,
+    ):
+        return ""
+
+
 async def _fetch_donor_email(
     client: httpx.AsyncClient,
     base_url: str,
@@ -228,6 +262,9 @@ class DonationDetailState(LoginState):
     donor_email_verified: bool = False
     donor_active: int = 0
     donor_completed: int = 0
+    # “No DoaFácil desde …” (change quem-doa-completo): texto pronto, como
+    # “outubro de 2020”, lido do perfil público; vazio esconde a linha.
+    donor_member_since: str = ""
     photos: list[str] = []
     view_state: str = "loading"
     contact_message: str = ""
@@ -250,6 +287,11 @@ class DonationDetailState(LoginState):
     @rx.var
     def donor_initial(self) -> str:
         return avatar_initial(self.donor_first_name)
+
+    @rx.var
+    def gallery_size(self) -> int:
+        """Quantas fotos a galeria mostra (de 1 a 5): escolhe o arranjo."""
+        return min(len(self.photos), MAX_GALLERY_PHOTOS)
 
     @rx.event
     def open_viewer(self, index: int) -> None:
@@ -297,7 +339,7 @@ class DonationDetailState(LoginState):
             DonationDetailState.prev_photo.fn(self)
 
     @rx.event
-    async def load_donation(self) -> None:
+    async def load_donation(self) -> rx.event.EventSpec | None:
         self.donation_id = 0
         self.title = ""
         self.condition = ""
@@ -312,6 +354,7 @@ class DonationDetailState(LoginState):
         self.donor_email_verified = False
         self.donor_active = 0
         self.donor_completed = 0
+        self.donor_member_since = ""
         self.photos = []
         self.view_state = "loading"
         self.contact_message = ""
@@ -359,6 +402,26 @@ class DonationDetailState(LoginState):
             self.donor_completed = donation["donor_completed"]
             self.photos = donation["photos"]
             self.view_state = "loaded"
+            # O “desde” vem depois, sem atrasar o detalhe.
+            return DonationDetailState.load_donor_since
+        return None
+
+    @rx.event
+    async def load_donor_since(self) -> None:
+        donation_id = self.donation_id
+        if donation_id <= 0:
+            return
+        base_url = os.getenv("XANO_API_URL", "").strip()
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                label = await _fetch_donor_member_since(
+                    client, base_url, donation_id
+                )
+        except httpx.HTTPError:
+            label = ""
+        # Outra doação foi aberta enquanto o perfil respondia.
+        if self.donation_id == donation_id:
+            self.donor_member_since = label
 
     @rx.event
     async def request_donor_contact(self) -> rx.event.EventSpec | None:
@@ -449,6 +512,27 @@ DONOR_AVATAR_BACKGROUND = "#F2F2F2"
 DETAIL_ICON = "/detalhe-atributo.svg"
 LOCATION_ICON = "/detalhe-localizacao.svg"
 MAX_THUMBNAILS = 4
+MAX_GALLERY_PHOTOS = MAX_THUMBNAILS + 1
+GALLERY_HEIGHT_WIDE = "470px"
+GALLERY_COVER_HEIGHT_NARROW = "300px"
+GALLERY_RADIUS = "8px"
+GALLERY_GAP_WIDE = "16px"
+GALLERY_GAP_NARROW = "8px"
+# Área da grade de cada foto, pela posição (a = capa).
+GALLERY_AREAS = ["a", "b", "c", "d", "e"]
+# Computador (change galeria-detalhe): colunas e áreas por quantidade de
+# fotos, todas dentro dos 470 px. Com 5, a capa fica com metade da largura.
+GALLERY_WIDE_LAYOUTS = {
+    1: ("minmax(0, 1fr)", "'a'"),
+    2: ("minmax(0, 1fr) minmax(0, 1fr)", "'a b'"),
+    3: ("minmax(0, 2fr) minmax(0, 1fr)", "'a b' 'a c'"),
+    4: ("minmax(0, 1fr) minmax(0, 1fr)", "'a b' 'c d'"),
+    5: ("repeat(4, minmax(0, 1fr))", "'a a b c' 'a a d e'"),
+}
+# Celular: capa em cima e uma fileira de 4 posições para as miniaturas.
+GALLERY_NARROW_COLUMNS = "repeat(4, minmax(0, 1fr))"
+GALLERY_NARROW_AREAS_SINGLE = "'a a a a'"
+GALLERY_NARROW_AREAS = "'a a a a' 'b c d e'"
 
 
 VIEWER_BACKDROP = "rgba(255, 246, 232, 0.85)"
@@ -732,83 +816,100 @@ def _photo_viewer() -> rx.Component:
     )
 
 
-def _gallery_thumbnail(photo: rx.Var[str], index: rx.Var[int]) -> rx.Component:
-    # As miniaturas são as fotos 2 a 5: posição no visualizador = index + 1.
-    return _photo_open_button(
-        rx.image(
-            src=photo,
-            alt="Foto da doação",
-            width="100%",
-            height=rx.breakpoints(initial="140px", md="100%"),
-            min_height="0",
-            object_fit="cover",
-            border_radius="8px",
-            background=PHOTO_PLACEHOLDER,
+def _gallery_photo(photo: rx.Var[str], index: rx.Var[int]) -> rx.Component:
+    """Uma foto da galeria, em qualquer posição: botão que abre o visualizador
+    nela, com a área da grade (a…e) dada pela posição."""
+    is_cover = index == 0
+    return rx.box(
+        _photo_open_button(
+            rx.image(
+                src=photo,
+                alt=rx.cond(is_cover, DonationDetailState.title, "Foto da doação"),
+                display="block",
+                width="100%",
+                height="100%",
+                min_height="0",
+                # Uma foto só: inteira (contain), com fundo neutro nas sobras.
+                object_fit=rx.cond(
+                    DonationDetailState.gallery_size > 1, "cover", "contain"
+                ),
+                object_position="center",
+                border_radius=GALLERY_RADIUS,
+                background=PHOTO_PLACEHOLDER,
+            ),
+            index,
+            _photo_label(index + 1),
         ),
-        index + 1,
-        _photo_label(index + 2),
+        class_name="detail-gallery-photo",
+        grid_area=rx.Var.create(GALLERY_AREAS)[index],
+        min_width="0",
+        min_height="0",
+        # No celular, as miniaturas são quadradas; a capa segue a linha de 300 px.
+        aspect_ratio=rx.breakpoints(
+            initial=rx.cond(is_cover, "auto", "1 / 1"), md="auto"
+        ),
+    )
+
+
+def _wide_layout(part: int) -> rx.Var:
+    """Colunas (part=0) ou áreas (part=1) do computador para a quantidade."""
+    return rx.match(
+        DonationDetailState.gallery_size,
+        *[
+            (size, layout[part])
+            for size, layout in GALLERY_WIDE_LAYOUTS.items()
+            if size != MAX_GALLERY_PHOTOS
+        ],
+        GALLERY_WIDE_LAYOUTS[MAX_GALLERY_PHOTOS][part],
     )
 
 
 def _gallery() -> rx.Component:
-    """Capa grande e, ao lado, até 4 miniaturas em 2 colunas (Figma).
+    """Galeria que se adapta à quantidade de fotos (change galeria-detalhe).
 
-    No celular, a capa vem em cima e as miniaturas abaixo, em 2 colunas.
-    Com uma foto só, a capa ocupa toda a largura da galeria e aparece inteira
-    (contain), centralizada, com fundo neutro nas sobras.
+    Uma grade só, com todas as fotos (até 5) como filhas diretas: o espaço e
+    os cantos são iguais entre todas. No computador, o arranjo depende da
+    quantidade (1 grande; 2 lado a lado; 3 com a capa em 2/3 e duas
+    empilhadas; 2x2; capa + 2x2). No celular, a capa vem em cima e as demais
+    numa fileira de miniaturas quadradas. Com 2 a 5 fotos, todas usam
+    ``object-fit: cover``; a foto única aparece inteira (``contain``).
     """
-    has_thumbnails = DonationDetailState.photos.length() > 1
+    has_thumbnails = DonationDetailState.gallery_size > 1
     return rx.box(
-        _photo_open_button(
-            rx.image(
-                src=DonationDetailState.photos[0],
-                alt=DonationDetailState.title,
-                width="100%",
-                height=rx.breakpoints(initial="300px", md="470px"),
-                object_fit=rx.cond(has_thumbnails, "cover", "contain"),
-                object_position="center",
-                border_radius="8px",
-                background=PHOTO_PLACEHOLDER,
-            ),
-            0,
-            _photo_label(1),
-        ),
-        rx.cond(
-            has_thumbnails,
-            rx.box(
-                rx.foreach(
-                    DonationDetailState.photos[1 : MAX_THUMBNAILS + 1],
-                    _gallery_thumbnail,
-                ),
-                class_name="detail-gallery-thumbnails",
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
-                    "gridAutoRows": rx.breakpoints(
-                        initial="140px", md="minmax(0, 1fr)"
-                    ),
-                },
-                gap="16px",
-                width="100%",
-                height=rx.breakpoints(initial="auto", md="470px"),
-            ),
-            rx.fragment(),
+        rx.foreach(
+            DonationDetailState.photos[0:MAX_GALLERY_PHOTOS],
+            _gallery_photo,
         ),
         class_name="detail-gallery",
         style={
             "display": "grid",
-            # Com uma foto só, a capa ocupa toda a largura da galeria.
             "gridTemplateColumns": rx.breakpoints(
-                initial="minmax(0, 1fr)",
-                md=rx.cond(
+                initial=GALLERY_NARROW_COLUMNS, md=_wide_layout(0)
+            ),
+            "gridTemplateAreas": rx.breakpoints(
+                initial=rx.cond(
                     has_thumbnails,
+                    GALLERY_NARROW_AREAS,
+                    GALLERY_NARROW_AREAS_SINGLE,
+                ),
+                md=_wide_layout(1),
+            ),
+            "gridTemplateRows": rx.breakpoints(
+                initial=rx.cond(
+                    has_thumbnails,
+                    f"{GALLERY_COVER_HEIGHT_NARROW} auto",
+                    GALLERY_COVER_HEIGHT_NARROW,
+                ),
+                md=rx.cond(
+                    DonationDetailState.gallery_size > 2,
                     "minmax(0, 1fr) minmax(0, 1fr)",
                     "minmax(0, 1fr)",
                 ),
             ),
         },
-        gap="16px",
+        gap=rx.breakpoints(initial=GALLERY_GAP_NARROW, md=GALLERY_GAP_WIDE),
         width="100%",
+        height=rx.breakpoints(initial="auto", md=GALLERY_HEIGHT_WIDE),
     )
 
 
@@ -1041,31 +1142,129 @@ def _location_card() -> rx.Component:
     )
 
 
-def _donor_card() -> rx.Component:
-    """Cartão de quem doa: foto, primeiro nome, “Cidade, UF”, os contadores e o
-    selo “E-mail verificado” (só quando verificado). Nunca o e-mail.
+DONOR_PROFILE_BUTTON_LABEL = "Ver perfil de quem doa"
+DONOR_SINCE_PREFIX = "No DoaFácil desde "
+DONOR_DONATIONS_TITLE = "Doações"
+DONOR_VERIFIED_TITLE = "Informações verificadas"
+DONOR_VERIFIED_EMAIL_LABEL = "E-mail"
+DONOR_BUTTON_HOVER_BACKGROUND = "#E8F5EC"
 
-    O cartão inteiro é o link para o perfil público (/doacao/<id>/quem-doa),
-    com rótulo acessível “Ver perfil de <primeiro nome>”. O frontend só usa o
-    id da doação, nunca o id de quem doa.
+
+def _donor_card() -> rx.Component:
+    """Cartão de quem doa em seções (change quem-doa-completo).
+
+    Topo com foto, primeiro nome, “No DoaFácil desde …” e “Cidade, UF”; o
+    botão “Ver perfil de quem doa”; “Doações” (os contadores, com os rótulos
+    do perfil público e de Minhas doações); e
+    “Informações verificadas” só com o e-mail verificado. Nunca o e-mail.
+
+    O cartão não é link: o link é o botão, para /doacao/<id>/quem-doa. O
+    frontend só usa o id da doação, nunca o id de quem doa.
     """
-    return rx.link(
+    return rx.box(
         _donor_card_content(),
-        href=f"/doacao/{DonationDetailState.donation_id}/quem-doa",
-        aria_label=(
-            rx.Var.create("Ver perfil de ")
-            + DonationDetailState.donor_first_name
-        ),
         class_name="detail-donor-card",
-        display="block",
         width="100%",
         padding="32px 28px",
         background="white",
         border=f"1px solid {BORDER_SOFT}",
         border_radius="8px",
-        text_decoration="none",
         color=TEXT_DONOR,
-        _hover={"borderColor": PRIMARY_GREEN, "textDecoration": "none"},
+    )
+
+
+def _donor_divider() -> rx.Component:
+    """Linha de 1 px entre as seções (decorativa)."""
+    return rx.box(
+        class_name="detail-donor-divider",
+        role="presentation",
+        width="100%",
+        height="0",
+        border_top=f"1px solid {BORDER_SOFT}",
+    )
+
+
+def _donor_section_title(text: str) -> rx.Component:
+    return rx.heading(
+        text,
+        as_="h3",
+        font_size="1rem",
+        font_weight="600",
+        color=TEXT_DONOR,
+    )
+
+
+def _donor_info_line(icon: str, *children: Any) -> rx.Component:
+    """Ícone decorativo e texto, como “No DoaFácil desde …” e “Cidade, UF”."""
+    return rx.hstack(
+        rx.icon(icon, size=18, color=TEXT_DONOR, aria_hidden="true", flex_shrink="0"),
+        rx.text(*children, color=TEXT_DONOR, font_size="0.9rem"),
+        spacing="2",
+        align="center",
+    )
+
+
+def _donor_stat(icon: str, value: rx.Var, labels: tuple[str, str]) -> rx.Component:
+    """Um número com ícone (decorativo) e o rótulo abaixo, no singular com 1,
+    como no perfil público e em Minhas doações."""
+    singular, plural = labels
+    return rx.hstack(
+        rx.icon(icon, size=22, color=TEXT_DONOR, aria_hidden="true", flex_shrink="0"),
+        rx.vstack(
+            rx.text(
+                value,
+                color=COUNT_NUMBER_COLOR,
+                font_size="1.3rem",
+                font_weight="700",
+                line_height="1.1",
+            ),
+            rx.text(
+                rx.cond(value == 1, singular, plural),
+                color=TEXT_LABEL,
+                font_size="0.85rem",
+                line_height="1.2",
+            ),
+            spacing="0",
+            align="start",
+        ),
+        class_name="detail-donor-stat",
+        spacing="2",
+        align="center",
+        flex="1",
+        min_width="0",
+    )
+
+
+def _donor_profile_button() -> rx.Component:
+    """Botão contornado, na largura toda, que leva ao perfil público."""
+    return rx.link(
+        DONOR_PROFILE_BUTTON_LABEL,
+        href=f"/doacao/{DonationDetailState.donation_id}/quem-doa",
+        # Começa pelo texto visível (WCAG 2.5.3) e diz de quem é o perfil.
+        aria_label=(
+            rx.Var.create(f"{DONOR_PROFILE_BUTTON_LABEL}, ")
+            + DonationDetailState.donor_first_name
+        ),
+        class_name="detail-donor-profile-button",
+        display="flex",
+        align_items="center",
+        justify_content="center",
+        width="100%",
+        min_height="44px",
+        padding="10px 16px",
+        box_sizing="border-box",
+        color=PRIMARY_GREEN,
+        font_weight="700",
+        text_align="center",
+        text_decoration="none",
+        background="white",
+        border=f"1px solid {PRIMARY_GREEN}",
+        border_radius="8px",
+        _hover={
+            "background": DONOR_BUTTON_HOVER_BACKGROUND,
+            "color": PRIMARY_GREEN_HOVER,
+            "textDecoration": "none",
+        },
         _focus_visible={
             "outline": f"2px solid {PRIMARY_GREEN}",
             "outlineOffset": "2px",
@@ -1083,7 +1282,7 @@ def _donor_card_content() -> rx.Component:
             color=TEXT_DONOR,
             class_name="page-fade-enter",
         ),
-        # Foto de perfil (ou a inicial) de 48 px ao lado do primeiro nome.
+        # Topo: foto (ou inicial) de 48 px, nome, “desde” e cidade.
         rx.hstack(
             avatar(
                 DonationDetailState.donor_photo,
@@ -1094,44 +1293,80 @@ def _donor_card_content() -> rx.Component:
                 color=TEXT_LABEL,
                 font_size="1.3rem",
             ),
-            rx.text(
-                DonationDetailState.donor_first_name,
-                color=TEXT_DONOR,
-                font_size="1.2rem",
-                font_weight="600",
-                overflow_wrap="anywhere",
+            rx.vstack(
+                rx.text(
+                    DonationDetailState.donor_first_name,
+                    color=TEXT_DONOR,
+                    font_size="1.2rem",
+                    font_weight="600",
+                    overflow_wrap="anywhere",
+                ),
+                # Só com a data lida do perfil público; sem ela, a linha some.
+                rx.cond(
+                    DonationDetailState.donor_member_since != "",
+                    _donor_info_line(
+                        "calendar",
+                        DONOR_SINCE_PREFIX,
+                        DonationDetailState.donor_member_since,
+                    ),
+                    rx.fragment(),
+                ),
+                _donor_info_line(
+                    "map-pin",
+                    DonationDetailState.city,
+                    ", ",
+                    DonationDetailState.state,
+                ),
+                spacing="1",
+                align="start",
+                min_width="0",
             ),
             spacing="3",
-            align="center",
+            align="start",
         ),
+        _donor_profile_button(),
+        _donor_divider(),
+        _donor_section_title(DONOR_DONATIONS_TITLE),
         rx.hstack(
-            rx.icon("map-pin", size=18, color=TEXT_DONOR, aria_hidden="true"),
-            rx.text(
-                DonationDetailState.city,
-                ", ",
-                DonationDetailState.state,
-                color=TEXT_DONOR,
-                font_size="0.9rem",
+            # Ativas (disponíveis e reservadas) e concluídas.
+            _donor_stat("package", DonationDetailState.donor_active, ACTIVE_LABELS),
+            _donor_stat(
+                "package-check",
+                DonationDetailState.donor_completed,
+                COMPLETED_LABELS,
             ),
-            spacing="3",
-            align="center",
+            spacing="4",
+            width="100%",
+            wrap="wrap",
         ),
-        # Contadores numa linha e, abaixo, o selo (só quando verificado).
-        donation_counts(
-            DonationDetailState.donor_active,
-            DonationDetailState.donor_completed,
-        ),
-        verified_badge(DonationDetailState.donor_email_verified),
-        # Mostra que o cartão é clicável.
-        rx.hstack(
-            rx.text("Ver perfil", color=PRIMARY_GREEN, font_weight="700"),
-            rx.icon("chevron-right", size=18, color=PRIMARY_GREEN, aria_hidden="true"),
-            spacing="1",
-            align="center",
-            padding_top="4px",
+        # Sem e-mail verificado, a seção e o divisor não aparecem.
+        rx.cond(
+            DonationDetailState.donor_email_verified,
+            rx.fragment(
+                _donor_divider(),
+                _donor_section_title(DONOR_VERIFIED_TITLE),
+                rx.hstack(
+                    rx.icon(
+                        "circle-check",
+                        size=18,
+                        color=COUNT_NUMBER_COLOR,
+                        aria_hidden="true",
+                        flex_shrink="0",
+                    ),
+                    rx.text(
+                        DONOR_VERIFIED_EMAIL_LABEL,
+                        color=TEXT_DONOR,
+                        font_size="0.9rem",
+                    ),
+                    class_name="detail-donor-verified-email",
+                    spacing="2",
+                    align="center",
+                ),
+            ),
+            rx.fragment(),
         ),
         align="stretch",
-        spacing="3",
+        spacing="4",
         width="100%",
     )
 

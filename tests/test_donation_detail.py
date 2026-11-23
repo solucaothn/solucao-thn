@@ -736,22 +736,71 @@ class DonationDetailTests(unittest.TestCase):
             with self.subTest(state=state_message):
                 self.assertIn(state_message, contents)
 
-    def test_gallery_shows_cover_and_up_to_four_thumbnails_in_two_columns(self) -> None:
-        from doafacil.detalhe_doacao import MAX_THUMBNAILS, _gallery
+    def test_gallery_is_one_grid_with_up_to_five_photos(self) -> None:
+        from doafacil.detalhe_doacao import MAX_GALLERY_PHOTOS, _gallery
 
-        self.assertEqual(MAX_THUMBNAILS, 4)
+        self.assertEqual(MAX_GALLERY_PHOTOS, 5)
         rendered = str(_gallery())
-        # Capa: a primeira foto, com o título como texto alternativo.
-        self.assertIn("photos_rx_state_?.at?.(0)", rendered)
-        self.assertIn('"height"] : "470px"', rendered)
-        # Miniaturas: da 2ª à 5ª foto, em 2 colunas.
-        self.assertIn(".slice(1, 5)", rendered)
-        self.assertIn("repeat(2, minmax(0, 1fr))", rendered)
+        # Um único foreach sobre as 5 primeiras fotos, filhas diretas da grade.
+        self.assertEqual(rendered.count("Array.prototype.map.call"), 1)
+        self.assertIn("photos_rx_state_.slice(0, 5)", rendered)
+        self.assertNotIn("detail-gallery-thumbnails", rendered)
+        # Capa com o título como texto alternativo; as demais, “Foto da doação”.
+        self.assertIn("title_rx_state_", rendered)
         self.assertIn("Foto da doa\\u00e7\\u00e3o", rendered)
-        # Com uma foto só, não há miniaturas e a capa ocupa a largura toda.
-        self.assertIn("photos_rx_state_.length > 1", rendered.replace("?.", "."))
-        self.assertIn('"minmax(0, 1fr) minmax(0, 1fr)"', rendered)
-        self.assertIn('"minmax(0, 1fr)"', rendered)
+        # Área de cada foto pela posição.
+        self.assertIn('["gridArea"] : ["a", "b", "c", "d", "e"]?.at?.(index_rx_state_)', rendered)
+        # Altura de 470 px no computador; espaço de 16 px (8 px no celular).
+        self.assertIn('["height"] : "470px"', rendered)
+        self.assertIn('["gap"] : "16px"', rendered)
+        self.assertIn('["gap"] : "8px"', rendered)
+
+    def test_gallery_wide_layout_for_each_photo_count(self) -> None:
+        from doafacil.detalhe_doacao import GALLERY_WIDE_LAYOUTS, _gallery
+
+        self.assertEqual(
+            GALLERY_WIDE_LAYOUTS,
+            {
+                1: ("minmax(0, 1fr)", "'a'"),
+                2: ("minmax(0, 1fr) minmax(0, 1fr)", "'a b'"),
+                3: ("minmax(0, 2fr) minmax(0, 1fr)", "'a b' 'a c'"),
+                4: ("minmax(0, 1fr) minmax(0, 1fr)", "'a b' 'c d'"),
+                5: ("repeat(4, minmax(0, 1fr))", "'a a b c' 'a a d e'"),
+            },
+        )
+        rendered = str(_gallery())
+        wide = rendered.split('"@media screen and (min-width: 62em)"', 1)[1]
+        for size, (columns, areas) in GALLERY_WIDE_LAYOUTS.items():
+            with self.subTest(size=size):
+                self.assertIn(f'"{columns}"', wide)
+                self.assertIn(f'"{areas}"', wide)
+        # Até 2 fotos, uma linha; com 3 ou mais, duas linhas iguais.
+        self.assertIn(
+            'gallery_size_rx_state_ > 2) ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr)"',
+            wide,
+        )
+
+    def test_gallery_narrow_layout_has_cover_on_top_and_square_thumbnails(self) -> None:
+        from doafacil.detalhe_doacao import _gallery
+
+        rendered = str(_gallery())
+        narrow = rendered.split('"@media screen and (min-width: 0px)"', 1)[1].split(
+            '"@media screen and (min-width: 62em)"', 1
+        )[0]
+        self.assertIn('"repeat(4, minmax(0, 1fr))"', narrow)
+        self.assertIn(
+            "gallery_size_rx_state_ > 1) ? \"'a a a a' 'b c d e'\" : \"'a a a a'\"",
+            narrow,
+        )
+        self.assertIn('gallery_size_rx_state_ > 1) ? "300px auto" : "300px"', narrow)
+        # Miniaturas quadradas; a capa segue a linha de 300 px.
+        self.assertIn('=== 0?.valueOf?.()) ? "auto" : "1 / 1"', rendered)
+
+    def test_gallery_size_caps_at_five(self) -> None:
+        for count, expected in ((0, 0), (1, 1), (3, 3), (5, 5), (7, 5)):
+            with self.subTest(count=count):
+                state = SimpleNamespace(photos=[f"https://images.example/{n}.jpg" for n in range(count)])
+                self.assertEqual(DonationDetailState.gallery_size.fget(state), expected)
 
     def test_gallery_handles_one_and_five_photos_from_parser(self) -> None:
         one = _parse_donation_detail({**DETAIL_PAYLOAD, "photos": ["https://images.example/a.jpg"]}, 42)
@@ -856,61 +905,120 @@ class DonationDetailTests(unittest.TestCase):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, rendered)
 
-    def test_donor_card_shows_first_name_city_counts_and_badge_only(self) -> None:
+    def test_donor_card_has_sections_with_existing_data_only(self) -> None:
         from doafacil.detalhe_doacao import _donor_card
 
         card = _donor_card()
         rendered = str(card)
-        # Textos fixos: o título, a vírgula da cidade, o selo e “Ver perfil”.
+        # Textos fixos, na ordem: topo, botão, “Doações” e “Informações verificadas”.
         self.assertEqual(
-            _component_contents(card), ["Quem doa", ", ", "E-mail verificado", "Ver perfil"]
+            _component_contents(card),
+            [
+                "Quem doa",
+                "No DoaFácil desde ",
+                ", ",
+                "Ver perfil de quem doa",
+                "Doações",
+                "Informações verificadas",
+                "E-mail",
+            ],
         )
-        self.assertIn("donor_first_name_rx_state_", rendered)
-        # Contadores e selo, sem e-mail (change perfil-credibilidade).
-        for var in ("donor_active", "donor_completed", "donor_email_verified"):
+        for var in (
+            "donor_first_name",
+            "donor_member_since",
+            "city",
+            "state",
+            "donor_active",
+            "donor_completed",
+            "donor_email_verified",
+        ):
             with self.subTest(var=var):
                 self.assertIn(f"{var}_rx_state_", rendered)
-        self.assertIn("profile-counts", rendered)
-        self.assertIn("verified-badge", rendered)
+        # Ícones decorativos: calendário, local, pacotes e o check verde.
+        for icon in ("LucideCalendar", "LucideMapPin", "LucidePackage", "LucidePackageCheck", "LucideCircleCheck"):
+            with self.subTest(icon=icon):
+                self.assertIn(icon, rendered)
+        self.assertNotIn('"aria-hidden":"false"', rendered)
+        self.assertIn('"#166B3B"', rendered)
+        # Dois divisores de 1 px entre as seções.
+        self.assertEqual(rendered.count("detail-donor-divider"), 2)
+        self.assertIn("1px solid #D9D9D9", rendered)
+        # Nada que o site não tem, e nunca o e-mail.
         self.assertNotIn("@", rendered)
         self.assertNotIn("donor_email_rx_state_", rendered)
-        self.assertIn("LucideMapPin", rendered)
-        self.assertNotIn("<img", rendered)
-        self.assertNotIn("Image", [type(n).__name__ for n in _all_component_nodes(card)])
+        contents = " ".join(_component_contents(card)).lower()
+        for excluded in ("online", "avalia", "estrela", "cancelad", "cpf", "não verificado"):
+            with self.subTest(excluded=excluded):
+                self.assertNotIn(excluded, contents)
 
-    def test_donor_card_links_to_public_profile_by_donation_id(self) -> None:
+    def test_donor_card_counts_use_profile_labels_with_singular(self) -> None:
+        from doafacil.detalhe_doacao import _donor_card
+
+        rendered = str(_donor_card())
+        # Os mesmos rótulos do perfil público e de Minhas doações.
+        self.assertIn(
+            'donor_active_rx_state_?.valueOf?.() === 1?.valueOf?.()) ? "Doa\\u00e7\\u00e3o" : "Doa\\u00e7\\u00f5es"',
+            rendered,
+        )
+        self.assertIn(
+            'donor_completed_rx_state_?.valueOf?.() === 1?.valueOf?.()) ? "Doa\\u00e7\\u00e3o realizada" : "Doa\\u00e7\\u00f5es realizadas"',
+            rendered,
+        )
+        for old_label in ("Dispon", "Conclu"):
+            with self.subTest(old_label=old_label):
+                self.assertNotIn(old_label, rendered)
+
+    def test_donor_card_optional_parts_depend_on_data(self) -> None:
+        from doafacil.detalhe_doacao import _donor_card
+
+        rendered = str(_donor_card())
+        # “Desde” só com o texto lido do perfil público.
+        self.assertIn(
+            '(!((reflex___state____state__doafacil___login____login_state__doafacil___detalhe_doacao____donation_detail_state.donor_member_since_rx_state_?.valueOf?.() === ""?.valueOf?.()))?',
+            rendered,
+        )
+        # “Informações verificadas”, com o divisor, só com o e-mail verificado.
+        verified_at = rendered.index("donor_email_verified_rx_state_?(")
+        self.assertLess(verified_at, rendered.rindex("detail-donor-divider"))
+        self.assertLess(verified_at, rendered.index("Informa\\u00e7\\u00f5es verificadas"))
+        self.assertGreater(verified_at, rendered.index("detail-donor-divider"))
+
+    def test_donor_card_is_not_a_link_and_button_goes_to_profile(self) -> None:
         from doafacil.detalhe_doacao import _donor_card
 
         card = _donor_card()
         rendered = str(card)
-        # O cartão inteiro é o link, com o id da doação (nunca o de quem doa).
-        self.assertEqual(type(card).__name__, "Link")
-        self.assertIn("ReactRouterLink", rendered)
+        # O cartão é uma caixa; o único link é o botão, com o id da doação.
+        self.assertNotEqual(type(card).__name__, "Link")
+        links = [n for n in _all_component_nodes(card) if type(n).__name__ == "Link"]
+        self.assertEqual(len(links), 1)
+        self.assertEqual(rendered.count("ReactRouterLink"), 1)
         self.assertIn('"/doacao/"+', rendered)
         self.assertIn("donation_id_rx_state_", rendered)
         self.assertIn('"/quem-doa"', rendered)
         self.assertNotIn("owner_id", rendered)
         self.assertNotIn("user_id", rendered)
 
-    def test_donor_card_link_has_accessible_label_and_visible_focus(self) -> None:
-        from doafacil.detalhe_doacao import _donor_card
+    def test_profile_button_is_outlined_full_width_and_accessible(self) -> None:
+        from doafacil.detalhe_doacao import _donor_profile_button
 
-        rendered = str(_donor_card())
-        self.assertIn("Ver perfil de ", rendered)
-        self.assertIn('"aria-label"', rendered)
+        rendered = str(_donor_profile_button())
+        # Rótulo que começa pelo texto visível e diz de quem é o perfil.
+        self.assertIn('"aria-label":("Ver perfil de quem doa, "+', rendered)
         self.assertIn("donor_first_name_rx_state_", rendered)
-        self.assertIn("LucideChevronRight", rendered)
-        # Hover com borda verde e foco com contorno visível.
-        self.assertIn('"#007A42"', rendered)
+        self.assertIn('["width"] : "100%"', rendered)
+        self.assertIn('["minHeight"] : "44px"', rendered)
+        self.assertIn('["border"] : "1px solid #007A42"', rendered)
+        self.assertIn('["color"] : "#007A42"', rendered)
         self.assertIn("&:hover", rendered)
         self.assertIn("&:focus-visible", rendered)
         self.assertIn("2px solid #007A42", rendered)
 
     def test_detail_has_no_other_profile_buttons(self) -> None:
         contents = _component_contents(donation_detail_page())
-        # O perfil só se abre pelo cartão “Quem doa”.
-        self.assertEqual(contents.count("Ver perfil"), 1)
-        for excluded in ("Acessar perfil do doador", "Ver perfil completo", "Perfil"):
+        # O perfil só se abre pelo botão do cartão “Quem doa”.
+        self.assertEqual(contents.count("Ver perfil de quem doa"), 1)
+        for excluded in ("Acessar perfil do doador", "Ver perfil completo", "Ver perfil", "Perfil"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
 
@@ -924,27 +1032,30 @@ class DonationDetailTests(unittest.TestCase):
 
     # Foto única e visualizador -------------------------------------------
 
-    def test_single_photo_is_shown_whole_and_many_photos_keep_cover(self) -> None:
+    def test_single_photo_is_whole_and_two_to_five_use_cover(self) -> None:
         from doafacil.detalhe_doacao import _gallery
 
         rendered = str(_gallery())
-        # A capa troca de cover para contain quando há uma foto só.
+        # Uma foto só: inteira (contain); de 2 a 5: cover.
         self.assertIn(
-            'photos_rx_state_.length > 1) ? "cover" : "contain"',
-            rendered.replace("?.", "."),
+            '["objectFit"] : ((reflex___state____state__doafacil___login____login_state__doafacil___detalhe_doacao____donation_detail_state.gallery_size_rx_state_ > 1) ? "cover" : "contain")',
+            rendered,
         )
-        self.assertIn('"objectPosition"] : "center"', rendered)
-        self.assertIn('"background"] : "#EEEEEE"', rendered)
-        # Mesma altura de antes.
-        self.assertIn('"height"] : "300px"', rendered)
-        self.assertIn('"height"] : "470px"', rendered)
+        self.assertIn('["objectPosition"] : "center"', rendered)
+        self.assertIn('["background"] : "#EEEEEE"', rendered)
+        self.assertIn('["borderRadius"] : "8px"', rendered)
+        # Mesmas alturas de antes: 300 px no celular e 470 px no computador.
+        self.assertIn('"300px"', rendered)
+        self.assertIn('["height"] : "470px"', rendered)
 
     def test_gallery_photos_are_buttons_that_open_the_viewer(self) -> None:
         from doafacil.detalhe_doacao import _gallery
 
         rendered = str(_gallery())
-        self.assertEqual(rendered.count('type:"button"'), 2)
-        self.assertEqual(rendered.count("open_viewer"), 2)
+        # Um botão só, gerado para cada foto, abrindo o visualizador nela.
+        self.assertEqual(rendered.count('type:"button"'), 1)
+        self.assertEqual(rendered.count("open_viewer"), 1)
+        self.assertIn("(index_rx_state_ + 1)", rendered)
         self.assertIn('"Ampliar foto "+', rendered)
         self.assertIn('" de "', rendered)
         self.assertIn('"cursor"] : "zoom-in"', rendered)
@@ -1229,3 +1340,145 @@ class DetailRetryTests(unittest.TestCase):
         retry_at = rendered.index('className:"detail-retry"')
         self.assertLess(message_at, retry_at)
         self.assertLess(retry_at - message_at, 1500)
+
+
+DONOR_PROFILE_PAYLOAD = {
+    "donor": {
+        "first_name": "Ana",
+        "city": "Campinas",
+        "state": "SP",
+        "member_since": "2020-10",
+        "email_verified": True,
+        "counts": {"active": 3, "completed": 4},
+    },
+    "items": [],
+    "page": 1,
+    "per_page": 12,
+    "total": 0,
+    "page_total": 0,
+}
+
+
+class DonorMemberSinceTests(unittest.TestCase):
+    """“No DoaFácil desde …” lido do perfil público (change quem-doa-completo)."""
+
+    BASE_URL = "https://xano.example/api:catalog"
+
+    def setUp(self) -> None:
+        from doafacil import cache_publico
+
+        cache_publico.clear()
+        self.addCleanup(cache_publico.clear)
+
+    def _fetch(self, handler: Callable[[httpx.Request], httpx.Response]) -> str:
+        from doafacil.detalhe_doacao import _fetch_donor_member_since
+
+        async def run() -> str:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                return await _fetch_donor_member_since(client, self.BASE_URL, 42)
+
+        return asyncio.run(run())
+
+    def test_reads_member_since_from_profile_page_one(self) -> None:
+        def respond(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.url.path, "/api:catalog/catalog/donations/donor")
+            self.assertEqual(request.url.params.get("donation_id"), "42")
+            self.assertEqual(request.url.params.get("page"), "1")
+            return httpx.Response(200, json=DONOR_PROFILE_PAYLOAD)
+
+        self.assertEqual(self._fetch(respond), "outubro de 2020")
+
+    def test_any_profile_failure_hides_the_line(self) -> None:
+        def status(code: int) -> Callable[[httpx.Request], httpx.Response]:
+            return lambda request: httpx.Response(code)
+
+        def network_error(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("offline", request=request)
+
+        bad = {**DONOR_PROFILE_PAYLOAD, "donor": {**DONOR_PROFILE_PAYLOAD["donor"], "member_since": "2020-13"}}
+        for name, handler in (
+            ("404", status(404)),
+            ("429", status(429)),
+            ("500", status(500)),
+            ("rede", network_error),
+            ("inválido", lambda request: httpx.Response(200, json=bad)),
+            ("não JSON", lambda request: httpx.Response(200, text="oops")),
+        ):
+            with self.subTest(case=name):
+                from doafacil import cache_publico
+
+                cache_publico.clear()
+                self.assertEqual(self._fetch(handler), "")
+
+    def test_two_reads_within_60_seconds_make_one_request(self) -> None:
+        calls: list[httpx.Request] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(200, json=DONOR_PROFILE_PAYLOAD)
+
+        self.assertEqual(self._fetch(respond), "outubro de 2020")
+        self.assertEqual(self._fetch(respond), "outubro de 2020")
+        self.assertEqual(len(calls), 1)
+
+    def test_load_donation_returns_the_since_event_only_when_loaded(self) -> None:
+        async def ok(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=DETAIL_PAYLOAD)
+
+        async def fail(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(500)
+
+        for handler, expected in ((ok, DonationDetailState.load_donor_since), (fail, None)):
+            with self.subTest(expected=expected):
+                from doafacil import cache_publico
+
+                cache_publico.clear()
+                state = _state_for_route_id("42")
+                state.donor_member_since = "março de 2019"
+                client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+                with (
+                    patch.dict("os.environ", {"XANO_API_URL": self.BASE_URL}),
+                    patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+                ):
+                    result = asyncio.run(DonationDetailState.load_donation.fn(state))
+                self.assertIs(result, expected)
+                # Zerado a cada carga: nunca sobra o “desde” de outra doação.
+                self.assertEqual(state.donor_member_since, "")
+
+    def _since_state(self, donation_id: int = 42) -> SimpleNamespace:
+        return SimpleNamespace(donation_id=donation_id, donor_member_since="")
+
+    def test_since_event_stores_the_label(self) -> None:
+        state = self._since_state()
+
+        async def fake(client: object, base_url: str, donation_id: int) -> str:
+            self.assertEqual(donation_id, 42)
+            return "outubro de 2020"
+
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": self.BASE_URL}),
+            patch("doafacil.detalhe_doacao._fetch_donor_member_since", side_effect=fake),
+        ):
+            asyncio.run(DonationDetailState.load_donor_since.fn(state))
+        self.assertEqual(state.donor_member_since, "outubro de 2020")
+
+    def test_since_event_ignores_answer_for_a_previous_donation(self) -> None:
+        state = self._since_state()
+
+        async def fake(client: object, base_url: str, donation_id: int) -> str:
+            state.donation_id = 77  # outra doação foi aberta no meio
+            return "outubro de 2020"
+
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": self.BASE_URL}),
+            patch("doafacil.detalhe_doacao._fetch_donor_member_since", side_effect=fake),
+        ):
+            asyncio.run(DonationDetailState.load_donor_since.fn(state))
+        self.assertEqual(state.donor_member_since, "")
+
+    def test_since_event_does_nothing_without_a_donation(self) -> None:
+        state = self._since_state(donation_id=0)
+        with patch("doafacil.detalhe_doacao._fetch_donor_member_since") as fetch:
+            asyncio.run(DonationDetailState.load_donor_since.fn(state))
+        fetch.assert_not_called()
+        self.assertEqual(state.donor_member_since, "")
