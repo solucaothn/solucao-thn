@@ -301,7 +301,7 @@ class DonationDetailTests(unittest.TestCase):
             patch("doafacil.detalhe_doacao.rx.redirect", return_value="login-redirect") as redirect,
             patch("doafacil.detalhe_doacao.httpx.AsyncClient") as async_client,
         ):
-            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+            result = _run_start_chat(state)
         self.assertEqual(result, "login-redirect")
         redirect.assert_called_once_with("/login")
         async_client.assert_not_called()
@@ -331,7 +331,7 @@ class DonationDetailTests(unittest.TestCase):
             patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
             patch("doafacil.detalhe_doacao.rx.redirect", return_value="chat-redirect") as redirect,
         ):
-            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+            result = _run_start_chat(state)
 
         self.assertEqual(result, "chat-redirect")
         redirect.assert_called_once_with("/chat?conversa=77")
@@ -358,7 +358,7 @@ class DonationDetailTests(unittest.TestCase):
                     patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
                     patch("doafacil.detalhe_doacao.rx.redirect") as redirect,
                 ):
-                    result = asyncio.run(DonationDetailState.start_chat.fn(state))
+                    result = _run_start_chat(state)
                 self.assertIsNone(result)
                 redirect.assert_not_called()
                 self.assertEqual(state.contact_message, expected)
@@ -374,7 +374,7 @@ class DonationDetailTests(unittest.TestCase):
             patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
             patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
         ):
-            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+            result = _run_start_chat(state)
         self.assertIsNone(result)
         self.assertEqual(state.contact_message, CHAT_START_ERROR_MESSAGE)
 
@@ -389,7 +389,7 @@ class DonationDetailTests(unittest.TestCase):
             patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
             patch("doafacil.detalhe_doacao.rx.redirect", return_value="login-redirect"),
         ):
-            result = asyncio.run(DonationDetailState.start_chat.fn(state))
+            result = _run_start_chat(state)
         self.assertEqual(result, "login-redirect")
         self.assertEqual(state.auth_token, "")
         self.assertEqual(state.account_name, "")
@@ -1316,6 +1316,94 @@ def _chat_state(*, auth_token: str) -> SimpleNamespace:
         contact_message_is_error=False,
         is_starting_chat=False,
     )
+
+
+def _start_chat_events(state: SimpleNamespace) -> list:
+    """Tudo o que o start_chat emite, em ordem (change chat-carregamento)."""
+
+    async def collect() -> list:
+        return [item async for item in DonationDetailState.start_chat.fn(state)]
+
+    return asyncio.run(collect())
+
+
+def _run_start_chat(state: SimpleNamespace):
+    emitted = [item for item in _start_chat_events(state) if item is not None]
+    return emitted[-1] if emitted else None
+
+
+class ChatButtonLoadingTests(unittest.TestCase):
+    """Change chat-carregamento: o botão “Chat” mostra o carregamento antes
+    do POST, sem pedido a mais ao Xano."""
+
+    def test_loading_is_sent_before_the_request(self) -> None:
+        state = _chat_state(auth_token="private-token")
+        seen: list[bool] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            seen.append(state.is_starting_chat)
+            return httpx.Response(
+                200,
+                json={
+                    "conversation_id": 77,
+                    "donation_id": 42,
+                    "last_message_at": 1762800000000,
+                    "other_user_first_name": "Ana",
+                    "donation_title": "Carrinho de brinquedo",
+                    "donation_status": "disponível",
+                },
+                request=request,
+            )
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+
+        async def run() -> list:
+            events = []
+            generator = DonationDetailState.start_chat.fn(state)
+            first = await generator.__anext__()
+            # Primeiro envio: só o estado, com o carregamento ligado e nenhum
+            # pedido feito ainda.
+            events.append((first, state.is_starting_chat, list(seen)))
+            async for item in generator:
+                events.append((item, state.is_starting_chat, list(seen)))
+            return events
+
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+            patch("doafacil.detalhe_doacao.rx.redirect", return_value="chat-redirect"),
+        ):
+            events = asyncio.run(run())
+
+        self.assertEqual(events[0], (None, True, []))
+        self.assertEqual(events[-1], ("chat-redirect", False, [True]))
+        self.assertEqual(len(seen), 1)
+
+    def test_loading_turns_off_after_failure(self) -> None:
+        state = _chat_state(auth_token="private-token")
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(500, json={"message": "x"}, request=request)
+            )
+        )
+        with (
+            patch.dict("os.environ", {"XANO_API_URL": "https://xano.example/api:catalog"}),
+            patch("doafacil.detalhe_doacao.httpx.AsyncClient", return_value=client),
+        ):
+            events = _start_chat_events(state)
+        self.assertEqual(events, [None])
+        self.assertFalse(state.is_starting_chat)
+
+    def test_second_click_while_starting_does_nothing(self) -> None:
+        state = _chat_state(auth_token="private-token")
+        state.is_starting_chat = True
+        with patch("doafacil.detalhe_doacao.httpx.AsyncClient") as async_client:
+            self.assertEqual(_start_chat_events(state), [])
+        async_client.assert_not_called()
+
+    def test_chat_button_shows_loading(self) -> None:
+        rendered = str(donation_detail_page())
+        self.assertRegex(rendered, r"loading:[^,}]*is_starting_chat")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -160,6 +161,7 @@ def _state(**overrides: Any) -> SimpleNamespace:
         "conversations_has_more": False,
         "list_error": "",
         "is_loading_list": False,
+        "is_loading_messages": False,
         "active_conversation_id": 0,
         "active_other_name": "",
         "active_donation_title": "",
@@ -206,8 +208,17 @@ def _decorated(*ids: int) -> list[dict[str, Any]]:
     ]
 
 
-def _run(coroutine: Any) -> Any:
-    return asyncio.run(coroutine)
+async def _collect(generator: Any) -> list[Any]:
+    return [item async for item in generator]
+
+
+def _run(target: Any) -> Any:
+    """Roda uma corrotina ou um evento com `yield` (change chat-carregamento).
+    Para o evento com `yield`, devolve o último evento não nulo emitido."""
+    if inspect.isasyncgen(target):
+        emitted = [item for item in asyncio.run(_collect(target)) if item is not None]
+        return emitted[-1] if emitted else None
+    return asyncio.run(target)
 
 
 class ChatClientTests(unittest.TestCase):
@@ -2017,3 +2028,164 @@ class UnreadTotalInChatTests(unittest.TestCase):
             _run(ChatState.load_chat.fn(state))
         self.assertEqual(state.unread_total, 9)
         self.assertEqual(state._unread_checked_token, "")
+
+
+class ChatLoadingTests(unittest.TestCase):
+    """Change chat-carregamento: a tela mostra “Carregando...” desde o
+    clique, a lista vem antes das mensagens e as consultas automáticas
+    esperam o primeiro carregamento, sem pedido a mais ao Xano."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _client(self, recorder: _Recorder) -> Any:
+        return patch("doafacil.chat._new_client", side_effect=lambda: recorder.client())
+
+    def _steps(self, state: SimpleNamespace, generator: Any, recorder: _Recorder) -> list[dict[str, Any]]:
+        """Foto do estado e dos pedidos feitos a cada `yield`."""
+
+        async def collect() -> list[dict[str, Any]]:
+            steps = []
+            async for item in generator:
+                steps.append({
+                    "event": item,
+                    "requests": [r.url.path.rsplit("/", 1)[-1] for r in recorder.requests],
+                    "is_loading_list": state.is_loading_list,
+                    "is_loading_messages": state.is_loading_messages,
+                    "conversations": len(state.chat_conversations),
+                    "messages": len(state.chat_messages),
+                })
+            return steps
+
+        return asyncio.run(collect())
+
+    @staticmethod
+    def _respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/conversations"):
+            return httpx.Response(200, json=_list_page([_conversation(7)]), request=request)
+        return httpx.Response(200, json=_messages_page([_message(1), _message(2)]), request=request)
+
+    @staticmethod
+    def _route(value: str) -> SimpleNamespace:
+        return SimpleNamespace(url=SimpleNamespace(path="/chat", query_parameters={"conversa": value}))
+
+    def test_loading_is_sent_before_any_request(self) -> None:
+        recorder = _Recorder(self._respond)
+        state = _state()
+        with self._client(recorder):
+            steps = self._steps(state, ChatState.load_chat.fn(state), recorder)
+        first = steps[0]
+        self.assertIsNone(first["event"])
+        self.assertEqual(first["requests"], [])
+        self.assertTrue(first["is_loading_list"])
+        self.assertFalse(first["is_loading_messages"])
+        self.assertEqual(len(recorder.requests), 1)
+        self.assertFalse(state.is_loading_list)
+        self.assertEqual(len(state.chat_conversations), 1)
+
+    def test_route_shows_list_before_messages_with_same_requests(self) -> None:
+        recorder = _Recorder(self._respond)
+        state = _state(router=self._route("7"))
+        with self._client(recorder):
+            steps = self._steps(state, ChatState.load_chat.fn(state), recorder)
+        self.assertEqual(len(steps), 2)
+        before, list_ready = steps
+        self.assertEqual(before["requests"], [])
+        self.assertTrue(before["is_loading_list"] and before["is_loading_messages"])
+        # A lista já aparece enquanto as mensagens carregam.
+        self.assertEqual(list_ready["requests"], ["conversations"])
+        self.assertEqual(list_ready["conversations"], 1)
+        self.assertFalse(list_ready["is_loading_list"])
+        self.assertTrue(list_ready["is_loading_messages"])
+        self.assertEqual(list_ready["messages"], 0)
+        # Mesmas 2 chamadas de antes, na mesma ordem.
+        self.assertEqual(
+            [r.url.path.rsplit("/", 1)[-1] for r in recorder.requests], ["conversations", "messages"]
+        )
+        self.assertFalse(state.is_loading_messages)
+        self.assertEqual(len(state.chat_messages), 2)
+
+    def test_invalid_route_does_not_wait_for_messages(self) -> None:
+        recorder = _Recorder(self._respond)
+        state = _state(router=self._route("abc"))
+        with self._client(recorder):
+            steps = self._steps(state, ChatState.load_chat.fn(state), recorder)
+        self.assertFalse(steps[0]["is_loading_messages"])
+        self.assertEqual(state.conversation_error, CONVERSATION_NOT_FOUND_MESSAGE)
+        self.assertEqual(len(recorder.requests), 1)
+
+    def test_loading_turns_off_on_failures(self) -> None:
+        def messages_fail(status: int, body: object) -> Callable[[httpx.Request], httpx.Response]:
+            def respond(request: httpx.Request) -> httpx.Response:
+                if request.url.path.endswith("/conversations"):
+                    return self._respond(request)
+                return httpx.Response(status, json=body, request=request)
+
+            return respond
+
+        cases = (
+            ("lista 500", _json(500, {"message": "x"}), "1"),
+            ("lista 429", _json(429, PLATFORM_429), "7"),
+            ("mensagens 500", messages_fail(500, {}), "7"),
+            ("mensagens 404", messages_fail(404, GENERIC_404), "7"),
+        )
+        for name, respond, route in cases:
+            with self.subTest(name):
+                state = _state(router=self._route(route))
+                with self._client(_Recorder(respond)):
+                    _run(ChatState.load_chat.fn(state))
+                self.assertFalse(state.is_loading_list)
+                self.assertFalse(state.is_loading_messages)
+
+    def test_401_turns_off_loading_and_redirects(self) -> None:
+        state = _state(router=self._route("7"))
+        recorder = _Recorder(_json(401, {"code": "ERROR_CODE_UNAUTHORIZED", "message": "x"}))
+        with (
+            self._client(recorder),
+            patch("doafacil.chat.rx.redirect", return_value="login-redirect"),
+        ):
+            result = _run(ChatState.load_chat.fn(state))
+        self.assertEqual(result, "login-redirect")
+        self.assertFalse(state.is_loading_list)
+        self.assertFalse(state.is_loading_messages)
+        self.assertEqual(state.auth_token, "")
+
+    def test_select_conversation_shows_loading_before_request(self) -> None:
+        recorder = _Recorder(self._respond)
+        state = _state(chat_conversations=[_listed(7)])
+        with self._client(recorder):
+            steps = self._steps(state, ChatState.select_conversation.fn(state, 7), recorder)
+        self.assertEqual(steps[0]["requests"], [])
+        self.assertTrue(steps[0]["is_loading_messages"])
+        self.assertEqual(len(recorder.requests), 1)
+        self.assertFalse(state.is_loading_messages)
+        self.assertEqual(state.active_conversation_id, 7)
+
+    def test_select_conversation_failure_turns_off_loading(self) -> None:
+        state = _state(chat_conversations=[_listed(7)])
+        with self._client(_Recorder(_json(500, {"message": "x"}))):
+            _run(ChatState.select_conversation.fn(state, 7))
+        self.assertFalse(state.is_loading_messages)
+
+    def test_automatic_queries_wait_for_the_first_load(self) -> None:
+        for flag in ("is_loading_list", "is_loading_messages"):
+            with self.subTest(flag=flag):
+                opened = _state(active_conversation_id=7, chat_messages=_decorated(1), **{flag: True})
+                closed = _state(mobile_view="list", **{flag: True})
+                recorder = _Recorder(self._respond)
+                with self._client(recorder):
+                    self.assertIsNone(ChatState.poll_tick.fn(opened))
+                    self.assertIsNone(_run(ChatState.poll_if_visible.fn(opened, "visible")))
+                    self.assertIsNone(ChatState.list_poll_tick.fn(closed))
+                    self.assertIsNone(_run(ChatState.list_poll_if_visible.fn(closed, "visible")))
+                self.assertEqual(recorder.requests, [])
+
+    def test_page_renders_loading_texts(self) -> None:
+        from doafacil.chat import LOADING_LIST_MESSAGE, LOADING_MESSAGES_MESSAGE, chat_page
+
+        rendered = str(chat_page())
+        self.assertIn(LOADING_LIST_MESSAGE, rendered)
+        self.assertIn(LOADING_MESSAGES_MESSAGE, rendered)
+        self.assertIn("is_loading_messages", rendered)
