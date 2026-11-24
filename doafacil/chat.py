@@ -65,6 +65,9 @@ READ_ONLY_MESSAGE = (
 EMPTY_LIST_MESSAGE = "Você ainda não tem conversas."
 NO_CONVERSATION_MESSAGE = "Escolha uma conversa para ver as mensagens."
 EMPTY_CONVERSATION_MESSAGE = "Ainda não há mensagens. Escreva a primeira."
+# Carregamento à mostra desde o clique (change chat-carregamento).
+LOADING_LIST_MESSAGE = "Carregando conversas..."
+LOADING_MESSAGES_MESSAGE = "Carregando mensagens..."
 MESSAGE_PLACEHOLDER = "Digite aqui..."
 # Mensagens da conversa à mostra a cada 25 s (change correcoes-finais: eram
 # 15 s; com poucas abas abertas, o chat estourava o limite do Xano).
@@ -751,6 +754,17 @@ def _other_name_for(state: Any, conversation_id: int, messages: list[dict[str, A
 async def _open_conversation(
     state: Any, client: httpx.AsyncClient, conversation_id: int
 ) -> None:
+    """Abre a conversa; `is_loading_messages` desliga ao terminar, com
+    sucesso ou não (quem chama o liga e manda o estado antes)."""
+    try:
+        await _fetch_conversation(state, client, conversation_id)
+    finally:
+        state.is_loading_messages = False
+
+
+async def _fetch_conversation(
+    state: Any, client: httpx.AsyncClient, conversation_id: int
+) -> None:
     _reset_conversation(state)
     state.active_conversation_id = conversation_id
     # O total do botão e do menu desconta as não lidas desta conversa na hora
@@ -785,6 +799,12 @@ async def _open_conversation(
     state.has_older = page["has_older"]
     state.active_other_name = _other_name_for(state, conversation_id, page["messages"])
     state.mobile_view = "conversation"
+
+
+def _first_load_running(state: Any) -> bool:
+    """Lista ou mensagens ainda carregando (change chat-carregamento): as
+    consultas automáticas esperam, para não somar pedidos ao Xano."""
+    return bool(state.is_loading_list or state.is_loading_messages)
 
 
 def _conversation_on_screen(state: Any) -> bool:
@@ -850,6 +870,8 @@ class ChatState(LoginState):
     conversations_has_more: bool = False
     list_error: str = ""
     is_loading_list: bool = False
+    # Mensagens da conversa sendo abertas (change chat-carregamento).
+    is_loading_messages: bool = False
 
     active_conversation_id: int = 0
     active_other_name: str = ""
@@ -922,34 +944,49 @@ class ChatState(LoginState):
         self._unread_checked_at = now
 
     @rx.event
-    async def load_chat(self) -> rx.event.EventSpec | None:
+    async def load_chat(self):
+        """Carrega o /chat em etapas (change chat-carregamento). Cada `yield`
+        manda o estado ao navegador: primeiro o “Carregando...”, antes de
+        qualquer chamada; depois a lista; por fim as mensagens da conversa da
+        URL. Sem os `yield`, o Reflex só atualizava a tela no fim de tudo.
+        As chamadas ao Xano são as mesmas de antes, na mesma ordem."""
         self.chat_conversations = []
         self.conversations_page = 1
         self.conversations_has_more = False
         self.list_error = ""
         self.mobile_view = "list"
         _reset_conversation(self)
+        self.is_loading_messages = False
         if not self.auth_token:
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
 
         # Query da URL (router.url; o router.page está obsoleto).
         route_value = self.router.url.query_parameters.get("conversa")
+        conversation_id = None
+        if route_value is not None:
+            conversation_id = _parse_route_conversation_id(route_value)
+            if conversation_id is None:
+                self.conversation_error = CONVERSATION_NOT_FOUND_MESSAGE
         self.is_loading_list = True
+        self.is_loading_messages = conversation_id is not None
+        yield
+        outcome = None
         try:
             async with _new_client() as client:
                 await _load_list(self, client)
-                if route_value is not None:
-                    conversation_id = _parse_route_conversation_id(route_value)
-                    if conversation_id is None:
-                        self.conversation_error = CONVERSATION_NOT_FOUND_MESSAGE
-                    else:
-                        await _open_conversation(self, client, conversation_id)
+                if conversation_id is not None:
+                    self.is_loading_list = False
+                    yield
+                    await _open_conversation(self, client, conversation_id)
         except ChatUnauthorizedError:
             _clear_session(self)
-            return login_redirect(self)
+            outcome = login_redirect(self)
         finally:
             self.is_loading_list = False
-        return None
+            self.is_loading_messages = False
+        if outcome is not None:
+            yield outcome
 
     @rx.event
     async def refresh_conversations(self) -> rx.event.EventSpec | None:
@@ -967,22 +1004,25 @@ class ChatState(LoginState):
         return None
 
     @rx.event
-    async def select_conversation(
-        self, conversation_id: int
-    ) -> rx.event.EventSpec | None:
+    async def select_conversation(self, conversation_id: int):
+        """Abre uma conversa da lista; o “Carregando mensagens...” aparece
+        antes do pedido (change chat-carregamento)."""
         if not self.auth_token:
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
         was_editing = bool(self.editing_message_id)
+        self.is_loading_messages = True
+        yield
         try:
             async with _new_client() as client:
                 await _open_conversation(self, client, int(conversation_id))
         except ChatUnauthorizedError:
             _clear_session(self)
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
         # A edição em andamento termina ao trocar de conversa.
         if was_editing:
-            return rx.set_value(MESSAGE_INPUT_ID, "")
-        return None
+            yield rx.set_value(MESSAGE_INPUT_ID, "")
 
     @rx.event
     async def load_older_messages(self) -> rx.event.EventSpec | None:
@@ -1166,6 +1206,7 @@ class ChatState(LoginState):
     def poll_tick(self, _value: Any = None) -> rx.event.EventSpec | None:
         if (
             not self.auth_token
+            or _first_load_running(self)
             or not _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
@@ -1182,6 +1223,7 @@ class ChatState(LoginState):
         if (
             visibility != "visible"
             or not self.auth_token
+            or _first_load_running(self)
             or not _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
@@ -1235,7 +1277,7 @@ class ChatState(LoginState):
         # correcoes-finais): só pelo botão de atualizar ou ao voltar à lista.
         if (
             not self.auth_token
-            or self.is_loading_list
+            or _first_load_running(self)
             or _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
@@ -1253,7 +1295,7 @@ class ChatState(LoginState):
         if (
             visibility != "visible"
             or not self.auth_token
-            or self.is_loading_list
+            or _first_load_running(self)
             or _conversation_on_screen(self)
             or _now() < self.poll_paused_until
         ):
@@ -1484,6 +1526,18 @@ def _conversation_list() -> rx.Component:
         ),
         rx.box(
             rx.foreach(ChatState.chat_conversations, _conversation_item),
+            rx.cond(
+                (ChatState.chat_conversations.length() == 0)
+                & ChatState.is_loading_list,
+                rx.text(
+                    LOADING_LIST_MESSAGE,
+                    role="status",
+                    color=TEXT_MUTED,
+                    font_size="0.9rem",
+                    padding="16px",
+                ),
+                rx.fragment(),
+            ),
             rx.cond(
                 (ChatState.chat_conversations.length() == 0)
                 & ~ChatState.is_loading_list
@@ -1770,28 +1824,38 @@ def _messages_area() -> rx.Component:
             rx.fragment(),
         ),
         rx.cond(
-            ChatState.active_conversation_id == 0,
-            rx.cond(
-                ChatState.conversation_error == "",
-                rx.center(
-                    rx.text(NO_CONVERSATION_MESSAGE, color=TEXT_MUTED),
-                    width="100%",
-                    height="100%",
-                ),
-                rx.fragment(),
+            ChatState.is_loading_messages,
+            # Antes de “escolha uma conversa” e de “ainda não há mensagens”
+            # (change chat-carregamento).
+            rx.center(
+                rx.text(LOADING_MESSAGES_MESSAGE, role="status", color=TEXT_MUTED),
+                width="100%",
+                height="100%",
             ),
             rx.cond(
-                (ChatState.chat_messages.length() == 0)
-                & (ChatState.conversation_error == ""),
-                rx.center(
-                    rx.text(EMPTY_CONVERSATION_MESSAGE, color=TEXT_MUTED),
-                    width="100%",
-                    height="100%",
+                ChatState.active_conversation_id == 0,
+                rx.cond(
+                    ChatState.conversation_error == "",
+                    rx.center(
+                        rx.text(NO_CONVERSATION_MESSAGE, color=TEXT_MUTED),
+                        width="100%",
+                        height="100%",
+                    ),
+                    rx.fragment(),
                 ),
-                rx.vstack(
-                    rx.foreach(ChatState.chat_messages, _message_bubble),
-                    spacing="3",
-                    width="100%",
+                rx.cond(
+                    (ChatState.chat_messages.length() == 0)
+                    & (ChatState.conversation_error == ""),
+                    rx.center(
+                        rx.text(EMPTY_CONVERSATION_MESSAGE, color=TEXT_MUTED),
+                        width="100%",
+                        height="100%",
+                    ),
+                    rx.vstack(
+                        rx.foreach(ChatState.chat_messages, _message_bubble),
+                        spacing="3",
+                        width="100%",
+                    ),
                 ),
             ),
         ),

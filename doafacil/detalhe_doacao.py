@@ -461,15 +461,22 @@ class DonationDetailState(LoginState):
         )
 
     @rx.event
-    async def start_chat(self) -> rx.event.EventSpec | None:
+    async def start_chat(self):
+        """Abre a conversa da doação (change chat-carregamento): o `yield` logo
+        depois de ligar `is_starting_chat` manda o estado ao navegador, e o
+        botão “Chat” mostra o carregamento enquanto o POST roda (sem ele, o
+        Reflex só atualizava a tela no fim do evento)."""
         self.contact_message = ""
         self.contact_message_is_error = False
         if not self.auth_token:
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
         if self.is_starting_chat:
-            return None
+            return
 
         self.is_starting_chat = True
+        yield
+        outcome = None
         try:
             donation_id = _positive_donation_id(str(self.donation_id))
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -479,21 +486,21 @@ class DonationDetailState(LoginState):
         except ChatUnauthorizedError:
             self.auth_token = ""
             self.account_name = ""
-            return login_redirect(self)
+            outcome = login_redirect(self)
         except ChatNotFoundError:
             self.contact_message = CHAT_NOT_AVAILABLE_FOR_DONATION_MESSAGE
-            return None
         except ChatRateLimitError as error:
             self.contact_message = rate_limit_message(error.kind)
             self.contact_message_is_error = True
-            return None
         except (ChatError, ValueError):
             self.contact_message = CHAT_START_ERROR_MESSAGE
             self.contact_message_is_error = True
-            return None
+        else:
+            outcome = rx.redirect(f"/chat?conversa={conversation['conversation_id']}")
         finally:
             self.is_starting_chat = False
-        return rx.redirect(f"/chat?conversa={conversation['conversation_id']}")
+        if outcome is not None:
+            yield outcome
 
 
 # Layout da página, segundo os frames detalhes-doacao-inteira e
@@ -955,6 +962,7 @@ def _summary_card() -> rx.Component:
                 ),
                 on_click=DonationDetailState.start_chat,
                 disabled=DonationDetailState.is_starting_chat,
+                loading=DonationDetailState.is_starting_chat,
                 width="100%",
                 min_height="52px",
                 background="white",
