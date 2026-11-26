@@ -25,6 +25,7 @@ O site SHALL apresentar todas as categorias válidas retornadas pelo backend, se
 - **WHEN** o backend não retorna as categorias
 - **THEN** a lista MUST informar que as categorias não puderam ser carregadas e oferecer o link “Explorar doações” para `/explorar`, sem categorias fictícias
 - **AND** a lista MUST oferecer o botão “Tentar de novo”, que busca as categorias outra vez
+- **AND** acionar “Tentar de novo”, na página `/categorias` ou na gaveta, MUST mostrar “Carregando categorias...” na hora, até a resposta
 
 #### Scenario: Navegar entre páginas que usam categorias
 - **WHEN** a pessoa abre, uma depois da outra, a home, a gaveta, `/categorias`, a Explorar filtrada e o cadastro de doação

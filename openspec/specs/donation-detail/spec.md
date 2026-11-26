@@ -351,12 +351,13 @@ Logo depois de publicar uma doação pelo cadastro, a página de detalhe dessa d
 - **THEN** o aviso MUST NOT aparecer nessa outra doação
 
 ### Requirement: Tentar de novo quando o detalhe falha
-Quando o detalhe da doação não puder ser carregado, a página SHALL mostrar a mensagem de falha com o botão “Tentar novamente”, que busca a doação outra vez sem sair da página.
+Quando o detalhe da doação não puder ser carregado, a página SHALL mostrar a mensagem de falha com o botão “Tentar de novo”, que busca a doação outra vez sem sair da página.
 
 #### Scenario: Falha ao carregar o detalhe
 - **WHEN** a busca do detalhe falha (por exemplo, pelo limite de pedidos do backend)
-- **THEN** a página MUST mostrar a mensagem de falha e o botão “Tentar novamente”, com 44 px de área de toque e foco visível
-- **AND** acionar o botão MUST buscar a doação de novo e, se der certo, mostrar o detalhe
+- **THEN** a página MUST mostrar a mensagem de falha e o botão “Tentar de novo”, com 44 px de área de toque e foco visível
+- **AND** acionar o botão MUST mostrar “Carregando doação...” na hora, buscar a doação de novo e, se der certo, mostrar o detalhe
+- **AND** a nova tentativa MUST fazer um único pedido do detalhe ao backend
 
 ### Requirement: Caminhos a partir de uma doação indisponível
 Quando a doação não está disponível (reservada, concluída, apagada ou com identificador inválido), a página de detalhe SHALL manter o aviso “Doação não encontrada” e acrescentar uma explicação e dois caminhos, sem revelar qual é o status da doação.

@@ -36,14 +36,14 @@ A home SHALL apresentar a seção “Comece por aqui” abaixo da ilustração, 
 - **WHEN** uma pessoa acessa a home pública
 - **THEN** a seção apresenta a etiqueta “COMECE POR AQUI”, em verde com contraste mínimo AA sobre o fundo, o título “Quer criar uma doação?” e a frase “Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa.”
 - **AND** a frase de apoio aparece maior e em negrito
-- **AND** a seção apresenta os cartões “Para você mesmo”, “Ajude quem precisa” e “Desapego em grupo” com seus textos de apoio
+- **AND** a seção apresenta os cartões “Para você”, “Ajude quem precisa” e “Desapego em grupo” com seus textos de apoio
 - **AND** a seção usa aproximadamente 2.5rem de padding superior e aproximadamente 5rem de padding inferior
 - **AND** há aproximadamente 1rem entre etiqueta e título, 1.5rem entre título e frase, 3rem entre frase e cartões, e 3rem entre cartões e barra de busca
 - **AND** o título tem line-height de aproximadamente 1.2 e a frase tem line-height de aproximadamente 1.4
 - **AND** os cartões usam gap aproximado de 1.5rem e padding interno aproximado de 2rem, com conteúdo superior alinhado e seta ou “Em breve” no rodapé
 
 #### Scenario: Cartões que navegam
-- **WHEN** uma pessoa aciona o cartão “Para você mesmo”, pelo mouse ou pelo teclado
+- **WHEN** uma pessoa aciona o cartão “Para você”, pelo mouse ou pelo teclado
 - **THEN** a página `/explorar` MUST ser aberta
 - **WHEN** uma pessoa aciona o cartão “Ajude quem precisa”
 - **THEN** a página `/cadastro-doacao` MUST ser aberta

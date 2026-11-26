@@ -118,7 +118,12 @@ A página MUST permitir enviar uma mensagem pelo campo “Digite aqui...”, com
 
 #### Scenario: Envio em andamento
 - **WHEN** um envio está em andamento
-- **THEN** o botão “Enviar” MUST ficar desativado até a resposta, evitando envio duplicado
+- **THEN** o botão “Enviar” MUST ficar desativado desde o acionamento, antes do pedido ao backend, até a resposta
+- **AND** o campo MUST continuar ativo, com o texto digitado
+
+#### Scenario: Enter repetido durante o envio
+- **WHEN** a pessoa aciona “Enviar” ou Enter e, com o envio em andamento, aperta Enter de novo
+- **THEN** a mensagem MUST ser enviada ao backend uma única vez e aparecer uma única vez na conversa
 
 ### Requirement: Texto das mensagens sempre literal
 O texto das mensagens, os nomes e os títulos das doações MUST ser apresentados como texto simples. Nenhum conteúdo vindo do chat pode ser interpretado como HTML ou executado.
@@ -322,7 +327,8 @@ Nas próprias mensagens enviadas há até 15 minutos, fora de conversa somente l
 
 #### Scenario: Edição em andamento
 - **WHEN** uma edição está em andamento
-- **THEN** “Salvar” MUST ficar desativado até a resposta
+- **THEN** “Salvar” MUST ficar desativado desde o acionamento, antes do pedido ao backend, até a resposta
+- **AND** um Enter repetido durante a edição MUST NOT enviar a edição de novo
 
 ### Requirement: Indicação de mensagem editada
 Toda mensagem editada MUST mostrar “(editada)” ao lado do horário de envio, para as duas pessoas, com o texto sempre como texto simples.
@@ -357,3 +363,23 @@ Quando a pessoa ainda não tem conversas, a página `/chat` SHALL oferecer, junt
 #### Scenario: Lista vazia com caminho
 - **WHEN** a pessoa autenticada abre `/chat` e não participa de nenhuma conversa
 - **THEN** a página MUST mostrar “Você ainda não tem conversas.” e o link “Explorar doações”, com foco visível e pelo menos 44 px de área de toque
+
+### Requirement: Carregamento visível nas ações da lista e do histórico
+Ao acionar “Atualizar conversas”, “Tentar de novo” na falha da lista, “Carregar mais conversas” ou “Carregar anteriores”, a página MUST mostrar o estado de carregamento desde o acionamento, antes do pedido ao backend, e desligá-lo quando a resposta chegar, com sucesso ou falha. Cada acionamento MUST fazer um único pedido.
+
+#### Scenario: Atualizar ou tentar de novo a lista
+- **WHEN** a pessoa aciona “Atualizar conversas” ou o “Tentar de novo” da falha da lista
+- **THEN** o botão de atualizar MUST aparecer desativado, com o carregamento, antes da resposta do backend
+- **AND** depois da resposta, MUST voltar ao normal
+
+#### Scenario: Carregar mais conversas ou mensagens anteriores
+- **WHEN** a pessoa aciona “Carregar mais conversas” ou “Carregar anteriores”
+- **THEN** o botão acionado MUST aparecer desativado antes da resposta do backend
+- **AND** um segundo clique durante a espera MUST NOT buscar a mesma página de novo
+
+### Requirement: Rótulo do botão da falha da lista
+Quando a lista de conversas não puder ser carregada, o botão para buscá-la outra vez MUST ter o texto “Tentar de novo”, como nas outras páginas do site.
+
+#### Scenario: Falha da lista
+- **WHEN** a consulta de conversas falha
+- **THEN** a página MUST mostrar a mensagem de erro e o botão “Tentar de novo”, que busca a lista outra vez
