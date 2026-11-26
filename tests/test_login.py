@@ -429,8 +429,11 @@ class LoginClientTests(unittest.TestCase):
         self.assertEqual(state.error_message, "")
         self.assertFalse(state.password_reset_notice_pending)
         self.assertFalse(state.password_reset_notice_visible)
-        self.assertEqual(len(events), 1)
-        self.assertIn("/", str(events[0]))
+        # O primeiro é o envio do “Entrando...”, antes do pedido (change
+        # correcoes-revisao); o segundo, o redirecionamento.
+        self.assertEqual(len(events), 2)
+        self.assertIsNone(events[0])
+        self.assertIn("/", str(events[1]))
 
     def test_login_state_errors_clear_token_and_end_loading(self) -> None:
         cases = (
@@ -478,7 +481,9 @@ class LoginClientTests(unittest.TestCase):
                 self.assertEqual(state.error_message, expected_message)
                 self.assertEqual(state.auth_token, "")
                 self.assertFalse(state.is_loading)
-                self.assertEqual(events, [])
+                # Só o envio do “Entrando...”, antes do pedido (change
+                # correcoes-revisao).
+                self.assertEqual(events, [None])
 
     def test_login_state_blocks_concurrent_submit(self) -> None:
         class State:
@@ -822,3 +827,131 @@ class LoginPageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AuthPendingStateTests(unittest.TestCase):
+    """Change correcoes-revisao: login, cadastro e recuperação de senha mandam
+    o botão em carregamento ao navegador (o primeiro `yield`) antes do pedido
+    ao Xano, com um único pedido; uma validação que falha não emite nada."""
+
+    ENV = {AUTH_API_ENV: "https://auth.example/api"}
+    SIGNUP_FORM = {
+        "name": "Pessoa Teste",
+        "email": "pessoa@example.test",
+        "city": "Cidade",
+        "state": "SP",
+        "password": "senha123",
+        "confirm_password": "senha123",
+    }
+
+    @staticmethod
+    def _state(**overrides):
+        from types import SimpleNamespace
+
+        values = dict(
+            is_loading=False,
+            error_message="",
+            auth_token="",
+            account_name="",
+            password_reset_notice_pending=False,
+            password_reset_notice_visible=False,
+            signup_notice_pending=False,
+            signup_notice_visible=False,
+            recovery_is_loading=False,
+            recovery_error_message="",
+            recovery_email="",
+            recovery_resend_seconds=0,
+            verification_flow="",
+            signup_email="",
+            _signup_password="",
+            _reset_token="",
+            _auth_next="",
+            router=None,
+        )
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def _steps(self, state, generator, target: str, flag: str, result=None):
+        """(evento, flag) a cada `yield` e o valor da flag no momento do pedido."""
+        seen: list[bool] = []
+
+        async def fake(*args, **kwargs):
+            seen.append(getattr(state, flag))
+            return result
+
+        async def collect():
+            return [(event, getattr(state, flag)) async for event in generator]
+
+        with patch.dict(os.environ, self.ENV), patch(f"doafacil.login.{target}", side_effect=fake):
+            steps = asyncio.run(collect())
+        return steps, seen
+
+    def test_every_auth_action_shows_loading_before_the_request(self) -> None:
+        from types import SimpleNamespace
+
+        cases = [
+            ("login", "request_login", "is_loading", {},
+             lambda s: LoginState.login.fn(s, {"email": "pessoa@example.test", "password": "senha123"}),
+             LoginResult(auth_token="token", user_id=1)),
+            ("signup", "request_signup", "is_loading", {},
+             lambda s: LoginState.signup.fn(s, dict(self.SIGNUP_FORM)), None),
+            ("pedir código", "request_password_reset_code", "recovery_is_loading", {},
+             lambda s: LoginState.request_recovery_code.fn(s, {"email": "pessoa@example.test"}), None),
+            ("reenviar (recuperação)", "request_password_reset_code", "recovery_is_loading",
+             {"recovery_email": "pessoa@example.test", "verification_flow": "recovery"},
+             lambda s: LoginState.resend_recovery_code.fn(s), None),
+            ("reenviar (cadastro)", "request_signup_resend", "recovery_is_loading",
+             {"signup_email": "pessoa@example.test", "_signup_password": "senha123", "verification_flow": "signup"},
+             lambda s: LoginState.resend_recovery_code.fn(s), None),
+            ("verificar (recuperação)", "request_password_reset_verification", "recovery_is_loading",
+             {"recovery_email": "pessoa@example.test", "verification_flow": "recovery"},
+             lambda s: LoginState.verify_recovery_code.fn(s, {"code": "123456"}),
+             SimpleNamespace(reset_token="reset")),
+            ("verificar (cadastro)", "request_signup_verification", "recovery_is_loading",
+             {"signup_email": "pessoa@example.test", "_signup_password": "senha123", "verification_flow": "signup"},
+             lambda s: LoginState.verify_recovery_code.fn(s, {"code": "123456"}), None),
+            ("nova senha", "request_password_reset_confirmation", "recovery_is_loading",
+             {"_reset_token": "reset"},
+             lambda s: LoginState.confirm_recovery_password.fn(
+                 s, {"password": "novaSenha1", "password_confirmation": "novaSenha1"}),
+             None),
+        ]
+        for name, target, flag, overrides, start, result in cases:
+            with self.subTest(acao=name):
+                state = self._state(**overrides)
+                with patch("doafacil.login.rx.redirect", side_effect=lambda path: f"redirect:{path}"):
+                    steps, seen = self._steps(state, start(state), target, flag, result)
+                self.assertEqual(steps[0], (None, True))
+                self.assertEqual(seen, [True])
+                self.assertFalse(getattr(state, flag))
+
+    def test_local_rejections_emit_nothing_and_make_no_request(self) -> None:
+        cases = [
+            ("login sem senha", "request_login", "is_loading", {},
+             lambda s: LoginState.login.fn(s, {"email": "pessoa@example.test", "password": ""})),
+            ("cadastro inválido", "request_signup", "is_loading", {},
+             lambda s: LoginState.signup.fn(s, {**self.SIGNUP_FORM, "confirm_password": "outra123"})),
+            ("e-mail inválido", "request_password_reset_code", "recovery_is_loading", {},
+             lambda s: LoginState.request_recovery_code.fn(s, {"email": "sem-arroba"})),
+            ("código curto", "request_password_reset_verification", "recovery_is_loading",
+             {"recovery_email": "pessoa@example.test"},
+             lambda s: LoginState.verify_recovery_code.fn(s, {"code": "123"})),
+            ("senhas diferentes", "request_password_reset_confirmation", "recovery_is_loading",
+             {"_reset_token": "reset"},
+             lambda s: LoginState.confirm_recovery_password.fn(
+                 s, {"password": "novaSenha1", "password_confirmation": "outraSenha2"})),
+        ]
+        for name, target, flag, overrides, start in cases:
+            with self.subTest(caso=name):
+                state = self._state(**overrides)
+                steps, seen = self._steps(state, start(state), target, flag)
+                self.assertEqual(steps, [])
+                self.assertEqual(seen, [])
+                self.assertFalse(getattr(state, flag))
+                self.assertTrue(state.error_message or state.recovery_error_message)
+
+    def test_buttons_show_loading_texts(self) -> None:
+        from doafacil.cadastro import signup_page
+
+        self.assertIn("Entrando...", str(login_page()))
+        self.assertIn("Criando...", str(signup_page()))

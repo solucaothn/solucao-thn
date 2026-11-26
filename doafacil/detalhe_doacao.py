@@ -407,6 +407,14 @@ class DonationDetailState(LoginState):
         return None
 
     @rx.event
+    def retry_donation(self):
+        """“Tentar de novo” da falha (change correcoes-revisao): mostra
+        “Carregando doação...” na hora e busca a doação outra vez, com o mesmo
+        pedido do load_donation (como o retry_profile do perfil)."""
+        self.view_state = "loading"
+        return DonationDetailState.load_donation
+
+    @rx.event
     async def load_donor_since(self) -> None:
         donation_id = self.donation_id
         if donation_id <= 0:
@@ -1566,8 +1574,10 @@ def donation_detail_page() -> rx.Component:
                         # Busca a doação de novo (change navegacao-celular).
                         rx.button(
                             rx.icon("rotate-cw", size=16, aria_hidden="true"),
-                            "Tentar novamente",
-                            on_click=DonationDetailState.load_donation,
+                            # Mesmo texto das outras páginas (change
+                            # correcoes-revisao).
+                            "Tentar de novo",
+                            on_click=DonationDetailState.retry_donation,
                             class_name="detail-retry",
                             variant="outline",
                             color=PRIMARY_GREEN,

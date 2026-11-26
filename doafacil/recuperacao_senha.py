@@ -216,7 +216,7 @@ def verify_recovery_page() -> rx.Component:
                             width="100%",
                         ),
                         rx.text(
-                            "Pode demorar um minutinho. Olha também no spam.",
+                            "Pode demorar um minutinho. Confira também a caixa de spam.",
                             color="#666666",
                             font_size="0.9rem",
                             width="100%",

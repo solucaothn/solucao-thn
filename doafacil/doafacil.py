@@ -201,6 +201,8 @@ class HomeState(rx.State):
     donations_error: str = ""
     # Opções do seletor “Categoria” da busca: {id, name} em texto.
     categories: list[dict[str, str]] = []
+    # “Tentar de novo” da gaveta em andamento (change correcoes-revisao).
+    categories_loading: bool = False
 
     @rx.event
     def search(self, form_data: dict[str, Any]):
@@ -214,11 +216,18 @@ class HomeState(rx.State):
         )
 
     @rx.event
-    async def reload_categories(self) -> None:
+    async def reload_categories(self):
         """“Tentar de novo” da gaveta: busca só as categorias (change
-        navegacao-celular; uma busca que deu certo fica no cache)."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            self.categories = await _load_categories_result(client)
+        navegacao-celular; uma busca que deu certo fica no cache). O `yield`
+        mostra “Carregando categorias...” na gaveta antes do pedido (change
+        correcoes-revisao)."""
+        self.categories_loading = True
+        yield
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                self.categories = await _load_categories_result(client)
+        finally:
+            self.categories_loading = False
 
     @rx.event
     def retry_home_data(self):
@@ -681,7 +690,7 @@ def start_here_section() -> rx.Component:
             ),
             rx.flex(
                 start_here_card(
-                    "Para você mesmo",
+                    "Para você",
                     "Escolha um item disponível e receba de alguém que está desapegando.",
                     "user-round",
                     href=EXPLORE_ROUTE,
@@ -985,6 +994,7 @@ def index() -> rx.Component:
                                 HomeState.categories,
                                 _categories_trigger(),
                                 on_retry=HomeState.reload_categories,
+                                loading=HomeState.categories_loading,
                             ),
                             # 12 px entre 992 e 1279 px (menos espaço) e
                             # 32 px a partir de 1280 px.

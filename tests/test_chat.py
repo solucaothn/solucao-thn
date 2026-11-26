@@ -1584,11 +1584,13 @@ class ChatPageTests(unittest.TestCase):
             "Carregar anteriores",
             "Carregar mais conversas",
             "Voltar \\u00e0s conversas",
-            "Tentar novamente",
+            # Mesmo texto das outras páginas (change correcoes-revisao).
+            "Tentar de novo",
         ]
         for text in expected:
             with self.subTest(text=text):
                 self.assertIn(text, self.rendered)
+        self.assertNotIn("Tentar novamente", self.rendered)
         for text in (EMPTY_LIST_MESSAGE, NO_CONVERSATION_MESSAGE, EMPTY_CONVERSATION_MESSAGE, READ_ONLY_MESSAGE):
             with self.subTest(text=text):
                 escaped = text.encode("ascii", "backslashreplace").decode().replace("\\x", "\\u00")
@@ -2189,3 +2191,138 @@ class ChatLoadingTests(unittest.TestCase):
         self.assertIn(LOADING_LIST_MESSAGE, rendered)
         self.assertIn(LOADING_MESSAGES_MESSAGE, rendered)
         self.assertIn("is_loading_messages", rendered)
+
+
+class ChatPendingStateTests(unittest.TestCase):
+    """Change correcoes-revisao: o envio, a edição e as ações da lista e do
+    histórico mandam o estado de andamento ao navegador (o primeiro `yield`)
+    antes do pedido ao Xano, com um único pedido por acionamento."""
+
+    def setUp(self) -> None:
+        patcher = patch.dict("os.environ", ENV)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _client(self, recorder: _Recorder) -> Any:
+        return patch("doafacil.chat._new_client", side_effect=lambda: recorder.client())
+
+    @staticmethod
+    def _steps(state: SimpleNamespace, generator: Any, recorder: _Recorder, flag: str) -> list[tuple[Any, bool, int]]:
+        """(evento, flag, pedidos feitos) a cada `yield`."""
+
+        async def collect() -> list[tuple[Any, bool, int]]:
+            return [(item, getattr(state, flag), len(recorder.requests)) async for item in generator]
+
+        return asyncio.run(collect())
+
+    @staticmethod
+    def _now_after(message_id: int, minutes: float) -> Any:
+        return patch("doafacil.chat._now", return_value=(_created_ms(message_id) + minutes * 60_000) / 1000)
+
+    def test_send_disables_button_before_the_request(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=_decorated(5))
+        recorder = _Recorder(_json(200, _message(9, mine=True, text="oi")))
+        with self._client(recorder), patch("doafacil.chat.rx.set_value", return_value="clear"):
+            steps = self._steps(state, ChatState.send_message.fn(state, {"message_text": "oi"}), recorder, "is_sending")
+        self.assertEqual(steps[0], (None, True, 0))
+        self.assertEqual(steps[-1], ("clear", False, 1))
+        self.assertEqual(len(recorder.requests), 1)
+
+    def test_save_edit_disables_button_before_the_request(self) -> None:
+        with self._now_after(6, 1):
+            messages = _decorate_messages([_message(5, mine=True), _message(6, mine=True)])
+        state = _state(active_conversation_id=7, chat_messages=messages, editing_message_id=5)
+        recorder = _Recorder(_json(200, _message(5, mine=True, text="Corrigido", edited_at=1_762_800_400_000)))
+        with self._client(recorder), self._now_after(6, 1), patch("doafacil.chat.rx.set_value", return_value="clear"):
+            steps = self._steps(
+                state, ChatState.send_message.fn(state, {"message_text": "Corrigido"}), recorder, "is_sending"
+            )
+        self.assertEqual(steps[0], (None, True, 0))
+        self.assertEqual(steps[-1], ("clear", False, 1))
+        self.assertEqual(recorder.requests[0].method, "PATCH")
+
+    def test_send_failure_turns_sending_off(self) -> None:
+        state = _state(active_conversation_id=7, chat_messages=_decorated(5))
+        recorder = _Recorder(_json(500, {"message": "x"}))
+        with self._client(recorder):
+            steps = self._steps(state, ChatState.send_message.fn(state, {"message_text": "oi"}), recorder, "is_sending")
+        self.assertEqual(steps, [(None, True, 0)])
+        self.assertFalse(state.is_sending)
+        self.assertEqual(len(recorder.requests), 1)
+
+    def test_second_enter_while_sending_makes_no_request(self) -> None:
+        """O segundo Enter, ainda com o envio em andamento, não envia de novo."""
+        for editing in (0, 5):
+            with self.subTest(editing=editing):
+                state = _state(active_conversation_id=7, chat_messages=_decorated(5), is_sending=True, editing_message_id=editing)
+                recorder = _Recorder(_json(200, _message(9, mine=True)))
+                with self._client(recorder):
+                    steps = self._steps(state, ChatState.send_message.fn(state, {"message_text": "oi"}), recorder, "is_sending")
+                self.assertEqual(steps, [])
+                self.assertEqual(recorder.requests, [])
+
+    def test_local_rejections_emit_nothing(self) -> None:
+        for text in ("   ", "a" * 1001):
+            with self.subTest(size=len(text)):
+                state = _state(active_conversation_id=7, chat_messages=_decorated(5))
+                recorder = _Recorder(_json(200, _message(9, mine=True)))
+                with self._client(recorder):
+                    steps = self._steps(state, ChatState.send_message.fn(state, {"message_text": text}), recorder, "is_sending")
+                self.assertEqual(steps, [])
+                self.assertFalse(state.is_sending)
+                self.assertEqual(recorder.requests, [])
+
+    def test_list_and_history_actions_show_loading_before_the_request(self) -> None:
+        cases = [
+            (
+                "refresh_conversations",
+                "is_loading_list",
+                _state(),
+                _json(200, _list_page([_conversation(1)])),
+            ),
+            (
+                "load_more_conversations",
+                "is_loading_list",
+                _state(chat_conversations=[_conversation(1)], conversations_has_more=True),
+                _json(200, _list_page([_conversation(2)], page=2)),
+            ),
+            (
+                "load_older_messages",
+                "is_loading_older",
+                _state(active_conversation_id=7, chat_messages=_decorated(5, 6), has_older=True),
+                _json(200, _messages_page([_message(3)])),
+            ),
+        ]
+        for name, flag, state, respond in cases:
+            for status in (200, 500):
+                with self.subTest(event=name, status=status):
+                    fresh = SimpleNamespace(**vars(state))
+                    recorder = _Recorder(respond if status == 200 else _json(500, {"message": "x"}))
+                    with self._client(recorder):
+                        steps = self._steps(fresh, getattr(ChatState, name).fn(fresh), recorder, flag)
+                    self.assertEqual(steps[0], (None, True, 0))
+                    self.assertFalse(getattr(fresh, flag))
+                    self.assertEqual(len(recorder.requests), 1)
+
+    def test_unauthorized_turns_loading_off_before_redirect(self) -> None:
+        cases = [
+            ("refresh_conversations", "is_loading_list", _state()),
+            ("load_more_conversations", "is_loading_list", _state(chat_conversations=[_conversation(1)], conversations_has_more=True)),
+            ("load_older_messages", "is_loading_older", _state(active_conversation_id=7, chat_messages=_decorated(5), has_older=True)),
+        ]
+        for name, flag, state in cases:
+            with self.subTest(event=name):
+                recorder = _Recorder(_json(401, {"message": "x"}))
+                with self._client(recorder), patch("doafacil.chat.login_redirect", return_value="login"):
+                    steps = self._steps(state, getattr(ChatState, name).fn(state), recorder, flag)
+                self.assertEqual(steps[0], (None, True, 0))
+                self.assertEqual(steps[-1], ("login", False, 1))
+                self.assertEqual(state.auth_token, "")
+
+    def test_retry_button_is_disabled_while_loading(self) -> None:
+        from doafacil.chat import chat_page
+
+        rendered = str(chat_page())
+        start = rendered.index('"Tentar de novo"')
+        button = rendered[rendered.rindex("jsx(", 0, start) : start]
+        self.assertIn("is_loading_list", button)

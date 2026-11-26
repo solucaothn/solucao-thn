@@ -212,7 +212,7 @@ Cada jornada mostra a sequência de ações, o resultado esperado e um espaço p
 
 5. **Passo 4 — “Como será a entrega?”:** a forma de entrega é **“A combinar”**, e a localização da doação é a cidade e o estado do seu perfil. Clique em **“Continuar”**.
 
-6. **Passo 5 — “Como prefere ser contatado?”:** escolha **“E-mail”** ou **“Chat do DoaFácil”** e clique em **“Publicar doação”**.
+6. **Passo 5 — “Como prefere que entrem em contato?”:** escolha **“E-mail”** ou **“Chat do DoaFácil”** e clique em **“Publicar doação”**.
    - **Resultado:** a doação é publicada e o site abre o detalhe dela com o aviso “Doação publicada!” e o link “Minhas doações”.
 
 Em qualquer passo, **“Voltar”** retorna ao anterior sem perder o que foi preenchido.

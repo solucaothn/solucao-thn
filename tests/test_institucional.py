@@ -271,6 +271,21 @@ class OtherPagesTests(unittest.TestCase):
         content = content.replace('src:"/logo.svg"', "").replace('src:"/seguranca/seguranca.jpg"', "", 1)
         self.assertNotIn("src:", content)
 
+    def test_review_texts(self) -> None:
+        """Change correcoes-revisao: o cartão de quem recebe, a concordância da
+        apresentação e o texto neutro da Ajuda."""
+        titles = [title for _, title, _ in inst.SECURITY_CARDS]
+        self.assertEqual(titles, ["Criei uma doação", "Recebi uma doação"])
+        receive = inst.SECURITY_CARDS[1][2]
+        self.assertIn("não confere os itens", receive)
+        self.assertIn("confira o item antes de levar", receive)
+        self.assertIn("a segurança e a transparência para todos", inst.SECURITY_INTRO)
+        rendered = str(security_page())
+        self.assertNotIn("Doei em uma doa", rendered)
+        answers = {q["id"]: q["answer"] for c in inst.HELP_CATEGORIES for q in c["questions"]}
+        self.assertIn("vá com alguém se puder", answers["combinar-com-seguranca"])
+        self.assertNotIn("acompanhado", " ".join(answers.values()))
+
     def test_about_mission_highlight_and_story(self) -> None:
         r = str(about_page())
         self.assertIn('className:"about-highlight"', r)

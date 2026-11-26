@@ -499,7 +499,8 @@ class PublicHomeTests(unittest.TestCase):
             "COMECE POR AQUI",
             "Quer criar uma doação?",
             "Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa.",
-            "Para você mesmo",
+            # Texto neutro quanto a gênero (change correcoes-revisao).
+            "Para você",
             "Escolha um item disponível e receba de alguém que está desapegando.",
             "Ajude quem precisa",
             "Cadastre um objeto que você não usa mais e encontre quem precisa.",
@@ -585,7 +586,8 @@ class PublicHomeTests(unittest.TestCase):
             for node in form_nodes
             if type(node).__name__ == "Link"
         }
-        self.assertEqual(links, {"Para você mesmo": "/explorar", "Ajude quem precisa": "/cadastro-doacao"})
+        self.assertEqual(links, {"Para você": "/explorar", "Ajude quem precisa": "/cadastro-doacao"})
+        self.assertNotIn("Para você mesmo", contents)
         form = next(node for node in form_nodes if type(node).__name__ == "Form")
         self.assertIn("on_submit", form.event_triggers)
         self.assertIn("search", str(form.event_triggers["on_submit"]))

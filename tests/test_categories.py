@@ -283,7 +283,9 @@ class RetryTests(unittest.TestCase):
     def test_failure_offers_retry_on_page_and_drawer(self) -> None:
         page = str(categories_page())
         self.assertIn('"Tentar de novo"', page)
-        self.assertIn("load_categories", page[page.index('className:"category-retry"') :][:600])
+        # Change correcoes-revisao: a /categorias usa o retry_categories, que
+        # mostra o carregando na hora.
+        self.assertIn("retry_categories", page[page.index('className:"category-retry"') :][:600])
         from doafacil.doafacil import index
 
         home = str(index())
@@ -295,9 +297,50 @@ class RetryTests(unittest.TestCase):
         self.assertNotIn("Tentar de novo", str(category_list(CategoriesState.categories)))
 
     def test_home_reload_categories(self) -> None:
+        """Change correcoes-revisao: a gaveta mostra o carregando antes do
+        pedido (o primeiro `yield`), com um único pedido."""
         from doafacil.doafacil import HomeState
 
-        state = SimpleNamespace(categories=[])
-        with patch("doafacil.doafacil._load_categories_result", new_callable=AsyncMock, return_value=CATEGORIES):
-            asyncio.run(HomeState.reload_categories.fn(state))
+        state = SimpleNamespace(categories=[], categories_loading=False)
+        seen: list[bool] = []
+
+        async def load(client):
+            seen.append(state.categories_loading)
+            return CATEGORIES
+
+        async def collect():
+            return [(event, state.categories_loading) async for event in HomeState.reload_categories.fn(state)]
+
+        with patch("doafacil.doafacil._load_categories_result", side_effect=load):
+            steps = asyncio.run(collect())
+        self.assertEqual(steps, [(None, True)])
+        self.assertEqual(seen, [True])
         self.assertEqual(state.categories, CATEGORIES)
+        self.assertFalse(state.categories_loading)
+
+    def test_home_reload_failure_turns_loading_off(self) -> None:
+        from doafacil.doafacil import HomeState
+
+        state = SimpleNamespace(categories=[], categories_loading=False)
+
+        async def collect():
+            return [event async for event in HomeState.reload_categories.fn(state)]
+
+        with patch("doafacil.doafacil._load_categories_result", new_callable=AsyncMock, return_value=[]):
+            self.assertEqual(asyncio.run(collect()), [None])
+        self.assertEqual(state.categories, [])
+        self.assertFalse(state.categories_loading)
+
+    def test_page_retry_shows_loading_and_reloads(self) -> None:
+        state = SimpleNamespace(loading=False, categories=[])
+        result = CategoriesState.retry_categories.fn(state)
+        self.assertTrue(state.loading)
+        self.assertIs(result, CategoriesState.load_categories)
+
+    def test_drawer_shows_loading_while_retrying(self) -> None:
+        from doafacil.doafacil import index
+
+        home = str(index())
+        start = home.index('className:"categories-drawer"')
+        self.assertIn("categories_loading", home[start:])
+        self.assertIn("Carregando categorias...", home)

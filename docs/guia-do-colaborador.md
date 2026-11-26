@@ -149,7 +149,7 @@ A referência visual é `docs/design/16-landing-nova.png`. As diferenças aprova
 
   | Origem | Destino |
   |---|---|
-  | menu “Explorar Doações”, “Ver mais...”, cartão “Para você mesmo”, rodapé “Doações” | `/explorar` |
+  | menu “Explorar Doações”, “Ver mais...”, cartão “Para você”, rodapé “Doações” | `/explorar` |
   | cartão “Ajude quem precisa”, rodapé “Criar doações”, “Quero Doar” | `/cadastro-doacao` |
   | rodapé “Doações mais recentes” | `/#doacoes-recentes` |
   | menu “Categorias” | abre a gaveta de categorias (change explorar-categorias) |
@@ -1206,6 +1206,7 @@ O script imprime só o cenário, o status, contagens e OK/FALHOU. A pausa entre 
 - Responder em português do Brasil.
 - No fim de cada tarefa, mostrar o resumo, o `git status` e o `git diff --stat`.
 - Teste manual no navegador é feito por uma pessoa, não pelo agente.
+- **Carregando que aparece (changes chat-carregamento e correcoes-revisao):** o Reflex só manda o estado ao navegador num `yield` ou no fim do evento. Num evento que liga um carregando ou desativa um botão antes de chamar o Xano, coloque um `yield` logo depois de ligar o estado e depois das validações locais. Sem ele, o “Entrando...” ou o botão desativado nunca aparecem, e um segundo clique entra na fila e repete o pedido. Nos testes, confira que o primeiro `yield` chega com o estado ligado e nenhum pedido feito.
 
 ## 13. Problemas comuns
 

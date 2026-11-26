@@ -452,7 +452,9 @@ class SignupStateTests(unittest.TestCase):
                 self.assertEqual(state.error_message, expected_message)
                 self.assertEqual(state.auth_token, "")
                 self.assertFalse(state.is_loading)
-                self.assertEqual(events, [])
+                # Só o envio do “Criando...”, antes do pedido (change
+                # correcoes-revisao).
+                self.assertEqual(events, [None])
 
     def test_signup_validates_before_request_and_blocks_duplicate_submission(self) -> None:
         class State:
@@ -659,7 +661,9 @@ class SignupStateTests(unittest.TestCase):
                             events.append(event)
                         return events
 
-                    self.assertEqual(asyncio.run(run()), [])
+                    # Só o envio do carregamento, antes do pedido (change
+                    # correcoes-revisao).
+                    self.assertEqual(asyncio.run(run()), [None])
 
                 self.assertEqual(state.recovery_error_message, expected)
                 self.assertEqual(state._signup_password, "senha123")

@@ -35,7 +35,7 @@ As imagens desta pasta são a referência visual do frontend (Reflex). O texto a
 - Etiqueta "COMECE POR AQUI" e título.
 - Abaixo do título, exibir em destaque e negrito: "Leva só alguns minutos: conte o que você quer doar e a gente conecta você a quem precisa."
 - Três cartões:
-  - **Para você mesmo**: "Escolha um item disponível e receba de alguém que está desapegando."
+  - **Para você**: "Escolha um item disponível e receba de alguém que está desapegando."
   - **Ajude quem precisa**: "Cadastre um objeto que você não usa mais e encontre quem precisa."
   - **Desapego em grupo**: "Para família ou uma empresa que quer doar vários itens de uma vez." Exibir a etiqueta **Em breve** e não exibir seta.
 - As setas dos dois primeiros cartões são decorativas; nenhum cartão ou controle navega nesta change.
@@ -76,7 +76,7 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 - **Números:** “Doações em circulação!” (doações disponíveis) e “Pessoas alcançadas” (doações concluídas), ambos vindos de `catalog/donations/count`. Número em Bold 24 px e rótulo em Regular 16 px, em `#005723` (8,9:1 sobre o creme), centralizados na altura dos cartões das recentes.
 - **Cartões das recentes:** quadrados entre 220 e 260 px de lado, dividindo a largura do carrossel entre os 4. A linha dos números e do carrossel usa as mesmas bordas do conteúdo do cabeçalho (até 1200 px, com margens de 16 e 24 px), e a coluna dos números tem 11rem. Assim, os 4 cartões cabem em 1512 px; quando não cabem, o carrossel rola dentro dele.
 - **“Doações mais recentes:”** com o link **“Ver mais...”** (`/explorar`) à direita.
-- **“Comece por aqui”:** “Para você mesmo” leva a `/explorar` e “Ajude quem precisa” a `/cadastro-doacao`; “Desapego em grupo” segue **Em breve**. A busca funciona: categorias do Xano, as 27 UFs e “Buscar” abrindo `/explorar?q=…&categoria=…&uf=…`.
+- **“Comece por aqui”:** “Para você” leva a `/explorar` e “Ajude quem precisa” a `/cadastro-doacao`; “Desapego em grupo” segue **Em breve**. A busca funciona: categorias do Xano, as 27 UFs e “Buscar” abrindo `/explorar?q=…&categoria=…&uf=…`.
 - **Institucional:** fundo creme, título em `#1F1F1F`, texto de apoio em `#166B3B` e quatro cartões quadrados com ícone em círculo verde: Solidariedade — “Histórias que continuam”; Segurança — “Você no controle”; Nossa missão — “Nada se perde”; Passo a passo — “Doar leva minutos”. Sem “Saiba mais”. Desde a change videos-home, o fundo de cada cartão é um vídeo próprio do grupo; o detalhamento está em “Vídeos dos cartões institucionais”, logo abaixo desta lista.
 - **Rodapé:** os links navegam (rotas na tabela do guia, seção 8).
 
@@ -728,7 +728,7 @@ Diferenças aprovadas em relação ao Figma:
 - **Botão “Enviar”** ao lado do campo; Enter também envia. O ícone de imagem do frame (anexar fotos) não foi implementado: o chat só aceita texto.
 - **Cores com contraste AA:** o Figma usa texto branco sobre cinza `#CDD2DF` e sobre verde `#32C470`, o que fica abaixo do contraste mínimo. As bolhas recebidas usam fundo `#E9ECEF` com texto `#1F1F1F`; as enviadas, `#007A42` (o verde dos botões primários) com texto branco. A pílula do dia também usa `#007A42`.
 - **Tamanhos de texto legíveis:** o frame usa 8 px no subtítulo da lista e no placeholder; aqui são 0,75 rem e o tamanho padrão do campo. O placeholder usa `#6B6B6B`, como nos outros formulários.
-- **Controles acrescentados:** “Conversas” com o botão “Atualizar conversas” no topo da lista, “Carregar mais conversas”, “Carregar anteriores” no topo das mensagens, “Tentar novamente” em erro e, em telas estreitas, “Voltar às conversas”.
+- **Controles acrescentados:** “Conversas” com o botão “Atualizar conversas” no topo da lista, “Carregar mais conversas”, “Carregar anteriores” no topo das mensagens, “Tentar de novo” em erro e, em telas estreitas, “Voltar às conversas”.
 - **Telas estreitas:** a lista e a conversa aparecem uma de cada vez.
 - **Textos neutros:** “Você ainda não tem conversas.”, “Escolha uma conversa para ver as mensagens.” e “Ainda não há mensagens. Escreva a primeira.”. As mensagens do mockup não são usadas.
 - **Horário de envio:** embaixo de cada bolha, do mesmo lado dela, em HH:MM no fuso de Brasília, fonte pequena e cor `#6b6b6b`. Não está no Figma.
