@@ -100,7 +100,7 @@ A aplicação SHALL permitir verificar o código de seis dígitos sem revelar a 
 
 #### Scenario: Exibir a tela de verificação
 - **WHEN** a pessoa chega à rota `/verificar-email`
-- **THEN** no fluxo de recuperação, a aplicação apresenta cartão com `auth-card-enter`, título “Verifique seu e-mail”, e-mail mascarado mostrando a primeira letra, `***` e domínio, campo Código, a dica “Pode demorar um minutinho. Olha também no spam.”, botão “Continuar” e link “← Voltar” para `/recuperar-senha`
+- **THEN** no fluxo de recuperação, a aplicação apresenta cartão com `auth-card-enter`, título “Verifique seu e-mail”, e-mail mascarado mostrando a primeira letra, `***` e domínio, campo Código, a dica “Pode demorar um minutinho. Confira também a caixa de spam.”, botão “Continuar” e link “← Voltar” para `/recuperar-senha`
 - **AND** no fluxo de recuperação, exibe a mensagem neutra “Se existir uma conta com esse e-mail, enviamos um código de 6 dígitos para <e-mail mascarado>.”
 - **AND** no fluxo de cadastro, os textos e o link “← Voltar” para `/cadastro` são definidos em `user-account`
 - **AND** o valor do código não é mantido no estado Reflex nem registrado em logs
@@ -210,3 +210,16 @@ O sistema SHALL oferecer a recuperação de senha somente pelo fluxo de código 
 #### Scenario: Fluxo por código preservado
 - **WHEN** uma pessoa solicita, verifica e confirma a recuperação pelo código
 - **THEN** o fluxo funciona como antes, com as mesmas respostas e regras
+
+### Requirement: Carregamento visível na recuperação de senha
+Nas telas `/recuperar-senha`, `/verificar-email` e `/nova-senha`, a aplicação SHALL mostrar o botão em estado de carregamento desde o acionamento até a resposta, nos fluxos de recuperação e de cadastro, sem pedidos a mais ao backend.
+
+#### Scenario: Pedir, reenviar, verificar ou confirmar
+- **WHEN** a pessoa pede o código, reenvia o código, verifica o código ou confirma a nova senha, e os dados passam na conferência da tela
+- **THEN** o botão MUST aparecer com o texto de carregamento e desativado antes de a resposta do backend chegar
+- **AND** MUST voltar ao texto normal quando a resposta chegar, com sucesso ou falha
+- **AND** cada acionamento MUST fazer um único pedido ao backend
+
+#### Scenario: Dados recusados pela tela
+- **WHEN** o e-mail, o código ou a senha não passam na conferência da tela
+- **THEN** a aplicação MUST mostrar a mensagem de erro sem mostrar o carregamento e sem chamar o backend

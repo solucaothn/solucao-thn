@@ -644,3 +644,20 @@ Toda ida ao login a partir de uma página do site SHALL levar o caminho dessa p�
 #### Scenario: Endereço externo ou inválido em next
 - **WHEN** o `next` não começa com uma única `/`, contém esquema, host, `//`, `\` ou caracteres de controle, aponta para uma tela de autenticação ou passa de 512 caracteres
 - **THEN** a aplicação MUST ignorá-lo e levar à home depois do login, sem nunca abrir um endereço fora do site
+
+### Requirement: Carregamento visível no login e no cadastro
+Ao acionar “Entrar” ou “Criar”, a interface MUST mostrar o botão como “Entrando...” ou “Criando...”, desativado, desde o acionamento até a resposta do backend, com um único pedido por acionamento.
+
+#### Scenario: Login em andamento
+- **WHEN** a pessoa aciona “Entrar” com e-mail e senha preenchidos
+- **THEN** o botão MUST aparecer como “Entrando...”, desativado, antes de a resposta do backend chegar
+- **AND** numa falha, MUST voltar a “Entrar” com a mensagem de erro
+
+#### Scenario: Cadastro em andamento
+- **WHEN** a pessoa aciona “Criar” com os dados válidos
+- **THEN** o botão MUST aparecer como “Criando...”, desativado, antes de a resposta do backend chegar
+- **AND** numa falha, MUST voltar a “Criar” com a mensagem de erro e os dados mantidos
+
+#### Scenario: Dados recusados pela tela
+- **WHEN** faltam e-mail ou senha no login, ou os dados do cadastro não passam na conferência da tela
+- **THEN** a interface MUST mostrar a mensagem de erro sem mostrar o carregamento e sem chamar o backend

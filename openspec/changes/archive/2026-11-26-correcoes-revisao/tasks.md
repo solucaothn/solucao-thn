@@ -52,3 +52,4 @@ Os comandos `git` e `xano` são do Higor. Esta change não mexe em `xano/` e nã
     - `/categorias`: o “Tentar de novo” mostra “Carregando categorias...” e volta à falha;
     - `/explorar` em 360 px: veja a 1.2.
   - Falta (Higor, numa rede sem interceptação de TLS): abrir uma doação existente e o perfil público dela, e repetir o login com dados inválidos para ver a mensagem “E-mail ou senha incorretos.”.
+  - **Nota (arquivamento em 2026-11-26):** a change foi arquivada com esta tarefa em aberto, por decisão do grupo. O teste com dados reais será feito fora da rede corporativa, e o resultado fica anotado aqui.
