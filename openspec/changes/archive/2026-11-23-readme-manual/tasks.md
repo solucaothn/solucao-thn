@@ -15,4 +15,4 @@ Os comandos `git` e `xano` são do Higor. Change só de documentação (`skip_sp
 ## 3. Verificação
 
 - [x] 3.1 Rodar a suíte inteira. Verificação: `python -m unittest discover -s tests` passa.
-- [ ] 3.2 Roteiro manual (para o Higor e o grupo): tirar as capturas da lista, salvá-las em `docs/manual/` com os nomes indicados, preencher a “Equipe” e conferir o README renderizado no GitHub.
+- [x] 3.2 Roteiro manual (para o Higor e o grupo): tirar as capturas da lista, salvá-las em `docs/manual/` com os nomes indicados, preencher a “Equipe” e conferir o README renderizado no GitHub.

@@ -330,12 +330,13 @@ Use duas janelas de navegação diferentes (uma normal e uma anônima, por exemp
 
 ## Equipe
 
-| Nome | Papel |
-|---|---|
-| _(nome)_ | _(papel)_ |
-| _(nome)_ | _(papel)_ |
-| _(nome)_ | _(papel)_ |
-| _(nome)_ | _(papel)_ |
+Grupo **Solução THN**:
+
+| Nome |
+|---|
+| Higor Rodrigues Silva |
+| Nicholas Gomes Cardoso |
+| Igor Cruz Carvalho |
 
 Contato do projeto: solucaothn@gmail.com
 
