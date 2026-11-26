@@ -535,7 +535,9 @@ class DonationCreationTests(unittest.TestCase):
         self.assertEqual((state.city, state.state), ("Recife", "PE"))
         # Sem limpar o upload ao entrar (change navegacao-celular): o
         # clear_selected_files quebrava no navegador e não havia o que limpar.
-        self.assertEqual(events, [])
+        # O único envio é o do estado “Preparando seu cadastro...”, antes dos
+        # pedidos (change correcoes-revisao).
+        self.assertEqual(events, [None])
 
         DonationCreateState.advance.fn(state)
         self.assertEqual(state.current_step, 1)
@@ -1117,3 +1119,123 @@ class WizardFocusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PendingStateAndNoticeTests(unittest.TestCase):
+    """Change correcoes-revisao: a publicação e o carregamento do cadastro
+    mandam o andamento ao navegador antes dos pedidos; o aviso legal cita só
+    os Termos de uso, com link para /termos em outra aba."""
+
+    ENV = {
+        "XANO_API_URL": "https://xano.example/api:catalog",
+        "XANO_AUTH_API_URL": "https://xano.example/api:auth",
+    }
+
+    def setUp(self) -> None:
+        from doafacil.cadastro_doacao import clear_category_cache
+
+        clear_category_cache()
+
+    def _publish_steps(self, state: SimpleNamespace, status: int) -> tuple[list, list]:
+        requests: list[httpx.Request] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            body = {"donation": {"id": 12, "status": "disponível"}} if status == 200 else {"message": "x"}
+            return httpx.Response(status, json=body, request=request)
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+
+        async def collect() -> list:
+            return [
+                (event, state.is_publishing, state.upload_progress, len(requests))
+                async for event in DonationCreateState.publish.fn(state)
+            ]
+
+        with (
+            patch.dict("os.environ", self.ENV),
+            patch("doafacil.cadastro_doacao.httpx.AsyncClient", return_value=client),
+            patch("doafacil.cadastro_doacao.rx.redirect", side_effect=lambda path: f"redirect:{path}"),
+        ):
+            return asyncio.run(collect()), requests
+
+    def test_publishing_is_shown_before_the_request(self) -> None:
+        state = _publish_state()
+        steps, requests = self._publish_steps(state, 200)
+        self.assertEqual(steps[0], (None, True, "Enviando sua doação...", 0))
+        self.assertEqual(steps[-1][0], "redirect:/doacao/12")
+        self.assertEqual(len(requests), 1)
+
+    def test_failure_after_progress_turns_it_off_and_keeps_data(self) -> None:
+        state = _publish_state()
+        steps, requests = self._publish_steps(state, 500)
+        self.assertEqual(steps, [(None, True, "Enviando sua doação...", 0)])
+        self.assertFalse(state.is_publishing)
+        self.assertEqual(state.upload_progress, "")
+        self.assertNotEqual(state.donation_error_message, "")
+        self.assertEqual((state.title, len(state.photos)), ("Mesa", 2))
+        self.assertEqual(len(requests), 1)
+
+    def test_invalid_data_shows_no_progress_and_makes_no_request(self) -> None:
+        # A publicação confere a etapa 5 (contato); as outras são conferidas
+        # ao avançar no assistente e de novo no Xano.
+        state = _publish_state(contact_preference="WhatsApp")
+        steps, requests = self._publish_steps(state, 200)
+        self.assertEqual(steps, [])
+        self.assertFalse(state.is_publishing)
+        self.assertEqual(state.upload_progress, "")
+        self.assertEqual(requests, [])
+
+    def test_load_shows_preparing_before_the_requests(self) -> None:
+        state = _publish_state(is_loading_data=False, data_load_failed=True, published=False)
+        requests: list[str] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            requests.append(request.url.path)
+            if request.url.path.endswith("/catalog/categories"):
+                return httpx.Response(200, json=[{"id": 3, "name": "Livros"}], request=request)
+            return httpx.Response(200, json={"city": "Recife", "state": "PE"}, request=request)
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+
+        async def collect() -> list:
+            return [
+                (event, state.is_loading_data, len(requests))
+                async for event in DonationCreateState.load_initial_data.fn(state)
+            ]
+
+        with (
+            patch.dict("os.environ", self.ENV),
+            patch("doafacil.cadastro_doacao.httpx.AsyncClient", return_value=client),
+        ):
+            steps = asyncio.run(collect())
+        self.assertEqual(steps, [(None, True, 0)])
+        self.assertFalse(state.is_loading_data)
+        self.assertFalse(state.data_load_failed)
+        # Os mesmos dois pedidos da abertura (categorias e perfil).
+        self.assertEqual(len(requests), 2)
+
+    def test_retry_button_text(self) -> None:
+        rendered = str(donation_creation_page())
+        self.assertIn('"Tentar de novo"', rendered)
+        self.assertNotIn("Tentar carregar novamente", rendered)
+
+    def test_legal_notice_cites_only_the_terms_with_link_in_new_tab(self) -> None:
+        rendered = str(donation_creation_page())
+        self.assertIn(
+            r"Ao clicar no bot\u00e3o abaixo, voc\u00ea declara que \u00e9 maior de 18 anos "
+            r"e que leu e concorda com os ",
+            rendered,
+        )
+        start = rendered.index('className:"donation-terms-link"')
+        link = rendered[start : rendered.index('"Termos de uso"', start)]
+        self.assertIn('to:"/termos"', link)
+        self.assertIn('"_blank"', link)
+        self.assertIn('rel:"noopener noreferrer"', link)
+        for removed in ("Taxas", "Prazos", "Regulamentos"):
+            self.assertNotIn(removed, rendered)
+
+    def test_contact_step_title_is_neutral(self) -> None:
+        rendered = str(_step_five())
+        self.assertIn("Como prefere que entrem em contato?", rendered)
+        self.assertNotIn("contatado", rendered)

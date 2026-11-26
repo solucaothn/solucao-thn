@@ -226,7 +226,7 @@ HELP_CATEGORIES: list[dict[str, Any]] = [
             _q(
                 "combinar-com-seguranca",
                 "Como combino uma entrega com segurança?",
-                "Prefira lugares públicos e movimentados, vá acompanhado se puder e não compartilhe "
+                "Prefira lugares públicos e movimentados, vá com alguém se puder e não compartilhe "
                 "dados que você não precisa, como documentos ou endereço completo.",
             ),
             _q(
@@ -813,7 +813,7 @@ def help_category_page() -> rx.Component:
 # ---------------------------------------------------------------------------
 
 SECURITY_INTRO = (
-    "No DoaFácil, a nossa prioridade é a segurança e transparência para todos. É por essa razão "
+    "No DoaFácil, a nossa prioridade é a segurança e a transparência para todos. É por essa razão "
     "que nos empenhamos intensamente para garantir uma experiência confiável e tranquila para você."
 )
 # (ícone, título, texto). Trocas em relação ao Figma estão na decisão 9.
@@ -857,7 +857,7 @@ SECURITY_CARDS = (
     ),
     (
         "hand-heart",
-        "Doei em uma doação",
+        "Recebi uma doação",
         "O DoaFácil não confere os itens: a entrega é combinada direto entre as pessoas, pelo chat "
         "ou pelo contato escolhido. Combine em lugar público e confira o item antes de levar.",
     ),

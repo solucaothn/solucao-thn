@@ -1411,13 +1411,16 @@ if __name__ == "__main__":
 
 
 class DetailRetryTests(unittest.TestCase):
-    """Change navegacao-celular: a falha do detalhe oferece “Tentar novamente”."""
+    """Change navegacao-celular: a falha do detalhe oferece o botão de tentar
+    de novo. Change correcoes-revisao: o texto é “Tentar de novo”, como nas
+    outras páginas, e o botão mostra “Carregando doação...” na hora."""
 
     def test_error_state_has_retry_that_reloads(self) -> None:
         rendered = str(donation_detail_page())
         retry = rendered[rendered.index('className:"detail-retry"') :][:1500]
-        self.assertIn('"Tentar novamente"', retry)
-        self.assertIn("load_donation", retry)
+        self.assertIn('"Tentar de novo"', retry)
+        self.assertNotIn("Tentar novamente", rendered)
+        self.assertIn("retry_donation", retry)
         self.assertIn('["minHeight"] : "44px"', retry)
         # Logo depois da mensagem de falha, no ramo do estado de erro.
         import json
@@ -1570,3 +1573,9 @@ class DonorMemberSinceTests(unittest.TestCase):
             asyncio.run(DonationDetailState.load_donor_since.fn(state))
         fetch.assert_not_called()
         self.assertEqual(state.donor_member_since, "")
+
+    def test_retry_shows_loading_and_reloads(self) -> None:
+        state = SimpleNamespace(view_state="error")
+        result = DonationDetailState.retry_donation.fn(state)
+        self.assertEqual(state.view_state, "loading")
+        self.assertIs(result, DonationDetailState.load_donation)

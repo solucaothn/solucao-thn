@@ -121,7 +121,11 @@ class LoginNextFlowTests(unittest.TestCase):
             patch("doafacil.login.request_login", new_callable=AsyncMock, return_value=LoginResult("tok", 1)),
             patch("doafacil.login.rx.redirect", side_effect=lambda path: f"redirect:{path}"),
         ):
-            return _run_events(LoginState.login.fn(state, {"email": "a@b.test", "password": "x"}))
+            events = _run_events(LoginState.login.fn(state, {"email": "a@b.test", "password": "x"}))
+        # O primeiro é o envio do “Entrando...”, antes do pedido (change
+        # correcoes-revisao); aqui interessa só o destino do redirecionamento.
+        self.assertIsNone(events[0])
+        return events[1:]
 
     def test_login_returns_to_safe_next(self) -> None:
         self.assertEqual(self._login(_query_router("/login", next="/doacao/7")), ["redirect:/doacao/7"])

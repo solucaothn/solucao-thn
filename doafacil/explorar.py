@@ -438,11 +438,15 @@ def explore_header() -> rx.Component:
                 on_submit=ExploreState.search,
                 reset_on_submit=False,
                 class_name="explore-header-search",
-                flex="1",
+                # Base de 100% abaixo de 992 px (change correcoes-revisao): a
+                # busca desce para uma linha própria e ocupa a largura toda.
+                # Num contêiner flex a base vence o `width`; com `flex: 1` (base
+                # 0%) a busca ficava espremida ao lado do logotipo, com o
+                # campo em 0 px e rolagem lateral em 360 px.
+                flex=rx.breakpoints(initial="1 1 100%", md="1 1 0%"),
                 min_width="0",
                 max_width="620px",
                 order=rx.breakpoints(initial="3", md="2"),
-                style={"width": rx.breakpoints(initial="100%", md="auto")},
             ),
             rx.box(responsive_header_controls(), order="2", margin_left="auto"),
             align="center",

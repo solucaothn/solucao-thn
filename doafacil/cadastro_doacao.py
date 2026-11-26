@@ -393,6 +393,9 @@ class DonationCreateState(LoginState):
         self.is_loading_data = True
         self.data_load_failed = False
         self.donation_error_message = ""
+        # “Preparando seu cadastro...” na hora, também no “Tentar de novo”
+        # (change correcoes-revisao); os pedidos são os mesmos de antes.
+        yield
         try:
             categories_endpoint = _api_endpoint(
                 CATALOG_API_ENV, "/catalog/categories"
@@ -677,6 +680,10 @@ class DonationCreateState(LoginState):
         self.is_publishing = True
         self.donation_error_message = ""
         self.upload_progress = "Enviando sua doação..."
+        # Manda o “Publicando...” e o aviso ao navegador antes do envio (change
+        # correcoes-revisao): sem o `yield`, a tela ficava parada até a
+        # resposta, que pode levar até 60 s.
+        yield
         payload: dict[str, object] = {
             "category_id": int(self.category_id),
             "title": self.title.strip(),
@@ -1134,7 +1141,7 @@ def _step_four() -> rx.Component:
 def _step_five() -> rx.Component:
     return rx.vstack(
         rx.heading(
-            "Como prefere ser contatado?",
+            "Como prefere que entrem em contato?",
             color="#333333",
             font_size="1.2rem",
             font_weight="700",
@@ -1173,10 +1180,29 @@ def _step_five() -> rx.Component:
     )
 
 
+TERMS_ROUTE = "/termos"
+
+
 def _legal_notice() -> rx.Component:
+    """Aviso legal (change correcoes-revisao): só os Termos de uso, que o site
+    tem, com link para /termos em outra aba. O cadastro recomeça vazio a cada
+    entrada, então abrir na mesma aba perderia o que foi preenchido."""
     return rx.text(
-        "Ao clicar no botão abaixo você declara que é maior de 18 anos, "
-        "leu e está de acordo com os Termos, Taxas, Prazos e Regulamentos.",
+        "Ao clicar no botão abaixo, você declara que é maior de 18 anos e que "
+        "leu e concorda com os ",
+        rx.link(
+            "Termos de uso",
+            href=TERMS_ROUTE,
+            is_external=True,
+            rel="noopener noreferrer",
+            class_name="donation-terms-link",
+            color="#166B3B",
+            font_weight="700",
+            text_decoration="underline",
+            _hover={"color": "#0F5530"},
+            _focus_visible=WIZARD_FOCUS,
+        ),
+        ".",
         color="#333333",
         font_size="0.75rem",
         line_height="1.5",
@@ -1268,7 +1294,8 @@ def _wizard_content() -> rx.Component:
         rx.cond(
             DonationCreateState.data_load_failed,
             rx.button(
-                "Tentar carregar novamente",
+                # Mesmo texto das outras páginas (change correcoes-revisao).
+                "Tentar de novo",
                 type="button",
                 on_click=DonationCreateState.load_initial_data,
                 disabled=DonationCreateState.is_loading_data,

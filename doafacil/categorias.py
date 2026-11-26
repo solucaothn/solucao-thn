@@ -163,6 +163,14 @@ class CategoriesState(rx.State):
         self.loading = False
 
     @rx.event
+    def retry_categories(self):
+        """“Tentar de novo” da /categorias (change correcoes-revisao): mostra
+        “Carregando categorias...” na hora e busca outra vez, com o mesmo
+        pedido do load_categories."""
+        self.loading = True
+        return CategoriesState.load_categories
+
+    @rx.event
     def set_drawer_open(self, is_open: bool) -> None:
         self.drawer_open = bool(is_open)
 
@@ -172,10 +180,15 @@ class CategoriesState(rx.State):
 
 
 def categories_drawer(
-    categories: rx.Var[list[dict[str, Any]]], trigger: rx.Component, on_retry: Any = None
+    categories: rx.Var[list[dict[str, Any]]],
+    trigger: rx.Component,
+    on_retry: Any = None,
+    loading: rx.Var | bool = False,
 ) -> rx.Component:
     """Gaveta à esquerda (Figma 474:1650): título, “Fechar” (X) e a lista.
-    Escolher uma categoria fecha a gaveta e abre a Explorar filtrada."""
+    Escolher uma categoria fecha a gaveta e abre a Explorar filtrada. Com
+    `loading`, mostra “Carregando categorias...” (o “Tentar de novo” da
+    gaveta, change correcoes-revisao)."""
     return rx.dialog.root(
         rx.dialog.trigger(trigger),
         rx.dialog.content(
@@ -216,7 +229,7 @@ def categories_drawer(
                 },
             ),
             rx.box(
-                category_list(categories, on_choose=CategoriesState.close_drawer, on_retry=on_retry),
+                category_list(categories, loading, on_choose=CategoriesState.close_drawer, on_retry=on_retry),
                 padding="12px 8px",
                 overflow_y="auto",
                 flex="1",
@@ -263,7 +276,8 @@ def categories_page() -> rx.Component:
                 category_list(
                     CategoriesState.categories,
                     CategoriesState.loading,
-                    on_retry=CategoriesState.load_categories,
+                    # Mostra o carregando na hora (change correcoes-revisao).
+                    on_retry=CategoriesState.retry_categories,
                 ),
                 width="100%",
                 max_width="560px",

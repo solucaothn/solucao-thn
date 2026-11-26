@@ -302,7 +302,8 @@ class RecoveryStateTests(unittest.TestCase):
 
             events = asyncio.run(run())
 
-        self.assertEqual(events, [])
+        # Só o envio do “Enviando...”, antes do pedido (change correcoes-revisao).
+        self.assertEqual(events, [None])
         self.assertEqual(state.recovery_error_message, RECOVERY_UNAVAILABLE_MESSAGE)
         self.assertEqual(state.recovery_email, "")
         self.assertFalse(state.recovery_is_loading)
@@ -354,7 +355,8 @@ class RecoveryStateTests(unittest.TestCase):
 
             events = asyncio.run(run())
 
-        self.assertEqual(events, [])
+        # Só o envio do carregamento, antes do pedido (change correcoes-revisao).
+        self.assertEqual(events, [None])
         self.assertEqual(state.recovery_error_message, RECOVERY_CODE_ERROR)
         self.assertFalse(state.recovery_is_loading)
 
@@ -650,7 +652,7 @@ class RecoveryPageTests(unittest.TestCase):
                 (
                     "Verifique seu e-mail",
                     "Código",
-                    "Pode demorar um minutinho. Olha também no spam.",
+                    "Pode demorar um minutinho. Confira também a caixa de spam.",
                     "Reenviar código",
                     "Usar outro e-mail",
                 ),
@@ -672,6 +674,8 @@ class RecoveryPageTests(unittest.TestCase):
                 contents = f"{_component_text(page)} {page}"
                 for text in expected_text:
                     self.assertIn(text, contents)
+                # Dica do spam corrigida (change correcoes-revisao).
+                self.assertNotIn("Olha também no spam", contents)
                 nodes = _component_nodes(page)
                 cards = [
                     node

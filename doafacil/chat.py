@@ -601,10 +601,46 @@ def _end_edit(state: Any) -> None:
     state.selected_message_id = 0
 
 
+async def _send_new_message(state: Any, text: str) -> rx.event.EventSpec | None:
+    """Envio de mensagem nova. Quem chama já ligou `is_sending` e mandou o
+    estado ao navegador (change correcoes-revisao); aqui ele é desligado."""
+    try:
+        async with _new_client() as client:
+            message = await send_message(
+                client, state.auth_token, state.active_conversation_id, text
+            )
+    except ChatUnauthorizedError:
+        _clear_session(state)
+        return login_redirect(state)
+    except ChatInvalidMessageError:
+        state.send_error = SEND_INVALID_MESSAGE
+        return None
+    except ChatNotFoundError:
+        state.send_error = SEND_NOT_FOUND_MESSAGE
+        state.read_only = True
+        return None
+    except ChatRateLimitError as error:
+        state.send_error = rate_limit_message(error.kind)
+        return None
+    except ChatServiceError:
+        state.send_error = SEND_ERROR_MESSAGE
+        return None
+    finally:
+        state.is_sending = False
+
+    state.chat_messages = _redecorate(state, [*state.chat_messages, message])
+    _move_conversation_to_top(
+        state, state.active_conversation_id, message["created_at"]
+    )
+    # Limpa o campo só depois do sucesso.
+    return rx.set_value(MESSAGE_INPUT_ID, "")
+
+
 async def _save_edit(state: Any, text: str) -> rx.event.EventSpec | None:
-    """Caminho de edição do formulário (o mesmo campo e o mesmo Enter)."""
+    """Caminho de edição do formulário (o mesmo campo e o mesmo Enter). Quem
+    chama já ligou `is_sending` e mandou o estado ao navegador (change
+    correcoes-revisao); aqui ele é desligado."""
     message_id = state.editing_message_id
-    state.is_sending = True
     try:
         async with _new_client() as client:
             message = await edit_message(client, state.auth_token, message_id, text)
@@ -989,19 +1025,26 @@ class ChatState(LoginState):
             yield outcome
 
     @rx.event
-    async def refresh_conversations(self) -> rx.event.EventSpec | None:
+    async def refresh_conversations(self):
+        """“Atualizar conversas” e “Tentar de novo” da lista: o `yield` manda
+        o botão desativado ao navegador antes do pedido (change
+        correcoes-revisao)."""
         if not self.auth_token:
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
         self.is_loading_list = True
+        yield
+        outcome = None
         try:
             async with _new_client() as client:
                 await _load_list(self, client)
         except ChatUnauthorizedError:
             _clear_session(self)
-            return login_redirect(self)
+            outcome = login_redirect(self)
         finally:
             self.is_loading_list = False
-        return None
+        if outcome is not None:
+            yield outcome
 
     @rx.event
     async def select_conversation(self, conversation_id: int):
@@ -1025,7 +1068,9 @@ class ChatState(LoginState):
             yield rx.set_value(MESSAGE_INPUT_ID, "")
 
     @rx.event
-    async def load_older_messages(self) -> rx.event.EventSpec | None:
+    async def load_older_messages(self):
+        """“Carregar anteriores”: o `yield` manda o botão desativado ao
+        navegador antes do pedido (change correcoes-revisao)."""
         if (
             not self.auth_token
             or not self.active_conversation_id
@@ -1033,10 +1078,11 @@ class ChatState(LoginState):
             or self.is_loading_older
             or not self.chat_messages
         ):
-            return None
+            return
         oldest_id = self.chat_messages[0]["id"]
         self.is_loading_older = True
         self.conversation_error = ""
+        yield
         try:
             async with _new_client() as client:
                 page = await fetch_messages(
@@ -1047,13 +1093,16 @@ class ChatState(LoginState):
                 )
         except ChatUnauthorizedError:
             _clear_session(self)
-            return login_redirect(self)
+            # Desligado antes do `yield`: o `finally` só roda depois dele.
+            self.is_loading_older = False
+            yield login_redirect(self)
+            return
         except ChatRateLimitError as error:
             self.conversation_error = rate_limit_message(error.kind)
-            return None
+            return
         except ChatError:
             self.conversation_error = MESSAGES_ERROR_MESSAGE
-            return None
+            return
         finally:
             self.is_loading_older = False
         _apply_page_metadata(self, page)
@@ -1062,17 +1111,20 @@ class ChatState(LoginState):
         _apply_read_marker(self, page)
         self.chat_messages = _redecorate(self, [*page["messages"], *self.chat_messages])
         self.has_older = page["has_older"]
-        return None
 
     @rx.event
-    async def load_more_conversations(self) -> rx.event.EventSpec | None:
+    async def load_more_conversations(self):
+        """“Carregar mais conversas”: o `yield` manda o botão desativado ao
+        navegador antes do pedido (change correcoes-revisao)."""
         if not self.auth_token:
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
         if not self.conversations_has_more or self.is_loading_list:
-            return None
+            return
         next_page = self.conversations_page + 1
         self.is_loading_list = True
         self.list_error = ""
+        yield
         try:
             async with _new_client() as client:
                 result = await list_conversations(
@@ -1080,13 +1132,16 @@ class ChatState(LoginState):
                 )
         except ChatUnauthorizedError:
             _clear_session(self)
-            return login_redirect(self)
+            # Desligado antes do `yield`: o `finally` só roda depois dele.
+            self.is_loading_list = False
+            yield login_redirect(self)
+            return
         except ChatRateLimitError as error:
             self.list_error = rate_limit_message(error.kind)
-            return None
+            return
         except ChatError:
             self.list_error = LIST_ERROR_MESSAGE
-            return None
+            return
         finally:
             self.is_loading_list = False
         self.chat_conversations = _without_unread_for(
@@ -1095,7 +1150,6 @@ class ChatState(LoginState):
         )
         self.conversations_page = next_page
         self.conversations_has_more = result["has_more"]
-        return None
 
     @rx.event
     async def back_to_list(self) -> rx.event.EventSpec | None:
@@ -1110,7 +1164,13 @@ class ChatState(LoginState):
     @rx.event
     async def send_message(
         self, form_data: dict[str, Any]
-    ) -> rx.event.EventSpec | None:
+    ):
+        """Envia a mensagem ou salva a edição (change correcoes-revisao): o
+        `yield` logo depois de ligar `is_sending` manda o “Enviar”/“Salvar”
+        desativado ao navegador antes do pedido ao Xano. Sem ele, o botão só
+        mudava no fim, e um segundo Enter ficava na fila com o mesmo texto e
+        enviava a mensagem duas vezes. Com o botão padrão desativado, o Enter
+        no campo não envia o formulário."""
         text = str(form_data.get("message_text", "")).strip()
         if (
             not text
@@ -1118,47 +1178,23 @@ class ChatState(LoginState):
             or self.read_only
             or self.is_sending
         ):
-            return None
+            return
         if not self.auth_token:
-            return login_redirect(self)
+            yield login_redirect(self)
+            return
         self.send_error = ""
         if len(text) > MAX_MESSAGE_LENGTH:
             self.send_error = SEND_INVALID_MESSAGE
-            return None
-        if self.editing_message_id:
-            return await _save_edit(self, text)
+            return
 
         self.is_sending = True
-        try:
-            async with _new_client() as client:
-                message = await send_message(
-                    client, self.auth_token, self.active_conversation_id, text
-                )
-        except ChatUnauthorizedError:
-            _clear_session(self)
-            return login_redirect(self)
-        except ChatInvalidMessageError:
-            self.send_error = SEND_INVALID_MESSAGE
-            return None
-        except ChatNotFoundError:
-            self.send_error = SEND_NOT_FOUND_MESSAGE
-            self.read_only = True
-            return None
-        except ChatRateLimitError as error:
-            self.send_error = rate_limit_message(error.kind)
-            return None
-        except ChatServiceError:
-            self.send_error = SEND_ERROR_MESSAGE
-            return None
-        finally:
-            self.is_sending = False
-
-        self.chat_messages = _redecorate(self, [*self.chat_messages, message])
-        _move_conversation_to_top(
-            self, self.active_conversation_id, message["created_at"]
-        )
-        # Limpa o campo só depois do sucesso.
-        return rx.set_value(MESSAGE_INPUT_ID, "")
+        yield
+        if self.editing_message_id:
+            outcome = await _save_edit(self, text)
+        else:
+            outcome = await _send_new_message(self, text)
+        if outcome is not None:
+            yield outcome
 
     @rx.event
     def start_edit(self, message_id: int) -> list[rx.event.EventSpec] | None:
@@ -1511,9 +1547,11 @@ def _conversation_list() -> rx.Component:
                     font_size="0.85rem",
                 ),
                 rx.button(
-                    "Tentar novamente",
+                    "Tentar de novo",
                     type="button",
                     on_click=ChatState.refresh_conversations,
+                    # Desativado durante a nova busca (change correcoes-revisao).
+                    disabled=ChatState.is_loading_list,
                     variant="outline",
                     color=GREEN_TEXT,
                     size="1",

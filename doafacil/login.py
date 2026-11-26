@@ -709,6 +709,8 @@ class LoginState(rx.State):
 
         self.recovery_is_loading = True
         self.recovery_error_message = ""
+        # “Enviando...” na tela antes do pedido (change correcoes-revisao).
+        yield
         try:
             endpoint = password_reset_request_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -743,6 +745,7 @@ class LoginState(rx.State):
 
             self.recovery_is_loading = True
             self.recovery_error_message = ""
+            yield
             try:
                 endpoint = auth_signup_resend_endpoint()
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -765,6 +768,7 @@ class LoginState(rx.State):
 
         self.recovery_is_loading = True
         self.recovery_error_message = ""
+        yield
         try:
             endpoint = password_reset_request_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -818,6 +822,7 @@ class LoginState(rx.State):
 
             self.recovery_is_loading = True
             self.recovery_error_message = ""
+            yield
             try:
                 endpoint = auth_signup_verify_endpoint()
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -856,6 +861,7 @@ class LoginState(rx.State):
 
         self.recovery_is_loading = True
         self.recovery_error_message = ""
+        yield
         try:
             endpoint = password_reset_verify_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -894,6 +900,7 @@ class LoginState(rx.State):
 
         self.recovery_is_loading = True
         self.recovery_error_message = ""
+        yield
         try:
             endpoint = password_reset_confirm_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1001,6 +1008,8 @@ class LoginState(rx.State):
             self.is_loading = False
             return
 
+        # “Entrando...” na tela antes do pedido (change correcoes-revisao).
+        yield
         try:
             endpoint = auth_login_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1045,6 +1054,8 @@ class LoginState(rx.State):
             self.is_loading = False
             return
 
+        # “Criando...” na tela antes do pedido (change correcoes-revisao).
+        yield
         try:
             endpoint = auth_signup_endpoint()
             async with httpx.AsyncClient(timeout=10.0) as client:

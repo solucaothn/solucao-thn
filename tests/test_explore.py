@@ -294,6 +294,19 @@ class ExplorePageTests(unittest.TestCase):
         self.assertIn("explore_state.search_text", r)
         self.assertIn("explore_state.state_select_value", r)
 
+    def test_header_search_takes_its_own_line_below_992px(self) -> None:
+        """Change correcoes-revisao: com `flex: 1` (base 0%), a busca ficava
+        espremida ao lado do logotipo em 360 px, com o campo em 0 px. Abaixo
+        de 992 px, a base é 100% (linha própria); a partir dela, 0% (divide a
+        linha com o logotipo e a conta, até 620 px)."""
+        r = self.rendered
+        start = r.index('className:"Root explore-header-search"')
+        form = r[start : r.index("onSubmit", start)]
+        self.assertIn('(min-width: 0px)"] : ({ ["flex"] : "1 1 100%", ["order"] : "3" })', form)
+        self.assertIn('(min-width: 62em)"] : ({ ["flex"] : "1 1 0%", ["order"] : "2" })', form)
+        self.assertIn('["maxWidth"] : "620px"', form)
+        self.assertNotIn('["width"]', form)
+
     def test_logo_same_size_as_home(self) -> None:
         from doafacil.doafacil import index
 
