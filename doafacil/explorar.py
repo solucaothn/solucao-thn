@@ -579,7 +579,9 @@ def explore_page() -> rx.Component:
                         ExploreState.title,
                         as_="h1",
                         color=TEXT_DARK,
-                        font_weight="400",
+                        # Negrito, como os títulos de /categorias e da
+                        # Central de ajuda (change acabamento-visual).
+                        font_weight="700",
                         overflow_wrap="anywhere",
                         style={"fontSize": rx.breakpoints(initial="1.5rem", md="1.75rem")},
                     ),

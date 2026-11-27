@@ -171,7 +171,7 @@ Cada jornada mostra a sequência de ações, o resultado esperado e um espaço p
 
    ![Perfil público de quem doa](docs/manual/04-perfil-quem-doa.png)
 
-4. Para falar com quem doa, use **“Chat”** (veja 5.5) ou **“Outros meios de comunicação”**. Esse segundo botão exige login. Ele abre o seu programa de e-mail com o endereço de quem doa só quando a preferência dela é e-mail; quando é o chat, aparece “Quem doa prefere contato pelo chat.”.
+4. Para falar com quem doa, use **“Chat”** (veja 5.5) ou **“Outros contatos”**. Esse segundo botão exige login. Ele abre o seu programa de e-mail com o endereço de quem doa só quando a preferência dela é e-mail; quando é o chat, aparece “Quem doa prefere contato pelo chat.”.
 
 ### 5.5 Conversar pelo chat
 

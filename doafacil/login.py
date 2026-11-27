@@ -1114,7 +1114,7 @@ def login_page() -> rx.Component:
                     rx.form(
                         rx.vstack(
                             rx.heading(
-                                "Bem-vindo",
+                                "Boas-vindas",
                                 color="#333333",
                                 font_size="2rem",
                                 font_weight="700",

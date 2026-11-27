@@ -346,7 +346,15 @@ def _statistic(value: rx.Var, error: rx.Var, label: str, retry: bool = False) ->
 def donation_count_view() -> rx.Component:
     return rx.vstack(
         _statistic(HomeState.donation_count, HomeState.count_error, "Doações em circulação!", retry=True),
-        _statistic(HomeState.completed_count, HomeState.completed_error, "Pessoas alcançadas"),
+        # Some só enquanto o número carregado for 0; durante o carregamento
+        # e com erro, continua aparecendo (change acabamento-visual).
+        rx.cond(
+            HomeState.count_loading
+            | (HomeState.completed_error != "")
+            | (HomeState.completed_count > 0),
+            _statistic(HomeState.completed_count, HomeState.completed_error, "Pessoas alcançadas"),
+            rx.fragment(),
+        ),
         align="start",
         spacing="5",
         style={"width": rx.breakpoints(initial="100%", md=STATS_COLUMN_WIDTH)},

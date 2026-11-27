@@ -665,7 +665,8 @@ class DonationDetailTests(unittest.TestCase):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, contents)
 
-        self.assertIn("Outros meios de comunicação", contents)
+        self.assertIn("Outros contatos", contents)
+        self.assertNotIn("Outros meios de comunicação", contents)
         self.assertIn("Chat", contents)
         self.assertIn("LucideMessageCircle", str(page))
 
@@ -818,8 +819,20 @@ class DonationDetailTests(unittest.TestCase):
         contents = _component_contents(card)
         self.assertIn("title_rx_state_", rendered)
         self.assertIn("Condição: ", contents)
-        self.assertIn("Outros meios de comunicação", contents)
+        self.assertIn("Outros contatos", contents)
         self.assertIn("Chat", contents)
+        # Visual do cartão: título semibold de 28/30 px em até 3 linhas,
+        # 28 px de respiro e os dois botões com 48 px, texto numa linha.
+        self.assertIn('"fontWeight"] : "600"', rendered)
+        self.assertIn('"1.75rem"', rendered)
+        self.assertIn('"1.875rem"', rendered)
+        self.assertIn('"lineHeight"] : "1.25"', rendered)
+        self.assertIn('["WebkitLineClamp"] : "3"', rendered)
+        self.assertIn('["padding"] : "28px"', rendered)
+        self.assertIn('["marginTop"] : "8px"', rendered)
+        self.assertIn('["marginTop"] : "24px"', rendered)
+        self.assertEqual(rendered.count('["height"] : "48px"'), 2)
+        self.assertEqual(rendered.count('["whiteSpace"] : "nowrap"'), 2)
         # Verde AA do projeto, e não o #00A859 (cerca de 2,9:1 com branco).
         self.assertIn('"#007A42"', rendered)
         self.assertNotIn("#00A859", rendered)
@@ -830,13 +843,24 @@ class DonationDetailTests(unittest.TestCase):
         self.assertIn('role:"status"', rendered)
         self.assertIn("0 8px 13px rgba(0, 0, 0, 0.15)", rendered)
 
-    def test_title_and_description_below_gallery_with_css_uppercase(self) -> None:
-        from doafacil.detalhe_doacao import _title_and_description
+    def test_description_section_below_gallery(self) -> None:
+        from doafacil.detalhe_doacao import (
+            _details_section,
+            _location_card,
+            _title_and_description,
+        )
 
-        rendered = str(_title_and_description())
-        self.assertIn('"textTransform"] : "uppercase"', rendered)
-        # O texto lido continua o original (sem .toUpperCase no conteúdo).
-        self.assertNotIn("toUpperCase", rendered)
+        section = _title_and_description()
+        rendered = str(section)
+        # Subtítulo “Descrição” no estilo de “Detalhes” e “Localização”; o
+        # título da doação fica só no cartão (sem caixa alta repetida).
+        self.assertIn("Descrição", _component_contents(section))
+        self.assertNotIn("title_rx_state_", rendered)
+        self.assertNotIn("uppercase", rendered)
+        heading_style = '["fontSize"] : "1.5rem", ["fontWeight"] : "500"'
+        for other in (_details_section(), _location_card()):
+            self.assertIn(heading_style, str(other))
+        self.assertIn(heading_style, rendered)
         self.assertIn("description_rx_state_", rendered)
         self.assertIn('"whiteSpace"] : "pre-wrap"', rendered)
 

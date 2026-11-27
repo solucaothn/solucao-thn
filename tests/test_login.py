@@ -536,7 +536,7 @@ class LoginPageTests(unittest.TestCase):
         self.assertEqual(page.background, "#FFF6E8")
         contents = _component_text(page)
         for text in (
-            "Bem-vindo",
+            "Boas-vindas",
             "Entre com seu e-mail e senha",
             "E-mail",
             "Senha",

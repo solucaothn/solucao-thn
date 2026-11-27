@@ -823,7 +823,9 @@ class PublicHomeTests(unittest.TestCase):
             )
             == "6px"
         ]
-        self.assertEqual(len(link_stacks), 4)
+        # As 4 colunas de links e o contêiner delas (mesmo espaço entre as
+        # linhas de grupos diferentes, change acabamento-visual).
+        self.assertEqual(len(link_stacks), 5)
         for node in nodes:
             self.assertFalse(getattr(node, "event_triggers", {}))
 

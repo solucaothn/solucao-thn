@@ -35,6 +35,9 @@ BRAZILIAN_STATES = (
     "TO",
 )
 
+# Altura dos campos do cadastro (o seletor “Estado” usa a mesma).
+SIGNUP_FIELD_HEIGHT = "48px"
+
 
 def _text_field(
     label: str,
@@ -182,17 +185,30 @@ def signup_page() -> rx.Component:
                                     font_weight="700",
                                     width="100%",
                                 ),
-                                rx.select(
-                                    list(BRAZILIAN_STATES),
+                                # No rx.select de alto nível, os estilos
+                                # ficam no Select.Root, que não vira elemento
+                                # na página: altura, fundo e borda vão no
+                                # gatilho, iguais aos dos outros campos.
+                                rx.select.root(
+                                    rx.select.trigger(
+                                        placeholder="Selecione seu estado",
+                                        class_name="signup-state-select",
+                                        width="100%",
+                                        height=SIGNUP_FIELD_HEIGHT,
+                                        background="white",
+                                        color="#333333",
+                                        border="1px solid #C8C8C8",
+                                        border_radius="8px",
+                                        box_shadow="none",
+                                    ),
+                                    rx.select.content(
+                                        rx.select.group(
+                                            *[rx.select.item(uf, value=uf) for uf in BRAZILIAN_STATES],
+                                        ),
+                                    ),
                                     name="state",
-                                    placeholder="Selecione seu estado",
                                     required=True,
-                                    width="100%",
-                                    height="48px",
-                                    background="white",
-                                    color="#333333",
-                                    border="1px solid #C8C8C8",
-                                    border_radius="8px",
+                                    size="3",
                                 ),
                                 align="start",
                                 spacing="2",
