@@ -12,4 +12,4 @@ Os comandos `git` e `xano` são do Higor. Esta change não toca no Xano.
 
 - [x] 2.1 Atualizar em `docs/design/README.md` os itens “Galeria” e “Uma foto só” para o novo arranjo. Verificação: o texto bate com a delta (`contain` só na foto única).
 - [x] 2.2 Rodar a suíte inteira e compilar o app. Verificação: `python -m unittest discover -s tests` passa e `reflex compile` termina sem erro.
-- [ ] 2.3 Roteiro manual (para o Higor): abrir doações com 1, 2, 3, 4 e 5 fotos em tela larga e em 360 px, conferir os arranjos, o espaçamento, a ausência de rolagem horizontal e que cada foto abre o visualizador nela.
+- [ ] 2.3 Roteiro manual (para o Higor): abrir doações com 1, 2, 3, 4 e 5 fotos em tela larga e em 360 px, conferir os arranjos, o espaçamento, a ausência de rolagem horizontal e que cada foto abre o visualizador nela. Parcial em 27/11/2026: doações com 3 e 4 fotos conferidas em tela larga; 1, 2, 5 fotos e 360 px não conferidos formalmente.

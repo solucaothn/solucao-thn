@@ -32,4 +32,4 @@ Os comandos `git` e `xano` são feitos pelo Higor. Esta change não mexe no Xano
 
 - [x] 5.1 (manual, Higor) Roteiro no navegador (entregue com a 4.2). Verificação: os itens anotados aqui.
   - OK: volta à origem depois do login; `next` externo vai para a home; 404 em português; doação indisponível com os links; títulos e ícone na aba; alinhamento.
-- [ ] 5.2 Montar a lista de caminhos para o commit; o Higor confere com o `git diff --stat`. Verificação: entram só os arquivos desta change.
+- [x] 5.2 Montar a lista de caminhos para o commit; o Higor confere com o `git diff --stat`. Verificação: entram só os arquivos desta change. Verificado em 27/11/2026: chegou à `main` pelo PR #105 (merge 8998a8f), num commit só (d2f384f). Esse commit tem apenas arquivos desta change (favicons, módulos, testes, `scripts/gerar_favicon.py`, `requirements-dev.txt`, docs e a change arquivada), sem `.xs`; os únicos extras são as specs principais em `openspec/specs/`, atualizadas pelo arquivamento.

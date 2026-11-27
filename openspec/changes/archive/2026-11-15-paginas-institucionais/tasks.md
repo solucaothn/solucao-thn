@@ -57,7 +57,7 @@ Páginas estáticas, sem Xano. Os comandos `git` são rodados pelo Higor.
     - o menu da conta com a foto;
     - o tema claro com o Windows em modo escuro;
     - home, Minhas doações, Editar perfil e chat sem mudança.
-- [ ] 5.5 Montar a lista de caminhos para o commit; o Higor roda o `git diff --stat` e confere. Verificação: entram só os módulos, testes e docs desta change, os PNGs 19 a 23 e `openspec/changes/paginas-institucionais/`.
+- [x] 5.5 Montar a lista de caminhos para o commit; o Higor roda o `git diff --stat` e confere. Verificação: entram só os módulos, testes e docs desta change, os PNGs 19 a 23 e `openspec/changes/paginas-institucionais/`. Verificado em 27/11/2026: chegou à `main` pelo PR #101 (merge 8886059). O `git show --name-status` mostra os módulos (incluindo `rxconfig.py`, da tarefa 6.8), os testes, os docs, os PNGs 19 a 23 e a change arquivada, sem nenhum `.xs`; os únicos extras são as specs principais em `openspec/specs/`, atualizadas pelo arquivamento.
 
 ## 6. Ajustes do roteiro 5.4 (pedidos do Higor)
 

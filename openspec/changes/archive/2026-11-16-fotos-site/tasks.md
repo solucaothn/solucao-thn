@@ -39,5 +39,5 @@ Os comandos `git` e `xano` são feitos pelo Higor. Esta change não mexe no Xano
 
   Verificação: os itens anotados aqui.
   - Resultado (Higor): `/quem-somos` e `/seguranca` com as fotos sem distorção, cantos arredondados sem canto branco e o crédito “Foto: Freepik” abaixo, também a 360 px.
-- [ ] 4.2 Montar a lista de caminhos para o commit (decisão 7), sem os `.png`; o Higor confere com o `git diff --stat`. Verificação: entram só os caminhos da decisão 7.
+- [x] 4.2 Montar a lista de caminhos para o commit (decisão 7), sem os `.png`; o Higor confere com o `git diff --stat`. Verificação: entram só os caminhos da decisão 7. Verificado em 27/11/2026: chegou à `main` pelo PR #103 (merge 5f0bb76), com exatamente os caminhos da decisão 7 (`git show --name-status`); os únicos extras são as specs principais em `openspec/specs/`, atualizadas pelo arquivamento. O `git log --all` dos dois `.png` não retorna nenhum commit, então eles nunca foram versionados.
   - Resultado parcial: a lista foi entregue; falta a conferência do Higor.

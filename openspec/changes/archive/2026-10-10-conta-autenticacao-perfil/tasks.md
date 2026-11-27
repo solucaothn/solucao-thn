@@ -7,17 +7,17 @@
 
 ## 2. Contratos de conta
 
-- [ ] 2.1 Verificar cadastro válido, rejeição de e-mail duplicado e validação de senha; confirmar por chamadas de API e inspeção da configuração que o token emitido expira em 86.400 segundos.
+- [ ] 2.1 Verificar cadastro válido, rejeição de e-mail duplicado e validação de senha; confirmar por chamadas de API e inspeção da configuração que o token emitido expira em 86.400 segundos. Não verificado formalmente; funcionalidade usada em produção pelo grupo.
 	Verificado manualmente: cadastro válido retornou token e id; verificado por inspeção do `.xs`: expiração configurada em 86.400 segundos; pendente: e-mail repetido e senha fraca.
-- [ ] 2.2 Verificar login válido e inválido e consulta de sessão com token válido, ausente e expirado; confirmar respostas e campos conforme `specs/user-account/spec.md`.
+- [ ] 2.2 Verificar login válido e inválido e consulta de sessão com token válido, ausente e expirado; confirmar respostas e campos conforme `specs/user-account/spec.md`. Não verificado formalmente; funcionalidade usada em produção pelo grupo.
 	Verificado manualmente: login válido e senha errada, com resposta de credenciais inválidas; pendente: `auth/me` com token válido e sessão sem token ou com token expirado.
-- [ ] 2.3 Verificar leitura e atualização autenticadas do próprio perfil, incluindo cidade e estado, e rejeição de campos obrigatórios vazios; confirmar os campos de resposta conforme a spec.
+- [ ] 2.3 Verificar leitura e atualização autenticadas do próprio perfil, incluindo cidade e estado, e rejeição de campos obrigatórios vazios; confirmar os campos de resposta conforme a spec. Não verificado formalmente; funcionalidade usada em produção pelo grupo.
 	Verificado manualmente: nenhuma verificação de perfil relatada; pendente: leitura e atualização do perfil, cidade e estado, campos de resposta e rejeição de campos obrigatórios vazios.
 
 ## 3. Privacidade dos eventos
 
 - [x] 3.1 Remover metadados livres da função de gravação e atualizar todos os chamadores identificados; manter a coluna histórica e verificar que novos eventos preservam ator, ação e data sem metadados pessoais.
-- [ ] 3.2 Validar os arquivos XanoScript alterados com o Xano Developer MCP e executar os cenários de cadastro, login, sessão, recuperação de senha e boas-vindas em ambiente de teste; inspecionar os novos registros para confirmar ausência de metadados e preservar a resposta do endpoint de histórico.
+- [ ] 3.2 Validar os arquivos XanoScript alterados com o Xano Developer MCP e executar os cenários de cadastro, login, sessão, recuperação de senha e boas-vindas em ambiente de teste; inspecionar os novos registros para confirmar ausência de metadados e preservar a resposta do endpoint de histórico. Não verificado formalmente; funcionalidade usada em produção pelo grupo.
 	Verificado manualmente: novos registros de signup e login no `event_log` com `metadata` vazia; XanoScript validado pelo MCP; pendente: cenários de sessão, recuperação de senha e boas-vindas, além da resposta do endpoint de histórico.
 
 ## 4. Revisão de integração

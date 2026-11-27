@@ -55,7 +55,7 @@ Os comandos `git` e `xano` são rodados pelo Higor. O agente edita os arquivos, 
     - os cartões das recentes entre 220 e 260 px (`clamp`);
     - a linha dos números e do carrossel nas bordas do cabeçalho (até 1200 px), com a coluna dos números em 11rem.
   - **2ª rodada (Higor):** roteiro OK. Em 1512 px: cabeçalho, título como no Figma, números alinhados, os 4 cartões cabendo, “Ver mais...”, “Comece por aqui”, busca chegando a `/explorar` com os filtros, cartões institucionais, rodapé e menu da conta. Em 360 px, sem rolagem horizontal.
-- [ ] 6.4 Montar a lista de caminhos para o commit; o Higor roda o `git diff --stat` e confere. Verificação: entram só os 16 caminhos abaixo. Os outros `.xs` modificados pelo pull não entram.
+- [x] 6.4 Montar a lista de caminhos para o commit; o Higor roda o `git diff --stat` e confere. Verificação: entram só os 16 caminhos abaixo. Os outros `.xs` modificados pelo pull não entram. Verificado em 27/11/2026: chegou à `main` pelo PR #98 (merge b7d2eb4). O `git show --name-status` mostra exatamente os caminhos listados abaixo: `count_GET.xs` como único `.xs`, os 3 módulos, os 5 testes, o script, os 3 docs e a change arquivada; os únicos extras são as specs principais em `openspec/specs/`, atualizadas pelo arquivamento.
   - Xano: `xano/api/catalog/catalog/donations/count_GET.xs`.
   - Frontend: `doafacil/doafacil.py`, `doafacil/cartoes_doacao.py` e `doafacil/explorar.py` (novo).
   - Testes: `tests/test_public_home.py`, `tests/test_explore.py` (novo), `tests/test_login.py`, `tests/test_my_donations.py` e `tests/test_chat.py`.
