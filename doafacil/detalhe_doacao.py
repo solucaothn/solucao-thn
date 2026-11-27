@@ -1116,7 +1116,7 @@ def _details_section() -> rx.Component:
             width="100%",
         ),
         align="stretch",
-        spacing="5",
+        spacing="3",
         width="100%",
     )
 
@@ -1153,7 +1153,7 @@ def _location_card() -> rx.Component:
             border_radius="8px",
         ),
         align="stretch",
-        spacing="4",
+        spacing="3",
         width="100%",
     )
 
@@ -1442,6 +1442,12 @@ def _published_notice() -> rx.Component:
     )
 
 
+# Ritmo vertical da página: entre seções (coluna esquerda e celular) e entre
+# os cartões da coluna direita.
+DETAIL_SECTION_GAP = "32px"
+DETAIL_CARD_GAP = "24px"
+
+
 def _donation_content() -> rx.Component:
     """Duas colunas no computador (como no Figma) e uma no celular.
 
@@ -1451,12 +1457,32 @@ def _donation_content() -> rx.Component:
     return rx.box(
         _published_notice(),
         rx.box(
-            rx.box(_gallery(), grid_area="gallery", min_width="0"),
-            rx.box(_summary_card(), grid_area="summary", min_width="0"),
-            rx.box(_title_and_description(), grid_area="title", min_width="0"),
-            rx.box(_details_section(), grid_area="details", min_width="0"),
-            rx.box(_location_card(), grid_area="location", min_width="0"),
-            rx.box(_donor_card(), grid_area="donor", min_width="0"),
+            # Cada coluna é uma pilha própria no computador, para a altura de
+            # uma não abrir vãos na outra. No celular a coluna vira
+            # "display: contents" e os filhos entram direto na grade de uma
+            # coluna, na mesma ordem de antes.
+            rx.box(
+                rx.box(_gallery(), grid_area="gallery", min_width="0"),
+                rx.box(_title_and_description(), grid_area="title", min_width="0"),
+                rx.box(_details_section(), grid_area="details", min_width="0"),
+                rx.box(_location_card(), grid_area="location", min_width="0"),
+                class_name="detail-column-main",
+                grid_area="main",
+                display=rx.breakpoints(initial="contents", md="flex"),
+                flex_direction="column",
+                gap=DETAIL_SECTION_GAP,
+                min_width="0",
+            ),
+            rx.box(
+                rx.box(_summary_card(), grid_area="summary", min_width="0"),
+                rx.box(_donor_card(), grid_area="donor", min_width="0"),
+                class_name="detail-column-side",
+                grid_area="side",
+                display=rx.breakpoints(initial="contents", md="flex"),
+                flex_direction="column",
+                gap=DETAIL_CARD_GAP,
+                min_width="0",
+            ),
             # Visualizador modal (fora do fluxo da grade).
             _photo_viewer(),
             class_name="detail-layout",
@@ -1472,15 +1498,12 @@ def _donation_content() -> rx.Component:
                     initial=(
                         "'gallery' 'summary' 'title' 'details' 'location' 'donor'"
                     ),
-                    md=(
-                        "'gallery summary' 'title donor' 'details donor' "
-                        "'location donor'"
-                    ),
+                    md="'main side'",
                 ),
                 "alignItems": "start",
             },
             column_gap="24px",
-            row_gap="32px",
+            row_gap=DETAIL_SECTION_GAP,
             width="100%",
             # Mesmo contêiner de Minhas doações (change acabamento); a grade
             # (áreas e colunas) não muda.
