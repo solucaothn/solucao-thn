@@ -74,4 +74,4 @@ Os comandos `git` e `xano` são feitos pelo Higor. Esta change não mexe no Xano
     - o painel ☰ funciona a 360 px, com e sem sessão;
     - a navegação rápida não mostra “Não foi possível carregar”, e o log `[xano]` não tem 429 nem nova tentativa.
   - O log `[xano]` fica no código, desligado por padrão (`DOAFACIL_LOG_XANO=1` liga).
-- [ ] 4.2 Montar a lista de caminhos para o commit; o Higor confere com o `git diff --stat`. Verificação: entram só os arquivos desta change.
+- [x] 4.2 Montar a lista de caminhos para o commit; o Higor confere com o `git diff --stat`. Verificação: entram só os arquivos desta change. Verificado em 27/11/2026: entrou junto com a change videos-home no PR #104 (13c2392); todos os arquivos pertencem a uma das duas changes e nenhum .xs entrou.

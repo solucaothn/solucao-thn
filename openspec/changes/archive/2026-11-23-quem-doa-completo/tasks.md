@@ -15,4 +15,4 @@ Os comandos `git` e `xano` são do Higor. Esta change não toca no Xano. Arquive
 
 - [x] 3.1 Atualizar em `docs/design/README.md` a descrição do cartão “Quem doa” e o item “Cartão ‘Quem doa’ como link”. Verificação: o texto bate com a delta.
 - [x] 3.2 Rodar a suíte inteira e compilar o app. Verificação: `python -m unittest discover -s tests` passa e `reflex compile` termina sem erro.
-- [ ] 3.3 Roteiro manual (para o Higor): abrir uma doação de alguém com e-mail verificado e outra sem, conferir as seções, o “desde”, o botão levando ao perfil e, em 360 px, a ausência de rolagem horizontal; com o Xano fora do ar só para o perfil (ou com 429), conferir que a linha “desde” some e o resto aparece.
+- [ ] 3.3 Roteiro manual (para o Higor): abrir uma doação de alguém com e-mail verificado e outra sem, conferir as seções, o “desde”, o botão levando ao perfil e, em 360 px, a ausência de rolagem horizontal; com o Xano fora do ar só para o perfil (ou com 429), conferir que a linha “desde” some e o resto aparece. Parcial em 27/11/2026: cartão com e-mail verificado e 'No DoaFácil desde' conferido; caso sem verificação, 360 px e falha do perfil não conferidos formalmente.

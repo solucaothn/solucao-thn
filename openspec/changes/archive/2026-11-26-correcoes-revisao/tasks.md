@@ -45,7 +45,7 @@ Os comandos `git` e `xano` são do Higor. Esta change não mexe em `xano/` e nã
     - os módulos alterados também passam com `-W error::SyntaxWarning -W error::DeprecationWarning` (464 testes);
     - `openspec validate correcoes-revisao --strict` OK;
     - o build de produção (`reflex run --env prod`) compila sem erro.
-- [ ] 7.2 Com o app rodando e o Xano real só no ambiente da sessão, abrir no navegador a home, a `/explorar` em 360 px, uma doação existente e o perfil público dela, e conferir o login com dados inválidos (“Entrando...” e depois a mensagem de erro). Verificação: os resultados ficam anotados aqui.
+- [x] 7.2 Com o app rodando e o Xano real só no ambiente da sessão, abrir no navegador a home, a `/explorar` em 360 px, uma doação existente e o perfil público dela, e conferir o login com dados inválidos (“Entrando...” e depois a mensagem de erro). Verificação: os resultados ficam anotados aqui. Verificado em 27/11/2026 pelo Higor com o Xano real: home, /explorar em 360 px, doação, perfil e login inválido OK.
   - Parcial (agente, 2026-11-26). Desta máquina, o servidor não alcança o Xano: a rede corporativa intercepta o TLS com uma raiz própria, e o Python recusa a cadeia (`CERTIFICATE_VERIFY_FAILED`). Sem os dados reais, a home, a doação e o perfil mostram a mensagem de falha. Conferido no navegador mesmo assim:
     - login com dados inválidos: “Entrando...” desativado e depois “Não foi possível conectar ao serviço de autenticação. Tente novamente.”;
     - detalhe da doação: o “Tentar de novo” mostra “Carregando doação...” e volta à falha;

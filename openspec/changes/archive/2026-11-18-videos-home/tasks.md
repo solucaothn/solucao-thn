@@ -42,4 +42,4 @@ Os comandos `git` e `xano` são feitos pelo Higor. Esta change não mexe no Xano
     - Corrigido no `<video>` com `disablePictureInPicture`, `disableRemotePlayback`, `controlsList` e `pointer-events: none`, coberto em `tests/test_public_home.py` (710 testes OK e `reflex compile` OK).
     - Falta conferir de novo no Edge.
   - Rodada 2 (Higor): OK no Edge; ao passar o mouse, nenhum controle do navegador aparece.
-- [ ] 3.2 Montar a lista de caminhos para o commit (decisão 6); o Higor confere com o `git diff --stat`. Verificação: entram só esses caminhos.
+- [x] 3.2 Montar a lista de caminhos para o commit (decisão 6); o Higor confere com o `git diff --stat`. Verificação: entram só esses caminhos. Verificado em 27/11/2026: entrou junto com a change navegacao-celular no PR #104 (13c2392); todos os arquivos pertencem a uma das duas changes e nenhum .xs entrou.
