@@ -850,9 +850,16 @@ class DonationDetailTests(unittest.TestCase):
             rendered,
         )
         self.assertIn(
-            "\"'gallery summary' 'title donor' 'details donor' 'location donor'\"",
+            "\"'main side'\"",
             rendered,
         )
+        # Computador: cada coluna é uma pilha própria (quem doa logo abaixo
+        # do resumo); celular: "display: contents" mantém a ordem acima.
+        for column in ("detail-column-main", "detail-column-side"):
+            self.assertIn(column, rendered)
+        self.assertIn('["display"] : "contents"', rendered)
+        self.assertIn('["gap"] : "32px"', rendered)
+        self.assertIn('["gap"] : "24px"', rendered)
         # Nenhuma aspa dupla sem escape dentro do valor (JavaScript válido).
         self.assertNotIn('""gallery', rendered)
         self.assertIn("minmax(0, 2.6fr) minmax(280px, 1fr)", rendered)

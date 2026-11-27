@@ -356,6 +356,6 @@ class UnavailableChatAndContainerTests(unittest.TestCase):
             '["gridTemplateColumns"] : "minmax(0, 1fr)"',
             '["gridTemplateColumns"] : "minmax(0, 2.6fr) minmax(280px, 1fr)"',
             "'gallery' 'summary' 'title' 'details' 'location' 'donor'",
-            "'gallery summary' 'title donor' 'details donor' 'location donor'",
+            "'main side'",
         ):
             self.assertIn(expected, rendered)
