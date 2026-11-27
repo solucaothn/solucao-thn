@@ -13,6 +13,8 @@ O sistema SHALL enviar o código por uma função interna usando o SendGrid, sem
 
 #### Scenario: Aparência do e-mail de recuperação
 - **WHEN** a versão HTML é aberta no Gmail, no Outlook ou no celular
-- **THEN** ela MUST mostrar, sobre fundo creme e com no máximo 600 px de largura, o logotipo do DoaFácil (160 px de largura, texto alternativo “DoaFácil”, por URL absoluta), o título em verde-escuro e o código num cartão cinza-claro com borda, em verde, grande e separado em 3 + 3 dígitos
+- **THEN** ela MUST mostrar, sobre fundo creme e com no máximo 600 px de largura, o logotipo do DoaFácil (160 px de largura, texto alternativo “DoaFácil”, por URL absoluta, sem anexo), o título em verde-escuro e o código num cartão cinza-claro com borda, em verde, grande e separado em 3 + 3 dígitos
+- **AND** a mensagem MUST NOT levar anexos
+- **AND** o HTML MUST ter no máximo 20 KB, para não ser cortado pelo Gmail
 - **AND** copiar o código da versão HTML MUST resultar nos seis dígitos, sem espaço no meio
 - **AND** a versão em texto simples MUST mostrar o código com os seis dígitos juntos

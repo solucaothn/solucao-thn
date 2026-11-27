@@ -19,6 +19,7 @@ _spec = importlib.util.spec_from_file_location(
 previas = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(previas)
 
+LOGO_FILE = ROOT / "assets" / "email" / "logo-email.png"
 LOGO_URL = (
     "https://raw.githubusercontent.com/solucaothn/solucao-thn/main/"
     "assets/email/logo-email.png"
@@ -159,6 +160,8 @@ class CodeEmailTests(unittest.TestCase):
     def test_email_safe_html(self) -> None:
         for _email, source in self._each():
             html = previas.render_html(source)
+            # Logotipo por URL absoluta (o embutido por cid aparecia quebrado no
+            # Gmail e ainda como anexo no fim).
             self.assertIn(
                 f'<img src="{LOGO_URL}" width="160" height="58" alt="DoaFácil"', html
             )
@@ -171,14 +174,34 @@ class CodeEmailTests(unittest.TestCase):
             self.assertIn("font-size:44px", html)
             self.assertIn("color:#168447", html)  # código verde
             self.assertIn(FONT_STACK, html)
-            # Só CSS inline, sem links e sem fontes ou arquivos externos além do logo.
+            # Só CSS inline, sem links e sem arquivos externos além do logotipo.
             self.assertNotIn("<style", html)
             self.assertNotIn("<a ", html)
             self.assertNotIn("href", html)
+            self.assertNotIn("cid:", html)
             self.assertEqual(re.findall(r"https?://[^\"' )]+", html), [LOGO_URL])
             # Toda font-family usada é a pilha segura.
             for family in re.findall(r"font-family:[^;\"]+", html):
                 self.assertEqual(family, FONT_STACK)
+
+    def test_no_attachments_in_payload(self) -> None:
+        for _email, source in self._each():
+            self.assertNotIn("attachments", source)
+            self.assertNotIn("content_id", source)
+            self.assertNotIn("disposition", source)
+
+    def test_logo_file_keeps_the_160x58_proportion(self) -> None:
+        # Largura e altura ficam no cabeçalho IHDR do PNG (bytes 16 a 24).
+        header = LOGO_FILE.read_bytes()[:24]
+        self.assertEqual(header[:8], b"\x89PNG\r\n\x1a\n")
+        width = int.from_bytes(header[16:20], "big")
+        height = int.from_bytes(header[20:24], "big")
+        self.assertEqual((width, height), (320, 116))  # 2× de 160 × 58
+
+    def test_html_stays_small(self) -> None:
+        # O Gmail corta mensagens grandes; o HTML fica bem abaixo de 20 KB.
+        for _email, source in self._each():
+            self.assertLess(len(previas.render_html(source).encode("utf-8")), 20 * 1024)
 
     def test_expiry_text_matches_the_real_validity(self) -> None:
         for email, _source in self._each():
@@ -214,10 +237,15 @@ class CodeEmailTests(unittest.TestCase):
             preview = (ROOT / email["preview"]).read_text(encoding="utf-8")
             self.assertEqual(
                 preview,
-                previas.render_html(source) + "\n",
+                previas.render_preview(source) + "\n",
                 "rode python scripts/gerar_previas_emails.py",
             )
             self.assertIn(">48<span", preview)
+            # Na prévia, o logotipo vem do arquivo local, que existe.
+            local_logo = "../../assets/email/logo-email.png"
+            self.assertIn(f'<img src="{local_logo}"', preview)
+            self.assertNotIn("cid:", preview)
+            self.assertTrue((ROOT / email["preview"]).parent.joinpath(local_logo).resolve().is_file())
 
 
 if __name__ == "__main__":

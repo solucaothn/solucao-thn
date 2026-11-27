@@ -32,13 +32,17 @@ O campo de código do site só aceita seis dígitos seguidos (`login.py`, `re.fu
    - Os cantos arredondados ficam de enfeite: o Outlook do Windows mostra cantos retos.
    - Um texto de pré-visualização (preheader) oculto, “O código expira em 10 minutos.”, aparece na lista de mensagens. Ele não leva o código.
 
-6. **Logotipo.** `<img>` com a URL absoluta do GitHub, `width="160"`, `height="58"` (proporção do arquivo de 480 × 174), `alt="DoaFácil"` e `display:block; border:0`. O texto alternativo vai em verde e negrito, para quando o leitor bloqueia imagens.
+6. **Logotipo por URL absoluta.** O `<img>` usa `src="https://raw.githubusercontent.com/solucaothn/solucao-thn/main/assets/email/logo-email.png"`, `width="160"`, `height="58"`, `alt="DoaFácil"` e `display:block; border:0`. O arquivo tem 320 × 116, o dobro de 160 × 58, para ficar nítido em telas de alta densidade. O texto alternativo vai em verde e negrito, para quando o leitor bloqueia imagens. O payload não leva anexos. Alternativas descartadas:
+   - logotipo embutido por `cid:` (anexo inline): foi testado e voltou atrás, porque no Gmail aparecia quebrado na primeira visualização e ainda aparecia como anexo no fim da mensagem;
+   - `data:` URI no `src`: o Gmail e o Outlook não mostram.
 
-7. **Prévias geradas a partir dos `.xs`.** O script `scripts/gerar_previas_emails.py` lê a lista do HTML no `.xs`, troca as partes do código por um exemplo (“482913”) e grava `docs/emails/confirmacao-cadastro.html` e `docs/emails/redefinicao-senha.html`. Um teste confere que as prévias estão iguais ao que o script gera. Assim, a prévia não fica diferente do e-mail real.
+7. **Prévias geradas a partir dos `.xs`.** O script `scripts/gerar_previas_emails.py` lê o HTML do `.xs`, troca as partes do código por um exemplo (“482913”) e a URL do logotipo pelo arquivo local (para mostrar a versão atual, mesmo antes de ela chegar à `main`) e grava `docs/emails/confirmacao-cadastro.html` e `docs/emails/redefinicao-senha.html`. Um teste confere que as prévias estão iguais ao que o script gera. Assim, a prévia não fica diferente do e-mail real.
 
 ## Riscos / Compromissos
 
-- [O logotipo ainda não está na `main`] → A imagem não aparece até `assets/email/logo-email.png` ir para a `main`. O texto alternativo “DoaFácil” cobre esse caso. O envio é do Higor.
+- [A `main` ainda tem o logotipo antigo (480 × 174)] → Até a versão nova chegar à `main`, o e-mail mostra a antiga, reduzida para 160 × 58 (mesma proporção). O envio é do Higor.
+- [O leitor bloqueia imagens externas até a pessoa liberar] → O texto alternativo “DoaFácil”, em verde e negrito, ocupa o lugar do logotipo.
+- [O Gmail corta mensagens grandes (“[Mensagem cortada]”)] → O HTML tem cerca de 3,5 KB, e um teste garante que ele fica abaixo de 20 KB. O corte visto no Gmail não vem do tamanho do HTML.
 - [O modo escuro do Gmail e do Outlook pode inverter as cores] → As cores têm contraste suficiente nos dois sentidos. Um tema escuro próprio fica de fora.
 - [O texto pode sair diferente do HTML] → Um teste confere que os textos do modelo estão nas duas versões das duas funções.
 
