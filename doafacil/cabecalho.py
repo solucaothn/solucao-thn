@@ -162,11 +162,18 @@ def back_link(label: str = "Voltar ao início", href: str = "/", class_name: str
 LOGO_WIDTH = rx.breakpoints(initial="100px", md="190px")
 
 
+HEADER_BUTTON_HEIGHT = "44px"
+HEADER_BUTTON_RADIUS = "6px"
+
+
 def account_control(touch: bool = False) -> rx.Component:
-    """O menu da conta, com sessão, ou “Entrar”, sem sessão. Com `touch`
-    (barra do celular), “Entrar” ganha 44 px de altura; no desktop fica como
-    sempre foi."""
-    touch_props = {"min_height": "44px"} if touch else {}
+    """O menu da conta, com sessão, ou “Entrar”, sem sessão.
+
+    “Entrar” tem a altura e os cantos do “Quero Doar” (44 px e 6 px) no
+    computador e no celular (change acabamento-visual). `touch` ficou sem
+    efeito; continua na assinatura para não mudar quem chama.
+    """
+    del touch
     return rx.cond(
         LoginState.auth_token,
         account_menu(),
@@ -177,7 +184,8 @@ def account_control(touch: bool = False) -> rx.Component:
             border_color=GREEN,
             size="2",
             on_click=rx.redirect(LoginState.login_href),
-            **touch_props,
+            min_height=HEADER_BUTTON_HEIGHT,
+            border_radius=HEADER_BUTTON_RADIUS,
         ),
     )
 
@@ -189,13 +197,13 @@ def donate_link() -> rx.Component:
         background=GREEN,
         color="white",
         padding="8px 16px",
-        border_radius="6px",
+        border_radius=HEADER_BUTTON_RADIUS,
         font_size="14px",
         font_weight="500",
         white_space="nowrap",
         display="inline-flex",
         align_items="center",
-        min_height="44px",
+        min_height=HEADER_BUTTON_HEIGHT,
         _hover={"background": "#126f3b"},
         _focus_visible=FOCUS_RING,
     )

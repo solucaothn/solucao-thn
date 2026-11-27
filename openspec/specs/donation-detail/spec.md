@@ -55,7 +55,7 @@ A página de detalhe MUST apresentar os dados existentes e aprovados da doação
 - **WHEN** uma pessoa abre uma doação disponível
 - **THEN** a página MUST apresentar a galeria, o título, a condição com o rótulo “Condição”, a descrição, o nome da categoria, a cidade/UF, a modalidade de entrega, a preferência de contato como texto e o cartão de quem doa com a foto de perfil de quem doa, redonda, com `object-fit: cover` e texto alternativo com o primeiro nome, ou, sem foto, um círculo com a inicial do primeiro nome, o primeiro nome e cidade/UF
 - **AND** o cartão de quem doa MUST mostrar, na seção “Doações”, “Doações” com o contador de ativas e “Doações realizadas” com o contador de concluídas, no singular quando o número é 1 (“Doação” e “Doação realizada”), como no perfil público e em Minhas doações, e, na seção “Informações verificadas”, “E-mail” somente quando o e-mail de quem doa está verificado, sem outros dados de quem doa
-- **AND** MUST apresentar no topo do cartão os botões “Outros meios de comunicação” e “Chat” em conformidade com o layout aprovado no Figma
+- **AND** MUST apresentar no topo do cartão de resumo os botões “Outros contatos” e “Chat”
 - **AND** o acesso ao perfil de quem doa MUST ser feito somente pelo botão “Ver perfil de quem doa” do cartão “Quem doa”, sem outros botões de perfil
 
 #### Scenario: Não apresentar dados ou recursos indisponíveis
@@ -122,8 +122,16 @@ A página de detalhe MUST apresentar os dados existentes e aprovados da doação
 
 #### Scenario: Título e descrição abaixo da galeria
 - **WHEN** a página exibe uma doação
-- **THEN** o título da doação MUST aparecer em destaque logo abaixo da galeria, seguido da descrição
+- **THEN** logo abaixo da galeria MUST aparecer o subtítulo “Descrição”, no mesmo estilo dos subtítulos “Detalhes” e “Localização”, seguido da descrição
+- **AND** o título da doação MUST aparecer só no cartão de resumo, como título principal da página, e MUST NOT se repetir acima da descrição
 - **AND** a descrição MUST preservar as quebras de linha e ser apresentada como texto simples
+
+#### Scenario: Cartão de resumo
+- **WHEN** a página exibe o cartão de resumo, em qualquer largura
+- **THEN** o título da doação MUST usar peso semibold, cerca de 28 px no celular e 30 px no computador, altura de linha de cerca de 1,25 e no máximo 3 linhas, terminando em reticências quando passar
+- **AND** o cartão MUST ter cerca de 28 px de respiro interno, cerca de 8 px entre o título e “Condição”, cerca de 24 px entre “Condição” e os botões e cerca de 12 px entre os dois botões
+- **AND** “Outros contatos” e “Chat” MUST ter a mesma altura, de cerca de 48 px, com o texto numa linha só
+- **AND** nenhum texto ou botão do cartão MUST encostar em outro ou na borda
 
 #### Scenario: Seção Detalhes em grade
 - **WHEN** a página exibe uma doação
@@ -138,12 +146,12 @@ A página de detalhe MUST apresentar os dados existentes e aprovados da doação
 
 #### Scenario: Layout em tela estreita
 - **WHEN** a página é exibida numa largura de 360 px
-- **THEN** a galeria, o resumo, o título com a descrição, os detalhes, a localização e o cartão de quem doa MUST aparecer em uma coluna, sem rolagem horizontal
+- **THEN** a galeria, o resumo, a descrição, os detalhes, a localização e o cartão de quem doa MUST aparecer em uma coluna, sem rolagem horizontal
 - **AND** a grade “Detalhes” MUST se reorganizar em menos colunas sem cortar textos
 
 #### Scenario: Contraste dos textos e botões
 - **WHEN** a página apresenta textos, rótulos e botões
-- **THEN** todos MUST ter contraste mínimo AA sobre o fundo em que aparecem, incluindo o texto branco do botão “Outros meios de comunicação”
+- **THEN** todos MUST ter contraste mínimo AA sobre o fundo em que aparecem, incluindo o texto branco do botão “Outros contatos”
 
 ### Requirement: Estados e navegação do detalhe
 A página MUST carregar o detalhe pela rota `/doacao/<id>`, validar o identificador antes da consulta e apresentar estados compreensíveis de carregamento e erro, respeitando movimento reduzido.
@@ -176,25 +184,25 @@ A página MUST carregar o detalhe pela rota `/doacao/<id>`, validar o identifica
 O sistema MUST permitir iniciar contato com quem doa somente de acordo com a preferência de contato e a autenticação da pessoa interessada, sem expor o e-mail na página. O botão “Chat” MUST iniciar ou reabrir a conversa pelo endpoint do chat e levar a pessoa a `/chat`, sem revelar por que uma doação não aceita conversa.
 
 #### Scenario: Pessoa sem login solicita outros meios de comunicação
-- **WHEN** uma pessoa sem sessão válida clica em “Outros meios de comunicação”
+- **WHEN** uma pessoa sem sessão válida clica em “Outros contatos”
 - **THEN** o sistema MUST redirecionar para `/login`
 - **AND** MUST NOT chamar o endpoint autenticado de e-mail
 
 #### Scenario: Pessoa logada solicita contato por e-mail
-- **WHEN** uma pessoa autenticada clica em “Outros meios de comunicação” em uma doação disponível cuja preferência é “E-mail” e que pertence a outra pessoa
+- **WHEN** uma pessoa autenticada clica em “Outros contatos” em uma doação disponível cuja preferência é “E-mail” e que pertence a outra pessoa
 - **THEN** o sistema MUST chamar o endpoint autenticado de e-mail com o token da sessão
 - **AND** MUST abrir `mailto:` com o e-mail codificado e um assunto simples que inclua o título da doação
 - **AND** MUST remover o e-mail do estado após iniciar o redirecionamento
 
 #### Scenario: Pessoa dona da doação solicita outros meios de comunicação
-- **WHEN** a pessoa autenticada que cadastrou a doação clica em “Outros meios de comunicação” na própria doação
+- **WHEN** a pessoa autenticada que cadastrou a doação clica em “Outros contatos” na própria doação
 - **THEN** o frontend MUST chamar o endpoint autenticado de e-mail, pois a resposta pública do detalhe não contém `owner_id`
 - **AND** quando o backend confirmar que a doação existe, está disponível e pertence à pessoa autenticada, MUST responder com HTTP 403 e uma mensagem própria, sem devolver o e-mail
 - **AND** o frontend MUST traduzir essa resposta para “Esta é a sua doação.”
 - **AND** o frontend MUST NOT receber nem guardar `owner_id`
 
 #### Scenario: Preferência de contato por chat
-- **WHEN** uma pessoa autenticada clica em “Outros meios de comunicação” em uma doação cuja preferência é “Chat do DoaFácil”
+- **WHEN** uma pessoa autenticada clica em “Outros contatos” em uma doação cuja preferência é “Chat do DoaFácil”
 - **THEN** a página MUST mostrar “Quem doa prefere contato pelo chat.”
 - **AND** MUST NOT chamar o endpoint autenticado de e-mail
 

@@ -221,6 +221,7 @@ A entrada no chat da home MUST ser um botão flutuante “Mensagens” no canto 
 - **WHEN** o botão flutuante aparece
 - **THEN** ele MUST ser um círculo verde `#007A42` de cerca de 56 px, com o ícone de mensagem branco e sombra leve
 - **AND** MUST ficar fixo a 24 px das bordas inferior e direita no computador, e a 16 px no celular
+- **AND** o espaço livre no fim das páginas com o botão MUST ser de 104 px no computador e 88 px no celular (o botão mais as duas margens)
 
 #### Scenario: Páginas sem o botão
 - **WHEN** a pessoa está no detalhe da doação (`/doacao/<id>`), que já tem o botão “Chat” da própria doação, ou em `/chat`, `/login`, `/cadastro`, `/verificar-email`, `/recuperar-senha`, `/nova-senha`, `/cadastro-doacao`, `/minhas-doacoes` ou `/minhas-doacoes/<id>/editar`

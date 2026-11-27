@@ -407,7 +407,13 @@ class PrivacyTableContrastTests(unittest.TestCase):
         header = f'["color"] : "{inst.TEXT_DARK}", ["fontWeight"] : "700", ["background"] : "{inst.TABLE_HEADER_BACKGROUND}"'
         self.assertEqual(r.count(header), 4)  # as 4 colunas
         self.assertEqual(r.count(f'RadixThemesTable.Cell,{{css:({{ ["color"] : "{inst.TEXT_BODY}" }})'), 3 * len(PRIVACY_DATA_ROWS))
-        self.assertEqual(r.count(f'["color"] : "{inst.TEXT_DARK}", ["fontWeight"] : "700" }})'), len(PRIVACY_DATA_ROWS))
+        # Cabeçalho da linha sem quebrar palavras no meio (change acabamento-visual).
+        # (minWidth é propriedade da célula do Radix, não CSS.)
+        row_header = (
+            f'["color"] : "{inst.TEXT_DARK}", ["fontWeight"] : "700", ["overflowWrap"] : "normal", '
+            f'["wordBreak"] : "normal" }}),minWidth:"{inst.PRIVACY_ROW_HEADER_MIN_WIDTH}",scope:"row"'
+        )
+        self.assertEqual(r.count(row_header), len(PRIVACY_DATA_ROWS))
         self.assertIn(f'["--gray-12"] : "{inst.TEXT_BODY}"', r)
         self.assertIn('["background"] : "white"', r)
 

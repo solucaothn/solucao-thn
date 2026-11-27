@@ -11,7 +11,7 @@ A home SHALL apresentar o cabeçalho, a frase de destaque, as estatísticas “D
 
 #### Scenario: Abrir a home sem autenticação
 - **WHEN** uma pessoa acessa a página inicial sem sessão
-- **THEN** a página apresenta o logotipo, os links Explorar Doações, Como funciona e Categorias, os botões Entrar e Quero Doar, a frase de destaque, as duas estatísticas e a seção de doações recentes
+- **THEN** a página apresenta o logotipo, os links Explorar Doações, Como funciona e Categorias, os botões Entrar e Quero Doar, a frase de destaque, as estatísticas (“Pessoas alcançadas” só quando maior que zero) e a seção de doações recentes
 - **AND** apresenta a ilustração aprovada ocupando toda a largura no rodapé da página, mantendo sua proporção
 
 #### Scenario: Links do menu do cabeçalho
@@ -109,7 +109,13 @@ A home SHALL apresentar, abaixo de “Doações em circulação!”, a estatíst
 
 #### Scenario: Quantidade retornada pelo backend
 - **WHEN** o serviço de contagem retorna a quantidade de doações concluídas
-- **THEN** a home exibe esse valor junto ao rótulo “Pessoas alcançadas”
+- **THEN** a home exibe esse valor junto ao rótulo “Pessoas alcançadas” quando ele é maior que zero
+
+#### Scenario: Nenhuma doação concluída
+- **WHEN** o serviço de contagem retorna zero doações concluídas
+- **THEN** a home MUST NOT mostrar a estatística “Pessoas alcançadas” enquanto o número for 0
+- **AND** “Doações em circulação!” MUST continuar aparecendo
+- **AND** durante o carregamento e em caso de falha, a estatística MUST continuar mostrando “Carregando...” ou a mensagem de erro
 
 #### Scenario: Falha ou valor inválido
 - **WHEN** o serviço de contagem falha ou não traz uma quantidade válida de doações concluídas

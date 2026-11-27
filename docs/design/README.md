@@ -73,7 +73,7 @@ Referência atual da home: o frame `655:2691` (“Frame 18”, 1512 × 2946) do 
 
 - **Cabeçalho:** “Explorar Doações” (`/explorar`) e “Como funciona” (`/#como-funciona`, a seção institucional da home) são links; “Categorias” abre a gaveta de categorias (veja “18-categorias”, abaixo). Com sessão, o **menu da conta** (círculo com a inicial, primeiro nome e seta) reúne “Minhas doações”, “Editar perfil” e “Sair”; abaixo de 768 px fica só a inicial. Sem sessão, **Entrar**. **Quero Doar** sempre.
 - **Título:** como no nó `615:2345` do Figma: LINE Seed JP Bold 36 px, altura de linha normal, `#2A2A2A`, centralizado, 1376 px de largura em 1512 px, quebrando em “…recomeço para” / “alguém.”. Em telas menores, a fonte diminui com a largura (`clamp(1.5rem, 2.4vw, 2.25rem)`).
-- **Números:** “Doações em circulação!” (doações disponíveis) e “Pessoas alcançadas” (doações concluídas), ambos vindos de `catalog/donations/count`. Número em Bold 24 px e rótulo em Regular 16 px, em `#005723` (8,9:1 sobre o creme), centralizados na altura dos cartões das recentes.
+- **Números:** “Doações em circulação!” (doações disponíveis) e “Pessoas alcançadas” (doações concluídas), ambos vindos de `catalog/donations/count`. Número em Bold 24 px e rótulo em Regular 16 px, em `#005723` (8,9:1 sobre o creme), centralizados na altura dos cartões das recentes. “Pessoas alcançadas” não aparece enquanto o número carregado for 0 (aparece carregando, com erro e a partir de 1; change acabamento-visual).
 - **Cartões das recentes:** quadrados entre 220 e 260 px de lado, dividindo a largura do carrossel entre os 4. A linha dos números e do carrossel usa as mesmas bordas do conteúdo do cabeçalho (até 1200 px, com margens de 16 e 24 px), e a coluna dos números tem 11rem. Assim, os 4 cartões cabem em 1512 px; quando não cabem, o carrossel rola dentro dele.
 - **“Doações mais recentes:”** com o link **“Ver mais...”** (`/explorar`) à direita.
 - **“Comece por aqui”:** “Para você” leva a `/explorar` e “Ajude quem precisa” a `/cadastro-doacao`; “Desapego em grupo” segue **Em breve**. A busca funciona: categorias do Xano, as 27 UFs e “Buscar” abrindo `/explorar?q=…&categoria=…&uf=…`.
@@ -296,7 +296,7 @@ A referência serve apenas para inspiração estrutural, sem copiar marca ou inc
 ### 04-login.png — Login
 
 - Cabeçalho branco com o logotipo colorido centralizado; fundo creme na página.
-- Cartão branco centralizado com o título "Bem-vindo" e o subtítulo "Entre com seu e-mail e senha".
+- Cartão branco centralizado com o título "Boas-vindas" e o subtítulo "Entre com seu e-mail e senha".
 - Campo "E-mail" com o texto interno "Insira seu e-mail" e campo "Senha" com o texto interno "Insira sua senha".
 - O campo Senha tem um botão de olho para mostrar ou ocultar a senha, acréscimo que não está no PNG do Figma.
 - O cartão tem uma animação suave de entrada, acréscimo que não está no PNG do Figma.
@@ -430,9 +430,11 @@ O que segue o Figma:
 - **Galeria no celular:** a capa em cima (300 px de altura) e as demais numa fileira de até 4 miniaturas quadradas, do mesmo tamanho, com 8 px entre elas e sem rolagem horizontal.
 - **Cartão de resumo, à direita da galeria:**
   - branco, com borda `#D9D9D9`, cantos de 8 px e sombra `0 8px 13px rgba(0,0,0,0.15)`;
-  - o título grande (2,4 rem) e “Condição: …”;
-  - o botão em pílula “Outros meios de comunicação” e o botão “Chat” branco com borda `#85858D`.
-- **Título e descrição logo abaixo da galeria:** o título em negrito, em caixa alta e preto; a descrição em texto corrido, mantendo as quebras de linha. O título aparece nos dois lugares, como no Figma.
+  - 28 px de respiro interno;
+  - o título da doação (o `h1` da página) em semibold, 1,875 rem no computador e 1,75 rem no celular, com altura de linha 1,25 e no máximo 3 linhas, com reticências quando passa;
+  - “Condição: …” 8 px abaixo do título;
+  - 24 px abaixo, o botão em pílula “Outros contatos” e o botão “Chat” branco com borda `#85858D`, os dois com 48 px de altura, texto numa linha e 12 px entre eles.
+- **“Descrição” logo abaixo da galeria:** o subtítulo “Descrição”, no mesmo estilo de “Detalhes” e “Localização”, e a descrição em texto corrido, mantendo as quebras de linha. O título da doação aparece só no cartão de resumo.
 - **“Detalhes”:** uma grade em que cada item tem o ícone verde do Figma (`assets/detalhe-atributo.svg`), um rótulo pequeno e o valor logo abaixo. Os itens são Categoria, Condição, Forma de entrega e Preferência de contato. A grade tem 4 colunas em telas largas, 2 em médias e 1 no celular.
 - **“Localização”:** a ilustração de edifícios do Figma (`assets/detalhe-localizacao.svg`, 56 px) e “Cidade, UF”.
 - **“Quem doa”:** à direita, abaixo do resumo, branco, com borda `#D9D9D9` e seções separadas por linhas de 1 px `#D9D9D9` (change quem-doa-completo):
@@ -442,7 +444,7 @@ O que segue o Figma:
   - seção “Informações verificadas”: “E-mail” com o check verde `#166B3B`, só quando o e-mail de quem doa está verificado; sem verificação, a seção e a linha acima dela não aparecem. O e-mail nunca aparece;
   - o “desde” vem do perfil público (`catalog/donations/donor`, página 1, no cache público de 60 s), carregado depois do detalhe. Se esse pedido falhar, a linha some e o resto do cartão aparece normalmente;
   - os ícones são decorativos. Não há presença online, estrelas, doações canceladas nem CPF.
-- **No celular:** uma coluna, na ordem galeria → resumo → título e descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
+- **No celular:** uma coluna, na ordem galeria → resumo → Descrição → Detalhes → Localização → Quem doa, com 16 px de margem e sem rolagem horizontal.
 
 Diferenças aprovadas em relação ao Figma:
 
@@ -451,7 +453,7 @@ Diferenças aprovadas em relação ao Figma:
 - **Rótulos da grade com 0,75 rem** (12 px), e não 10 px, para ficarem legíveis. O texto usa `#2A2A2A` e `#555555`, e o cartão de quem doa `#001C3C`, todos com contraste AA.
 - **Fundo creme `#FFF6E8`**, como no resto do site, no lugar do `#FFF9ED`.
 - **“Condição”** no lugar do “Estado” do Figma, como pede a spec.
-- **Caixa alta do título só no visual** (`text-transform: uppercase`); o texto lido continua o original.
+- **Título só no cartão de resumo:** o Figma repete o título em caixa alta acima da descrição; aqui, esse lugar tem o subtítulo “Descrição”, e o botão “Outros meios de comunicação” do Figma se chama “Outros contatos”, para caber numa linha.
 - **“Localização” num cartão branco** com borda, no lugar das divisórias do Figma, e com uma só linha: “Cidade, UF”.
 - **Sem “NOVO” e sem status:** o detalhe não recebe a data de criação e só mostra doações disponíveis (decisão do grupo).
 - **Ícones decorativos:** os dois SVGs do Figma têm `alt=""` e `aria-hidden`.
@@ -472,7 +474,7 @@ Diferenças aprovadas em relação ao Figma:
 
 ### Elementos fora do escopo desta versão
 
-Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações e presença online dependem de dados ou funcionalidades que ainda não existem. O único indicador de verificação é o “E-mail” da seção “Informações verificadas” do cartão “Quem doa”. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros meios de comunicação", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo botão “Ver perfil de quem doa” do cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
+Cor, Material e Tipo, que aparecem no Figma, não existem no cadastro e não são criados. Bairro, zona, CEP e dados além do primeiro nome do doador são omitidos para preservar a privacidade: a localização pública é só cidade e UF. Avaliações e presença online dependem de dados ou funcionalidades que ainda não existem. O único indicador de verificação é o “E-mail” da seção “Informações verificadas” do cartão “Quem doa”. As outras doações de quem doa aparecem só no perfil público, não no detalhe. O cartão do topo mostra "Outros contatos", que abre o e-mail de quem doa só para quem está logado e só quando a preferência é E-mail, e "Chat", que inicia ou reabre a conversa e abre `/chat` (veja a seção “Chat”). O perfil público é aberto só pelo botão “Ver perfil de quem doa” do cartão “Quem doa”; o botão “Acessar perfil do doador” do Figma não é usado.
 
 ## Perfil público de quem doa
 
@@ -741,7 +743,7 @@ Diferenças aprovadas em relação ao Figma:
   - Acima de 99, mostra “99+”. Com zero não aparece, e a conversa aberta nunca mostra contador.
   - O rótulo acessível diz o número real (“1 mensagem não lida”, “150 mensagens não lidas”).
 - **Botão flutuante “Mensagens”** (como no Figma da home), no lugar do antigo link “Mensagens” do cabeçalho, que saiu:
-  - **Aparência:** círculo `#007A42` de 56 px com o ícone `message-circle` branco e sombra leve, fixo no canto inferior direito, a 24 px das bordas no computador e a 16 px no celular.
+  - **Aparência:** círculo `#007A42` de 56 px com o ícone `message-circle` branco e sombra leve, fixo no canto inferior direito, a 24 px das bordas no computador e a 16 px no celular. (A change acabamento-visual chegou a subir o botão acima do selo “Built with Reflex”, mas isso foi revertido: o selo só aparece com `--env prod`, e o projeto roda em modo dev.)
   - **Contador:** círculo vermelho `#C62828` com número branco (5,6:1, AA) e borda branca, no canto superior direito do botão. Mostra “99+” acima de 99 e não aparece com zero, sem login ou se a consulta falhar. Usa a mesma consulta única de não lidas por carregamento, sem atualização automática.
   - **Rótulo e destino:** com login, “Mensagens” ou “Mensagens, N não lidas”, e abre `/chat`. Sem login, “Mensagens”, vai para `/login` e não consulta o Xano. O contador fica oculto do leitor de tela, porque o total já está no rótulo.
   - **Onde aparece:** só na home, por enquanto. É o componente `chat_fab()`, para reutilizar nas próximas telas que forem pedidas.

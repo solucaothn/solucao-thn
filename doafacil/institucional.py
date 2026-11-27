@@ -545,6 +545,7 @@ def _photo(
 # escuro do sistema (era isso que deixava o item aberto preto).
 ACCORDION_OPEN_BACKGROUND = "#FFFAF1"
 ACCORDION_HOVER_BACKGROUND = "#F7F3EA"
+ACCORDION_QUESTION_LINE_HEIGHT = "1.35"
 _TRIGGER_COLORS = {"color": TEXT_BODY, "background": "transparent"}
 ACCORDION_STYLE = {
     "--accent-4": ACCORDION_HOVER_BACKGROUND,
@@ -579,6 +580,8 @@ ACCORDION_STYLE = {
         "fontFamily": "inherit",
         "fontWeight": "700",
         "fontSize": "1rem",
+        # O botão herdava altura de linha 1 (perguntas de 2 linhas coladas).
+        "lineHeight": ACCORDION_QUESTION_LINE_HEIGHT,
         "cursor": "pointer",
     },
     "& .AccordionTrigger:focus-visible": {"outline": f"2px solid {GREEN}", "outlineOffset": "-2px"},
@@ -1228,6 +1231,9 @@ def terms_page() -> rx.Component:
     )
 
 
+PRIVACY_ROW_HEADER_MIN_WIDTH = "120px"
+
+
 def _privacy_table() -> rx.Component:
     """Tabela dos dados tratados (Figma 398:1697), com os dados reais. Em telas
     estreitas, rola dentro do contêiner, nunca a página."""
@@ -1244,7 +1250,18 @@ def _privacy_table() -> rx.Component:
             rx.table.body(
                 *[
                     rx.table.row(
-                        rx.table.row_header_cell(row[0], scope="row", color=TEXT_DARK, font_weight="700"),
+                        # O <main> institucional quebra palavras em qualquer
+                        # ponto (overflow-wrap: anywhere); aqui não, para não
+                        # partir “Mensagens” e “Registros” no celular.
+                        rx.table.row_header_cell(
+                            row[0],
+                            scope="row",
+                            color=TEXT_DARK,
+                            font_weight="700",
+                            overflow_wrap="normal",
+                            word_break="normal",
+                            min_width=PRIVACY_ROW_HEADER_MIN_WIDTH,
+                        ),
                         *[rx.table.cell(value, **body_cell) for value in row[1:]],
                     )
                     for row in PRIVACY_DATA_ROWS

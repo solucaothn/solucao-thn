@@ -928,37 +928,56 @@ def _gallery() -> rx.Component:
     )
 
 
+SUMMARY_CARD_PADDING = "28px"
+SUMMARY_TITLE_MAX_LINES = 3
+# Os dois botões do cartão têm a mesma altura e o texto numa linha só.
+SUMMARY_BUTTON_HEIGHT = "48px"
+DONOR_CONTACT_BUTTON_LABEL = "Outros contatos"
+
+
 def _summary_card() -> rx.Component:
-    """Cartão de resumo à direita: título, condição e contato (Figma)."""
+    """Cartão de resumo à direita: título, condição e contato (Figma).
+
+    Ritmo: 8 px entre o título e a condição, 24 px até os botões e 12 px
+    entre eles. Títulos longos param em 3 linhas, com reticências.
+    """
     return rx.vstack(
         rx.heading(
             DonationDetailState.title,
             as_="h1",
-            font_size=rx.breakpoints(initial="1.8rem", md="2.4rem"),
-            font_weight="500",
+            class_name="detail-summary-title",
+            font_size=rx.breakpoints(initial="1.75rem", md="1.875rem"),
+            font_weight="600",
             color=TEXT_STRONG,
-            line_height="1.2",
+            line_height="1.25",
             overflow_wrap="anywhere",
+            style={
+                "display": "-webkit-box",
+                "WebkitLineClamp": str(SUMMARY_TITLE_MAX_LINES),
+                "WebkitBoxOrient": "vertical",
+                "overflow": "hidden",
+            },
         ),
         rx.text(
             "Condição: ",
             DonationDetailState.condition,
             color=TEXT_STRONG,
             font_size="0.95rem",
+            margin_top="8px",
         ),
         rx.vstack(
             rx.button(
-                "Outros meios de comunicação",
+                DONOR_CONTACT_BUTTON_LABEL,
                 on_click=DonationDetailState.request_donor_contact,
                 class_name="detail-primary-button",
                 width="100%",
-                min_height="56px",
+                height=SUMMARY_BUTTON_HEIGHT,
                 background=PRIMARY_GREEN,
                 color="white",
                 font_weight="700",
                 font_size="1rem",
                 border_radius="999px",
-                white_space="normal",
+                white_space="nowrap",
                 _hover={"background": PRIMARY_GREEN_HOVER},
             ),
             rx.button(
@@ -972,7 +991,8 @@ def _summary_card() -> rx.Component:
                 disabled=DonationDetailState.is_starting_chat,
                 loading=DonationDetailState.is_starting_chat,
                 width="100%",
-                min_height="52px",
+                height=SUMMARY_BUTTON_HEIGHT,
+                white_space="nowrap",
                 background="white",
                 color=TEXT_STRONG,
                 font_weight="500",
@@ -997,15 +1017,15 @@ def _summary_card() -> rx.Component:
                 rx.fragment(),
             ),
             align="stretch",
-            spacing="4",
+            spacing="3",
             width="100%",
-            padding_top="24px",
+            margin_top="24px",
         ),
         class_name="detail-summary-card",
         align="stretch",
-        spacing="2",
+        spacing="0",
         width="100%",
-        padding="40px 20px 32px",
+        padding=SUMMARY_CARD_PADDING,
         background="white",
         border=f"1px solid {BORDER_SOFT}",
         border_radius="8px",
@@ -1013,20 +1033,28 @@ def _summary_card() -> rx.Component:
     )
 
 
+DESCRIPTION_HEADING = "Descrição"
+
+
+def _section_heading(text: str) -> rx.Component:
+    """Subtítulo das seções da coluna esquerda (Descrição, Detalhes, Localização)."""
+    return rx.heading(
+        text,
+        as_="h2",
+        font_size="1.5rem",
+        font_weight="500",
+        color=TEXT_STRONG,
+        class_name="page-fade-enter",
+    )
+
+
 def _title_and_description() -> rx.Component:
-    """Título (caixa alta só no visual) e descrição logo abaixo da galeria."""
+    """Seção “Descrição” logo abaixo da galeria.
+
+    O título da doação aparece só no cartão da direita (o h1 da página).
+    """
     return rx.vstack(
-        rx.heading(
-            DonationDetailState.title,
-            as_="h2",
-            class_name="detail-title",
-            font_size="1.5rem",
-            font_weight="700",
-            color="#000000",
-            text_transform="uppercase",
-            line_height="1.25",
-            overflow_wrap="anywhere",
-        ),
+        _section_heading(DESCRIPTION_HEADING),
         rx.text(
             DonationDetailState.description,
             class_name="detail-description",
@@ -1087,14 +1115,7 @@ def _detail_item(label: str, value: rx.Var) -> rx.Component:
 
 def _details_section() -> rx.Component:
     return rx.vstack(
-        rx.heading(
-            "Detalhes",
-            as_="h2",
-            font_size="1.5rem",
-            font_weight="500",
-            color=TEXT_STRONG,
-            class_name="page-fade-enter",
-        ),
+        _section_heading("Detalhes"),
         rx.box(
             _detail_item("Categoria", DonationDetailState.category),
             _detail_item("Condição", DonationDetailState.condition),
@@ -1124,14 +1145,7 @@ def _details_section() -> rx.Component:
 def _location_card() -> rx.Component:
     """Só “Cidade, UF”: bairro, zona e CEP não aparecem (privacidade)."""
     return rx.vstack(
-        rx.heading(
-            "Localização",
-            as_="h2",
-            font_size="1.5rem",
-            font_weight="500",
-            color=TEXT_STRONG,
-            class_name="page-fade-enter",
-        ),
+        _section_heading("Localização"),
         rx.hstack(
             _decorative_icon(LOCATION_ICON, "56px"),
             rx.text(

@@ -101,3 +101,10 @@ As páginas `/explorar` e `/categorias` SHALL caber em 360 px sem rolagem horizo
 #### Scenario: Busca do cabeçalho a partir de 992 px
 - **WHEN** `/explorar` ou `/categorias` é exibida com 992 px de largura ou mais
 - **THEN** a busca MUST ficar na mesma linha do logotipo e dos controles da conta, com no máximo 620 px de largura
+
+### Requirement: Título de Explorar em destaque
+O título da página `/explorar` (“Adicionadas recentemente” ou o título dos filtros) SHALL usar negrito, como os títulos de `/categorias` e da Central de ajuda.
+
+#### Scenario: Abrir Explorar
+- **WHEN** uma pessoa abre `/explorar`, com ou sem filtros
+- **THEN** o título da página MUST aparecer em negrito (peso 700)

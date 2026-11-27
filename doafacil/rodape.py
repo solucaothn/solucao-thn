@@ -38,6 +38,11 @@ FOOTER_LINK_GROUPS = (
     (("Dúvidas frequentes", INSTITUTIONAL_ROUTES["duvidas"]), ("Segurança e transparência", INSTITUTIONAL_ROUTES["seguranca"])),
 )
 FOOTER_FOCUS_RING = {"outline": "2px solid #2DBF72", "outlineOffset": "2px"}
+# Espaços do rodapé (change acabamento-visual): entre “Fale conosco” e “Links
+# rápidos”, entre as colunas de links e entre as linhas de links.
+FOOTER_BLOCK_GAP = "16px"
+FOOTER_LINK_COLUMN_GAP_PX = 12
+FOOTER_LINK_ROW_GAP = "6px"
 
 
 def contact_href() -> str:
@@ -98,17 +103,24 @@ def public_home_footer() -> rx.Component:
                                 align="start",
                                 spacing="0",
                                 style={
-                                    "rowGap": "6px",
+                                    "rowGap": FOOTER_LINK_ROW_GAP,
+                                    # As larguras descontam o espaço entre
+                                    # as colunas (2 por linha no celular, 4
+                                    # no computador).
                                     "width": rx.breakpoints(
-                                        initial="50%", md="25%"
-                                    )
+                                        initial=f"calc(50% - {FOOTER_LINK_COLUMN_GAP_PX / 2:g}px)",
+                                        md=f"calc(25% - {FOOTER_LINK_COLUMN_GAP_PX * 3 / 4:g}px)",
+                                    ),
                                 },
                             )
                             for group in FOOTER_LINK_GROUPS
                         ],
                         wrap="wrap",
                         align="start",
-                        gap="0",
+                        column_gap=f"{FOOTER_LINK_COLUMN_GAP_PX}px",
+                        # Mesmo espaço entre as linhas de grupos diferentes
+                        # e entre os links de um grupo.
+                        row_gap=FOOTER_LINK_ROW_GAP,
                         width="100%",
                     ),
                     align="start",
@@ -125,7 +137,9 @@ def public_home_footer() -> rx.Component:
                     )
                 },
                 align="start",
-                gap="4",
+                # Com unidade: “4” sem px ia cru para o CSS e era ignorado
+                # (no celular, “Links rápidos” encostava em “Fale conosco”).
+                gap=FOOTER_BLOCK_GAP,
                 width="100%",
             ),
             rx.text(

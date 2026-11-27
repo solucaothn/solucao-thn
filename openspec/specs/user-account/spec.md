@@ -84,7 +84,7 @@ A aplicação SHALL oferecer uma página pública de login responsiva, coerente 
 #### Scenario: Acessar a página de login
 - **WHEN** uma pessoa acessa `/login` ou aciona “Entrar” no cabeçalho da home
 - **THEN** a aplicação apresenta cabeçalho branco com logotipo colorido centralizado, fundo creme e cartão branco centralizado
-- **AND** o cartão apresenta “Bem-vindo”, “Entre com seu e-mail e senha”, os campos “E-mail” e “Senha”, o link “Esqueci minha senha” alinhado à direita abaixo da senha e o botão verde “Entrar”
+- **AND** o cartão apresenta “Boas-vindas”, “Entre com seu e-mail e senha”, os campos “E-mail” e “Senha”, o link “Esqueci minha senha” alinhado à direita abaixo da senha e o botão verde “Entrar”
 - **AND** a página apresenta abaixo do cartão o botão em forma de pílula “Criar conta”
 - **AND** não solicita CPF
 - **AND** “Esqueci minha senha” leva para `/recuperar-senha`, enquanto “Criar conta” leva para `/cadastro`
@@ -677,3 +677,10 @@ Ao acionar “Entrar” ou “Criar”, a interface MUST mostrar o botão como �
 #### Scenario: Dados recusados pela tela
 - **WHEN** faltam e-mail ou senha no login, ou os dados do cadastro não passam na conferência da tela
 - **THEN** a interface MUST mostrar a mensagem de erro sem mostrar o carregamento e sem chamar o backend
+
+### Requirement: Campos do cadastro com a mesma altura
+Na página `/cadastro`, o seletor “Estado” MUST ter a mesma altura dos outros campos do formulário, cerca de 48 px, em qualquer largura.
+
+#### Scenario: Ver o formulário de cadastro
+- **WHEN** uma pessoa abre `/cadastro` em 1280 ou 360 px
+- **THEN** o seletor “Estado” MUST ter a mesma altura dos campos Nome, E-mail, Cidade, Senha e Confirmar senha
