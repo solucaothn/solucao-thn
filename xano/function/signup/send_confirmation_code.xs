@@ -3,6 +3,7 @@ function "Signup/send_confirmation_code" {
     email recipient {
       sensitive = true
     }
+
     text code {
       sensitive = true
     }
@@ -10,7 +11,94 @@ function "Signup/send_confirmation_code" {
 
   stack {
     var $message {
-      value = "Seu código de confirmação de cadastro é " ~ $input.code ~ ". Ele é válido por 10 minutos."
+      value = """
+        Confirme seu e-mail
+
+        Use o código abaixo para confirmar seu endereço e ativar sua conta no DoaFácil.
+
+        Seu código: {{CODIGO}}
+
+        O código expira em 10 minutos.
+
+        Se você não criou uma conta no DoaFácil, pode ignorar este e-mail. Nada será feito com o seu endereço.
+
+        --
+        Você recebeu este e-mail porque alguém usou este endereço no DoaFácil.
+        Projeto acadêmico DoaFácil
+        """|replace:"{{CODIGO}}":$input.code
+    }
+
+    var $html_template {
+      value = """
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Confirme seu e-mail</title>
+        </head>
+        <body style="margin:0;padding:0;background-color:#FFF6E8;">
+        <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#FFF6E8;opacity:0;">O código expira em 10 minutos.</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFF6E8" style="width:100%;background-color:#FFF6E8;">
+        <tr>
+        <td align="center" style="padding:32px 16px 40px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
+        <tr>
+        <td align="center">
+        <table role="presentation" width="472" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:472px;">
+        <tr>
+        <td align="center" style="padding:0 0 40px 0;"><img src="https://raw.githubusercontent.com/solucaothn/solucao-thn/main/assets/email/logo-email.png" width="160" height="58" alt="DoaFácil" style="display:block;width:160px;max-width:160px;height:auto;border:0;outline:none;text-decoration:none;font-family:Helvetica, Arial, sans-serif;font-size:24px;font-weight:bold;color:#168447;"></td>
+        </tr>
+        <tr>
+        <td style="padding:0 0 16px 0;"><h1 style="margin:0;font-family:Helvetica, Arial, sans-serif;font-size:28px;line-height:34px;font-weight:bold;color:#0B5A2E;">Confirme seu e-mail</h1></td>
+        </tr>
+        <tr>
+        <td style="padding:0 0 24px 0;font-family:Helvetica, Arial, sans-serif;font-size:17px;line-height:26px;color:#222222;">Use o código abaixo para confirmar seu endereço e ativar sua conta no DoaFácil.</td>
+        </tr>
+        <tr>
+        <td style="padding:0 0 24px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F1F3F2" style="width:100%;background-color:#F1F3F2;border:1px solid #8E9490;border-radius:10px;">
+        <tr>
+        <td align="center" style="padding:28px 16px 32px 16px;font-family:Helvetica, Arial, sans-serif;">
+        <p style="margin:0 0 6px 0;font-family:Helvetica, Arial, sans-serif;font-size:14px;line-height:20px;color:#555555;">Seu código</p>
+        <p style="margin:0;padding-left:8px;font-family:Helvetica, Arial, sans-serif;font-size:44px;line-height:52px;font-weight:bold;color:#168447;letter-spacing:8px;white-space:nowrap;">{{CODIGO_INICIO}}<span style="letter-spacing:28px;">{{CODIGO_MEIO}}</span>{{CODIGO_FIM}}</p>
+        </td>
+        </tr>
+        </table>
+        </td>
+        </tr>
+        <tr>
+        <td align="center" style="padding:0 0 24px 0;font-family:Helvetica, Arial, sans-serif;font-size:15px;line-height:22px;color:#555555;">O código expira em 10 minutos.</td>
+        </tr>
+        <tr>
+        <td style="padding:0 0 24px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+        <td height="1" style="height:1px;line-height:1px;font-size:1px;background-color:#E2DCCF;">&nbsp;</td>
+        </tr>
+        </table>
+        </td>
+        </tr>
+        <tr>
+        <td style="padding:0 0 48px 0;font-family:Helvetica, Arial, sans-serif;font-size:15px;line-height:23px;color:#555555;">Se você não criou uma conta no DoaFácil, pode ignorar este e-mail. Nada será feito com o seu endereço.</td>
+        </tr>
+        <tr>
+        <td align="center" style="font-family:Helvetica, Arial, sans-serif;font-size:13px;line-height:20px;color:#6B6B6B;">Você recebeu este e-mail porque alguém usou este endereço no DoaFácil.<br>Projeto acadêmico DoaFácil</td>
+        </tr>
+        </table>
+        </td>
+        </tr>
+        </table>
+        </td>
+        </tr>
+        </table>
+        </body>
+        </html>
+        """
+    }
+
+    var $html {
+      value = $html_template|replace:"{{CODIGO_INICIO}}":($input.code|substr:0:2)|replace:"{{CODIGO_MEIO}}":($input.code|substr:2:1)|replace:"{{CODIGO_FIM}}":($input.code|substr:3:3)
     }
 
     var $payload {
@@ -21,11 +109,15 @@ function "Signup/send_confirmation_code" {
           }
         ]
         from            : {email: $env.SENDGRID_FROM_EMAIL}
-        subject         : "Confirmação de cadastro no DoaFácil"
+        subject         : "Confirme seu e-mail no DoaFácil"
         content         : [
           {
             type : "text/plain"
             value: $message
+          }
+          {
+            type : "text/html"
+            value: $html
           }
         ]
       }
