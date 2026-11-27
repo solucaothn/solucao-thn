@@ -6,7 +6,10 @@ Uso, na raiz do projeto, com o .venv ativo:
 
 Lê o HTML de cada função do Xano (o bloco ``\"\"\"`` de ``$html_template``),
 troca os marcadores pelo código de exemplo 482913, como a função faz com
-``|replace``, e grava o resultado em ``docs/emails/``. O ``.xs`` continua
+``|replace``, e grava o resultado em ``docs/emails/``. No e-mail, o logotipo
+vem da URL absoluta do GitHub (``main``); na prévia, ele aponta para o
+arquivo local ``assets/email/logo-email.png``, para mostrar o logotipo atual
+mesmo antes de ele chegar à ``main``. O ``.xs`` continua
 sendo a única fonte: depois de mudar o e-mail, rode o script de novo (um
 teste confere que as prévias estão atualizadas). Não chama o Xano nem o
 SendGrid.
@@ -21,6 +24,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_CODE = "482913"
+LOGO_URL = (
+    "https://raw.githubusercontent.com/solucaothn/solucao-thn/main/"
+    "assets/email/logo-email.png"
+)
+# Caminho do logotipo visto de docs/emails/.
+LOGO_PREVIEW_SRC = "../../assets/email/logo-email.png"
 
 # Função do Xano → prévia gerada.
 EMAILS = {
@@ -54,12 +63,19 @@ def render_text(source: str, code: str = SAMPLE_CODE) -> str:
     return template(source, "message").replace("{{CODIGO}}", code)
 
 
+def render_preview(source: str, code: str = SAMPLE_CODE) -> str:
+    """HTML da prévia: o do e-mail, com o logotipo apontando para o arquivo local."""
+    return render_html(source, code).replace(
+        f'src="{LOGO_URL}"', f'src="{LOGO_PREVIEW_SRC}"'
+    )
+
+
 def main() -> int:
     for xs, preview in EMAILS.items():
         source = (ROOT / xs).read_text(encoding="utf-8")
         target = ROOT / preview
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(render_html(source) + "\n", encoding="utf-8", newline="\n")
+        target.write_text(render_preview(source) + "\n", encoding="utf-8", newline="\n")
         print(f"{preview} gerado a partir de {xs}")
     return 0
 
