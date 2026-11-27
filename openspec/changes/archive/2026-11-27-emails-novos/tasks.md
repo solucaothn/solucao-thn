@@ -1,6 +1,6 @@
 # Tarefas
 
-Os comandos `git` e `xano` são do Higor. Nada aqui envia ao Xano nem ao SendGrid: a verificação é feita pelo validador do Xano Developer MCP, pelos testes e pelas prévias locais.
+Os comandos `git` e `xano` são do Higor. As tarefas 1 a 7 não enviam nada ao Xano nem ao SendGrid: a verificação é feita pelo validador do Xano Developer MCP, pelos testes e pelas prévias locais. O envio ao Xano e o teste real (tarefa 8) foram feitos pelo Higor.
 
 ## 1. E-mail de confirmação de cadastro
 
@@ -37,3 +37,9 @@ Os comandos `git` e `xano` são do Higor. Nada aqui envia ao Xano nem ao SendGri
 ## 7. Volta ao logotipo por URL
 
 - [x] 7.1 Nas duas funções, tirar `attachments` do payload e voltar o `src` do `<img>` para a URL absoluta do GitHub, mantendo `width="160"`, `height="58"` e `alt="DoaFácil"` (decisão 6). As prévias trocam a URL pelo arquivo local. Verificação: `xano_validate_xanoscript` sem erros, testes de `tests/test_emails_codigo.py` (sem anexos, HTML abaixo de 20 KB e logotipo de 320 × 116) e `openspec validate emails-novos --strict`.
+
+## 8. Teste real
+
+- [x] 8.1 Levar o logotipo novo (`assets/email/logo-email.png`, 320 × 116) para a `main` e enviar as duas funções ao Xano. Feito pelo Higor. Evidência: os e-mails reais de 27/11/2026 (tarefa 8.2) chegaram com o logotipo.
+- [x] 8.2 Pedir um código de cadastro e um de redefinição de senha e conferir os e-mails no Gmail. Evidência (27/11/2026, Higor): os dois e-mails chegaram com o logotipo, o layout e o código corretos, sem anexo. O primeiro caiu no Spam, porque o remetente é um endereço @gmail.com enviado pelo SendGrid. Trocar o remetente é assunto à parte, fora desta change.
+- [ ] 8.3 Conferir os dois e-mails no Outlook e no app de e-mail do celular. Ainda não feito: o teste real foi só no Gmail.
